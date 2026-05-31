@@ -1,0 +1,165 @@
+insert into public.products (nom_fr, nom_ar, reference, categorie, prix_achat, prix_vente, stock, stock_min) values
+
+-- ============================================================
+-- MAHLE / KNECHT
+-- ============================================================
+('Filtre huile Mahle — Renault/Dacia 1.5 dCi',      'فلتر زيت ماهله — رينو داسيا',       'OC315',      'filtre_huile',18,31,12,3),
+('Filtre huile Mahle — Peugeot/Citroën 1.6 HDi',    'فلتر زيت ماهله — بيجو سيتروين',     'OC977',      'filtre_huile',18,31,10,3),
+('Filtre huile Mahle — VW Golf/Polo 1.9 TDI',       'فلتر زيت ماهله — فولكسفاغن TDI',    'OC205D',     'filtre_huile',19,32,10,3),
+('Filtre huile Mahle — Ford Focus/Fiesta TDCi',     'فلتر زيت ماهله — فورد',              'OX173D',     'filtre_huile',17,29,8,3),
+('Filtre huile Mahle — Toyota Corolla/Yaris D4D',   'فلتر زيت ماهله — تويوتا',           'OC498',      'filtre_huile',18,31,8,3),
+('Filtre huile Mahle — BMW 316/318/320d',           'فلتر زيت ماهله — بي إم دبليو',      'OX339D',     'filtre_huile',22,38,6,3),
+('Filtre huile Mahle — Mercedes C/E 220 CDI',       'فلتر زيت ماهله — مرسيدس',           'OC256',      'filtre_huile',22,38,6,3),
+('Filtre huile Mahle — Hyundai/Kia 1.5/2.0 CRDi',  'فلتر زيت ماهله — هيونداي كيا',      'OC268',      'filtre_huile',17,29,8,3),
+('Filtre huile Mahle — Nissan Micra/Qashqai dCi',  'فلتر زيت ماهله — نيسان',            'OC988',      'filtre_huile',17,29,8,3),
+('Filtre huile Mahle — Opel Astra/Corsa CDTi',      'فلتر زيت ماهله — أوبل',             'OC315/2',    'filtre_huile',17,29,8,3),
+('Filtre huile Mahle — Fiat Punto 1.3 Multijet',    'فلتر زيت ماهله — فيات',             'OC315/3',    'filtre_huile',16,27,8,3),
+('Filtre air Mahle — Renault Clio/Symbol 1.4/1.6', 'فلتر هواء ماهله — رينو كليو',       'LX1919',     'filtre_air',13,22,12,3),
+('Filtre air Mahle — Dacia Logan/Sandero',          'فلتر هواء ماهله — داسيا',           'LX1042/1',   'filtre_air',13,22,15,3),
+('Filtre air Mahle — Peugeot 206/207/208 HDi',      'فلتر هواء ماهله — بيجو',            'LX221',      'filtre_air',12,20,12,3),
+('Filtre air Mahle — VW Golf III/IV 1.9 TDI',       'فلتر هواء ماهله — فولكسفاغن',       'LX818/1',    'filtre_air',13,22,10,3),
+('Filtre air Mahle — Ford Focus 1.8/2.0 TDCi',      'فلتر هواء ماهله — فورد فوكس',       'LX1665',     'filtre_air',13,22,8,3),
+('Filtre air Mahle — Toyota Corolla 2.0 D4D',       'فلتر هواء ماهله — تويوتا كورولا',   'LX2079',     'filtre_air',14,24,8,3),
+('Filtre air Mahle — BMW 316/318/320d',             'فلتر هواء ماهله — بي إم دبليو',     'LX1780/3',   'filtre_air',16,27,6,3),
+('Filtre carburant Mahle — Renault/Dacia 1.5 dCi', 'فلتر بنزين ماهله — رينو داسيا',     'KL615',      'filtre_carburant',19,33,10,3),
+('Filtre carburant Mahle — Peugeot/Citroën HDi',   'فلتر بنزين ماهله — بيجو',           'KL87',       'filtre_carburant',18,32,10,3),
+('Filtre carburant Mahle — VW/Seat/Skoda TDI',      'فلتر بنزين ماهله — فولكسفاغن',      'KL147',      'filtre_carburant',19,33,8,3),
+('Filtre carburant Mahle — Ford Focus/Transit',     'فلتر بنزين ماهله — فورد',           'KL614',      'filtre_carburant',19,33,8,3),
+('Filtre carburant Mahle — Toyota Hilux/Land Cr.',  'فلتر بنزين ماهله — تويوتا',         'KL400',      'filtre_carburant',21,36,6,3),
+('Filtre habitacle Mahle — Renault Clio II/III',   'فلتر مقصورة ماهله — رينو',          'LA68',       'filtre_habitacle',14,25,10,3),
+('Filtre habitacle Mahle — Dacia Logan/Sandero',   'فلتر مقصورة ماهله — داسيا',         'LA334',      'filtre_habitacle',13,24,12,3),
+('Filtre habitacle Mahle — Peugeot 307/308',       'فلتر مقصورة ماهله — بيجو',          'LA403/S',    'filtre_habitacle',14,25,10,3),
+('Filtre habitacle Mahle — VW Golf IV/V Polo',     'فلتر مقصورة ماهله — فولكسفاغن',     'LAK62',      'filtre_habitacle',15,27,8,3),
+('Filtre habitacle Mahle — BMW Serie 3 E46/E90',   'فلتر مقصورة ماهله — بي إم دبليو',   'LAK62/S',    'filtre_habitacle',17,30,6,3),
+
+-- ============================================================
+-- PURFLUX (très courant Peugeot/Citroën/Renault)
+-- ============================================================
+('Filtre huile Purflux — Renault/Dacia 1.5 dCi',   'فلتر زيت بيورفلوكس — رينو داسيا',   'LS925',      'filtre_huile',17,29,12,3),
+('Filtre huile Purflux — Peugeot/Citroën 1.6 HDi', 'فلتر زيت بيورفلوكس — بيجو',         'LS712',      'filtre_huile',16,28,12,3),
+('Filtre huile Purflux — Peugeot 405/406 2.0 HDi', 'فلتر زيت بيورفلوكس — بيجو 406',     'LS879',      'filtre_huile',17,29,8,3),
+('Filtre huile Purflux — Citroën Berlingo/Xsara',  'فلتر زيت بيورفلوكس — سيتروين',      'LS712/2',    'filtre_huile',16,28,8,3),
+('Filtre huile Purflux — Renault Megane/Laguna',   'فلتر زيت بيورفلوكس — رينو ميغان',   'LS925/2',    'filtre_huile',17,29,8,3),
+('Filtre air Purflux — Renault Clio II/III',       'فلتر هواء بيورفلوكس — رينو كليو',   'A1274',      'filtre_air',12,21,12,3),
+('Filtre air Purflux — Renault Megane II/III',     'فلتر هواء بيورفلوكس — رينو ميغان',  'A1408',      'filtre_air',12,21,10,3),
+('Filtre air Purflux — Peugeot 206/307 HDi',       'فلتر هواء بيورفلوكس — بيجو',        'A1096',      'filtre_air',11,19,12,3),
+('Filtre air Purflux — Citroën C3/C4 HDi',         'فلتر هواء بيورفلوكس — سيتروين',     'A1235',      'filtre_air',11,19,10,3),
+('Filtre air Purflux — Dacia Logan/Sandero',       'فلتر هواء بيورفلوكس — داسيا',       'A1442',      'filtre_air',11,19,12,3),
+('Filtre carburant Purflux — Renault 1.5 dCi',     'فلتر بنزين بيورفلوكس — رينو dCi',   'CS738',      'filtre_carburant',18,32,10,3),
+('Filtre carburant Purflux — Peugeot 1.6/2.0 HDi', 'فلتر بنزين بيورفلوكس — بيجو HDi',   'CS914',      'filtre_carburant',17,31,10,3),
+('Filtre carburant Purflux — Citroën Berlingo HDi','فلتر بنزين بيورفلوكس — سيتروين',    'CS714',      'filtre_carburant',17,31,8,3),
+('Filtre habitacle Purflux — Renault Clio/Megane', 'فلتر مقصورة بيورفلوكس — رينو',      'AHC256',     'filtre_habitacle',13,23,10,3),
+('Filtre habitacle Purflux — Peugeot 206/307',     'فلتر مقصورة بيورفلوكس — بيجو',      'AHC330',     'filtre_habitacle',12,22,10,3),
+('Filtre habitacle Purflux — Citroën C3/C4',       'فلتر مقصورة بيورفلوكس — سيتروين',   'AHC256/2',   'filtre_habitacle',13,23,8,3),
+('Filtre habitacle Purflux — Dacia Logan/Duster',  'فلتر مقصورة بيورفلوكس — داسيا',     'AHC438',     'filtre_habitacle',12,22,10,3),
+
+-- ============================================================
+-- HENGST
+-- ============================================================
+('Filtre huile Hengst — Renault/Dacia 1.5 dCi',    'فلتر زيت هنغست — رينو داسيا',       'E115HD148',  'filtre_huile',17,29,10,3),
+('Filtre huile Hengst — Peugeot/Citroën HDi',      'فلتر زيت هنغست — بيجو سيتروين',    'E500HD17',   'filtre_huile',17,29,10,3),
+('Filtre huile Hengst — VW Golf/Polo TDI',         'فلتر زيت هنغست — فولكسفاغن',        'E500H',      'filtre_huile',18,30,8,3),
+('Filtre huile Hengst — Ford Focus/Fiesta TDCi',   'فلتر زيت هنغست — فورد',             'E115H',      'filtre_huile',16,28,8,3),
+('Filtre huile Hengst — Toyota Corolla D4D',        'فلتر زيت هنغست — تويوتا',           'E500H/1',    'filtre_huile',17,29,8,3),
+('Filtre huile Hengst — Mercedes C/E CDI',         'فلتر زيت هنغست — مرسيدس',           'E500HD17/1', 'filtre_huile',21,36,6,3),
+('Filtre air Hengst — Renault Clio/Symbol',        'فلتر هواء هنغست — رينو كليو',       'E449L',      'filtre_air',12,21,10,3),
+('Filtre air Hengst — Dacia Logan/Sandero',        'فلتر هواء هنغست — داسيا',           'E519L',      'filtre_air',12,21,12,3),
+('Filtre air Hengst — Peugeot 206/307 HDi',        'فلتر هواء هنغست — بيجو',            'E491L',      'filtre_air',11,19,10,3),
+('Filtre air Hengst — VW Golf 1.9 TDI',            'فلتر هواء هنغست — فولكسفاغن',       'E587L',      'filtre_air',13,22,8,3),
+('Filtre carburant Hengst — Renault/Dacia dCi',    'فلتر بنزين هنغست — رينو داسيا',     'H421WK',     'filtre_carburant',18,31,8,3),
+('Filtre carburant Hengst — Peugeot/Citroën HDi',  'فلتر بنزين هنغست — بيجو',           'H207WK',     'filtre_carburant',17,30,8,3),
+('Filtre carburant Hengst — VW/Seat TDI',          'فلتر بنزين هنغست — فولكسفاغن',      'H200WK',     'filtre_carburant',18,31,6,3),
+('Filtre habitacle Hengst — Renault Clio/Megane',  'فلتر مقصورة هنغست — رينو',          'E3910LI',    'filtre_habitacle',13,23,8,3),
+('Filtre habitacle Hengst — Peugeot 307/308',      'فلتر مقصورة هنغست — بيجو',          'E2977LI',    'filtre_habitacle',13,23,8,3),
+('Filtre habitacle Hengst — VW Golf/Polo',         'فلتر مقصورة هنغست — فولكسفاغن',     'E3001LI',    'filtre_habitacle',14,25,6,3),
+
+-- ============================================================
+-- UFI (marque italienne, très répandue)
+-- ============================================================
+('Filtre huile UFI — Renault/Dacia 1.5 dCi',       'فلتر زيت يو إف آي — رينو داسيا',    '23.103.00',  'filtre_huile',16,27,10,3),
+('Filtre huile UFI — Peugeot/Citroën 1.6 HDi',     'فلتر زيت يو إف آي — بيجو',          '23.182.00',  'filtre_huile',16,27,10,3),
+('Filtre huile UFI — VW Golf/Polo 1.9 TDI',        'فلتر زيت يو إف آي — فولكسفاغن',     '23.445.00',  'filtre_huile',17,28,8,3),
+('Filtre huile UFI — Ford Focus/Mondeo TDCi',      'فلتر زيت يو إف آي — فورد',           '23.236.00',  'filtre_huile',16,27,8,3),
+('Filtre huile UFI — Toyota Corolla/Hilux D4D',    'فلتر زيت يو إف آي — تويوتا',        '23.268.00',  'filtre_huile',17,28,8,3),
+('Filtre huile UFI — Mercedes Sprinter/Vito CDI',  'فلتر زيت يو إف آي — مرسيدس',        '23.131.00',  'filtre_huile',20,34,6,3),
+('Filtre air UFI — Renault Clio/Megane',           'فلتر هواء يو إف آي — رينو',          '30.350.00',  'filtre_air',11,19,10,3),
+('Filtre air UFI — Dacia Logan/Sandero/Duster',    'فلتر هواء يو إف آي — داسيا',         '30.541.00',  'filtre_air',11,19,12,3),
+('Filtre air UFI — Peugeot 206/207/307',           'فلتر هواء يو إف آي — بيجو',          '30.107.00',  'filtre_air',10,18,12,3),
+('Filtre air UFI — Citroën Berlingo/C4',           'فلتر هواء يو إف آي — سيتروين',       '30.519.00',  'filtre_air',11,19,10,3),
+('Filtre air UFI — VW Golf/Polo TDI',              'فلتر هواء يو إف آي — فولكسفاغن',     '30.082.00',  'filtre_air',12,20,8,3),
+('Filtre carburant UFI — Renault/Dacia 1.5 dCi',  'فلتر بنزين يو إف آي — رينو داسيا',   '31.813.00',  'filtre_carburant',17,29,8,3),
+('Filtre carburant UFI — Peugeot/Citroën HDi',    'فلتر بنزين يو إف آي — بيجو',          '31.815.00',  'filtre_carburant',16,28,8,3),
+('Filtre carburant UFI — Toyota D4D',              'فلتر بنزين يو إف آي — تويوتا',        '31.952.00',  'filtre_carburant',19,32,6,3),
+('Filtre habitacle UFI — Renault Clio/Megane',     'فلتر مقصورة يو إف آي — رينو',        '53.065.00',  'filtre_habitacle',12,21,8,3),
+('Filtre habitacle UFI — Peugeot 206/307',         'فلتر مقصورة يو إف آي — بيجو',        '53.030.00',  'filtre_habitacle',11,20,8,3),
+('Filtre habitacle UFI — Dacia Logan/Duster',      'فلتر مقصورة يو إف آي — داسيا',       '53.148.00',  'filtre_habitacle',11,20,10,3),
+
+-- ============================================================
+-- FLAG (marque populaire Maroc/Afrique du Nord)
+-- ============================================================
+('Filtre huile Flag — Renault/Dacia 1.5 dCi',      'فلتر زيت فلاغ — رينو داسيا',        'FH-1015D',   'filtre_huile',12,20,20,3),
+('Filtre huile Flag — Peugeot/Citroën 1.4/1.6',   'فلتر زيت فلاغ — بيجو سيتروين',      'FH-1021D',   'filtre_huile',12,20,15,3),
+('Filtre huile Flag — Renault Symbol/Clio 1.4',    'فلتر زيت فلاغ — رينو سيمبول',       'FH-1009',    'filtre_huile',11,19,15,3),
+('Filtre huile Flag — VW Golf/Polo TDI',           'فلتر زيت فلاغ — فولكسفاغن',          'FH-1030D',   'filtre_huile',13,21,10,3),
+('Filtre huile Flag — Toyota Corolla/Yaris',       'فلتر زيت فلاغ — تويوتا',            'FH-1042',    'filtre_huile',12,20,10,3),
+('Filtre huile Flag — Ford Focus/Fiesta',          'فلتر زيت فلاغ — فورد',               'FH-1033D',   'filtre_huile',11,19,10,3),
+('Filtre huile Flag — Hyundai/Kia 1.4/1.6',       'فلتر زيت فلاغ — هيونداي كيا',       'FH-1056',    'filtre_huile',11,19,10,3),
+('Filtre huile Flag — Mercedes Sprinter/Vito',     'فلتر زيت فلاغ — مرسيدس',            'FH-1060D',   'filtre_huile',14,23,8,3),
+('Filtre air Flag — Renault Clio/Symbol 1.4/1.6', 'فلتر هواء فلاغ — رينو كليو',        'FA-2015',    'filtre_air',9,16,15,3),
+('Filtre air Flag — Dacia Logan/Sandero',          'فلتر هواء فلاغ — داسيا لوغان',      'FA-2019',    'filtre_air',9,16,20,3),
+('Filtre air Flag — Peugeot 206/207 HDi',          'فلتر هواء فلاغ — بيجو 206',         'FA-2021',    'filtre_air',8,15,15,3),
+('Filtre air Flag — Citroën Berlingo/C3 HDi',      'فلتر هواء فلاغ — سيتروين',          'FA-2025',    'filtre_air',8,15,12,3),
+('Filtre air Flag — VW Golf/Polo 1.9 TDI',         'فلتر هواء فلاغ — فولكسفاغن',         'FA-2031',    'filtre_air',9,16,10,3),
+('Filtre air Flag — Toyota Corolla/Yaris D4D',     'فلتر هواء فلاغ — تويوتا',           'FA-2044',    'filtre_air',9,16,10,3),
+('Filtre air Flag — Ford Focus/Fiesta TDCi',       'فلتر هواء فلاغ — فورد',              'FA-2036',    'filtre_air',9,16,10,3),
+('Filtre air Flag — Hyundai i20/i30 CRDi',         'فلتر هواء فلاغ — هيونداي',          'FA-2052',    'filtre_air',8,15,10,3),
+('Filtre carburant Flag — Renault/Dacia 1.5 dCi', 'فلتر بنزين فلاغ — رينو داسيا',      'FC-5015D',   'filtre_carburant',14,24,12,3),
+('Filtre carburant Flag — Peugeot/Citroën HDi',   'فلتر بنزين فلاغ — بيجو سيتروين',    'FC-5021D',   'filtre_carburant',13,23,12,3),
+('Filtre carburant Flag — VW/Seat/Skoda TDI',      'فلتر بنزين فلاغ — فولكسفاغن',        'FC-5030D',   'filtre_carburant',14,24,8,3),
+('Filtre carburant Flag — Ford Transit TDCi',      'فلتر بنزين فلاغ — فورد ترانزيت',    'FC-5036D',   'filtre_carburant',14,24,8,3),
+('Filtre carburant Flag — Toyota Hilux D4D',       'فلتر بنزين فلاغ — تويوتا هايلكس',   'FC-5044D',   'filtre_carburant',15,25,8,3),
+('Filtre habitacle Flag — Renault Clio/Megane',    'فلتر مقصورة فلاغ — رينو',           'FK-8015',    'filtre_habitacle',10,18,12,3),
+('Filtre habitacle Flag — Dacia Logan/Sandero',    'فلتر مقصورة فلاغ — داسيا',          'FK-8019',    'filtre_habitacle',10,18,15,3),
+('Filtre habitacle Flag — Peugeot 206/307',        'فلتر مقصورة فلاغ — بيجو',           'FK-8021',    'filtre_habitacle',9,17,12,3),
+('Filtre habitacle Flag — Citroën C3/C4',          'فلتر مقصورة فلاغ — سيتروين',        'FK-8025',    'filtre_habitacle',10,18,10,3),
+('Filtre habitacle Flag — VW Golf/Polo',           'فلتر مقصورة فلاغ — فولكسفاغن',       'FK-8030',    'filtre_habitacle',10,18,8,3),
+
+-- ============================================================
+-- FILTREX
+-- ============================================================
+('Filtre huile Filtrex — Renault/Dacia 1.5 dCi',   'فلتر زيت فيلتريكس — رينو داسيا',   'FX-OH001D',  'filtre_huile',13,22,12,3),
+('Filtre huile Filtrex — Peugeot/Citroën HDi',     'فلتر زيت فيلتريكس — بيجو',          'FX-OH007D',  'filtre_huile',12,21,10,3),
+('Filtre huile Filtrex — VW Golf/Polo TDI',        'فلتر زيت فيلتريكس — فولكسفاغن',     'FX-OH011D',  'filtre_huile',13,22,8,3),
+('Filtre huile Filtrex — Ford Focus TDCi',         'فلتر زيت فيلتريكس — فورد',           'FX-OH014D',  'filtre_huile',12,21,8,3),
+('Filtre huile Filtrex — Toyota Corolla D4D',      'فلتر زيت فيلتريكس — تويوتا',        'FX-OH018',   'filtre_huile',12,21,8,3),
+('Filtre huile Filtrex — Hyundai/Kia CRDi',        'فلتر زيت فيلتريكس — هيونداي',       'FX-OH022',   'filtre_huile',12,21,8,3),
+('Filtre huile Filtrex — Nissan Micra/Note dCi',   'فلتر زيت فيلتريكس — نيسان',         'FX-OH025D',  'filtre_huile',12,21,8,3),
+('Filtre air Filtrex — Renault Clio/Symbol',       'فلتر هواء فيلتريكس — رينو',         'FX-AF003',   'filtre_air',9,16,12,3),
+('Filtre air Filtrex — Dacia Logan/Sandero',       'فلتر هواء فيلتريكس — داسيا',        'FX-AF007',   'filtre_air',9,16,15,3),
+('Filtre air Filtrex — Peugeot 206/207',           'فلتر هواء فيلتريكس — بيجو',         'FX-AF011',   'filtre_air',8,15,12,3),
+('Filtre air Filtrex — Citroën Berlingo/C3',       'فلتر هواء فيلتريكس — سيتروين',      'FX-AF015',   'filtre_air',8,15,10,3),
+('Filtre air Filtrex — VW Golf/Polo TDI',          'فلتر هواء فيلتريكس — فولكسفاغن',    'FX-AF019',   'filtre_air',9,16,8,3),
+('Filtre air Filtrex — Toyota Corolla/Yaris',      'فلتر هواء فيلتريكس — تويوتا',       'FX-AF023',   'filtre_air',9,16,8,3),
+('Filtre carburant Filtrex — Renault/Dacia dCi',  'فلتر بنزين فيلتريكس — رينو',         'FX-FF005D',  'filtre_carburant',14,24,10,3),
+('Filtre carburant Filtrex — Peugeot/Citroën HDi','فلتر بنزين فيلتريكس — بيجو',         'FX-FF009D',  'filtre_carburant',13,23,10,3),
+('Filtre carburant Filtrex — VW/Seat TDI',         'فلتر بنزين فيلتريكس — فولكسفاغن',   'FX-FF013D',  'filtre_carburant',14,24,6,3),
+('Filtre habitacle Filtrex — Renault Clio/Megane','فلتر مقصورة فيلتريكس — رينو',        'FX-CF002',   'filtre_habitacle',10,18,10,3),
+('Filtre habitacle Filtrex — Dacia Logan/Duster', 'فلتر مقصورة فيلتريكس — داسيا',       'FX-CF006',   'filtre_habitacle',10,18,12,3),
+('Filtre habitacle Filtrex — Peugeot 206/307',    'فلتر مقصورة فيلتريكس — بيجو',        'FX-CF010',   'filtre_habitacle',9,17,10,3),
+
+-- ============================================================
+-- FRAM
+-- ============================================================
+('Filtre huile Fram — Renault/Dacia 1.5 dCi',      'فلتر زيت فرام — رينو داسيا',        'PH10295',    'filtre_huile',15,25,10,3),
+('Filtre huile Fram — Peugeot/Citroën 1.6 HDi',   'فلتر زيت فرام — بيجو سيتروين',      'PH3614',     'filtre_huile',14,24,8,3),
+('Filtre huile Fram — VW Golf 1.9 TDI',            'فلتر زيت فرام — فولكسفاغن',          'PH4967',     'filtre_huile',15,25,8,3),
+('Filtre huile Fram — Toyota Corolla D4D',         'فلتر زيت فرام — تويوتا',            'PH10295/2',  'filtre_huile',14,24,8,3),
+('Filtre air Fram — Renault Clio/Symbol',          'فلتر هواء فرام — رينو',              'CA9685',     'filtre_air',11,19,10,3),
+('Filtre air Fram — Dacia Logan/Sandero',          'فلتر هواء فرام — داسيا',            'CA10173',    'filtre_air',10,18,12,3),
+('Filtre air Fram — Peugeot 206/307',              'فلتر هواء فرام — بيجو',              'CA9267',     'filtre_air',10,18,10,3),
+('Filtre carburant Fram — Renault/Dacia dCi',     'فلتر بنزين فرام — رينو داسيا',       'P11216',     'filtre_carburant',16,27,8,3),
+('Filtre carburant Fram — Peugeot/Citroën HDi',   'فلتر بنزين فرام — بيجو',             'P10289',     'filtre_carburant',15,26,8,3),
+('Filtre habitacle Fram — Renault/Dacia',          'فلتر مقصورة فرام — رينو داسيا',     'CF10132',    'filtre_habitacle',12,21,8,3),
+('Filtre habitacle Fram — Peugeot/Citroën',       'فلتر مقصورة فرام — بيجو سيتروين',   'CF8728',     'filtre_habitacle',11,20,8,3)
+
+on conflict (reference) do nothing;

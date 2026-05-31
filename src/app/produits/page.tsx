@@ -61,7 +61,7 @@ export default function ProduitsPage() {
     setShowForm(true);
   }
 
-  const BRANDS = ["Filtron", "Bosch", "Mann", "Champion", "Purflux", "Mahle"];
+  const BRANDS = ["Filtron", "Mann", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Flag", "Filtrex", "Fram"];
   const [brandFilter, setBrandFilter] = useState("");
 
   const filtered = products.filter(p => {
