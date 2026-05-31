@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/context/LangContext";
-import { LayoutDashboard, Package, Users, ShoppingCart, MapPin, Settings, Menu, X } from "lucide-react";
+import { LayoutDashboard, Package, Users, ShoppingCart, MapPin, Settings, Menu, X, AlertCircle, BarChart2 } from "lucide-react";
 import clsx from "clsx";
 import { useState } from "react";
 
@@ -11,6 +11,8 @@ const navItems = [
   { href: "/produits", icon: Package, key: "products" as const },
   { href: "/clients", icon: Users, key: "clients" as const },
   { href: "/ventes", icon: ShoppingCart, key: "sales" as const },
+  { href: "/rappels", icon: AlertCircle, key: "reminders" as const },
+  { href: "/stats", icon: BarChart2, key: "stats" as const },
   { href: "/tournees", icon: MapPin, key: "tours" as const },
 ];
 

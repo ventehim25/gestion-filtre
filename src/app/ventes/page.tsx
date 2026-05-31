@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Sale, Client, Product, SaleItem, SaleStatus } from "@/types/database";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Printer } from "lucide-react";
 
 type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string };
 
@@ -70,6 +70,31 @@ export default function VentesPage() {
     }
     setShowForm(false); setLines([]); setClientId(""); setNotes(""); setMontantPaye(0);
     load();
+  }
+
+  function printReceipt(s: Sale & { client: Client }) {
+    const items = (s.items ?? []).map(i =>
+      `<tr><td>${(i.product as Product | undefined)?.nom_fr ?? ""}</td><td style="text-align:center">${i.quantite}</td><td style="text-align:right">${i.prix_unitaire} MAD</td><td style="text-align:right">${(i.quantite * i.prix_unitaire).toFixed(2)} MAD</td></tr>`
+    ).join("");
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Bon de livraison</title>
+    <style>body{font-family:Arial,sans-serif;padding:20px;max-width:600px;margin:0 auto}h2{text-align:center}table{width:100%;border-collapse:collapse;margin:16px 0}th,td{border:1px solid #ddd;padding:8px;font-size:13px}th{background:#f3f4f6}.total{font-weight:bold;font-size:16px;text-align:right;margin-top:8px}.footer{margin-top:24px;text-align:center;font-size:12px;color:#888}@media print{button{display:none}}</style>
+    </head><body>
+    <h2>Bon de Livraison</h2>
+    <p><strong>Client :</strong> ${s.client?.nom ?? ""}</p>
+    <p><strong>Ville :</strong> ${s.client?.ville ?? ""}</p>
+    <p><strong>Date :</strong> ${s.date}</p>
+    <table><thead><tr><th>Produit</th><th>Qté</th><th>Prix unit.</th><th>Total</th></tr></thead>
+    <tbody>${items}</tbody></table>
+    <p class="total">Total : ${s.total.toFixed(2)} MAD</p>
+    <p class="total" style="color:${s.statut === "paye" ? "green" : "red"}">
+      ${s.statut === "paye" ? "✓ Payé" : `Reste à payer : ${(s.total - s.montant_paye).toFixed(2)} MAD`}
+    </p>
+    <p class="footer">Gestion Filtres — Maroc</p>
+    <button onclick="window.print()" style="margin-top:16px;padding:8px 16px;background:#2563eb;color:white;border:none;border-radius:6px;cursor:pointer">Imprimer</button>
+    </body></html>`);
+    w.document.close();
   }
 
   const badgeClass = (s: SaleStatus) =>
@@ -160,6 +185,9 @@ export default function VentesPage() {
                 <td className="px-4 py-3 text-slate-500">{s.client?.ville}</td>
                 <td className="px-4 py-3 font-semibold">{s.total.toFixed(2)} MAD</td>
                 <td className="px-4 py-3"><span className={badgeClass(s.statut)}>{t(s.statut === "paye" ? "paid" : s.statut === "partiel" ? "partial" : "pending")}</span></td>
+              <td className="px-4 py-3">
+                <button onClick={() => printReceipt(s)} className="text-slate-400 hover:text-blue-600" title={t("printReceipt")}><Printer size={15} /></button>
+              </td>
               </tr>
             ))}
           </tbody>

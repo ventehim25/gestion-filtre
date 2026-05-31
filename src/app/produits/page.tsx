@@ -61,10 +61,15 @@ export default function ProduitsPage() {
     setShowForm(true);
   }
 
-  const filtered = products.filter(p =>
-    p.nom_fr.toLowerCase().includes(search.toLowerCase()) ||
-    p.reference.toLowerCase().includes(search.toLowerCase())
-  );
+  const BRANDS = ["Filtron", "Bosch", "Mann", "Champion", "Purflux", "Mahle"];
+  const [brandFilter, setBrandFilter] = useState("");
+
+  const filtered = products.filter(p => {
+    const q = search.toLowerCase();
+    const matchSearch = !q || p.nom_fr.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q) || p.nom_ar.includes(search);
+    const matchBrand = !brandFilter || p.nom_fr.includes(brandFilter);
+    return matchSearch && matchBrand;
+  });
 
   return (
     <div>
@@ -74,11 +79,22 @@ export default function ProduitsPage() {
         </button>
       } />
 
-      <div className="card p-4 mb-4">
-        <div className="relative">
+      <div className="card p-4 mb-4 flex flex-wrap gap-3">
+        <div className="relative flex-1 min-w-48">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input className="input ps-9" placeholder={t("search")} value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="input ps-9" placeholder={t("searchByCar")} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
+        <select className="input w-40" value={brandFilter} onChange={e => setBrandFilter(e.target.value)}>
+          <option value="">{t("allBrands")}</option>
+          {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+        </select>
+        <select className="input w-44" onChange={e => setSearch(e.target.value)}>
+          <option value="">{t("category")} — tous</option>
+          <option value="huile">{t("filterOil")}</option>
+          <option value="air">{t("filterAir")}</option>
+          <option value="carburant">{t("filterFuel")}</option>
+          <option value="habitacle">{t("filterCabin")}</option>
+        </select>
       </div>
 
       {showForm && (
