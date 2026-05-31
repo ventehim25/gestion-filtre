@@ -14,7 +14,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <LangProvider>
           <Sidebar />
-          <main className="ms-56 min-h-screen p-6">
+          <main className="md:ms-56 min-h-screen p-4 md:p-6 pt-16 md:pt-6">
             {children}
           </main>
         </LangProvider>

@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Client } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, Phone } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Phone, MessageCircle } from "lucide-react";
 
 const empty = { nom: "", telephone: "", ville: "", adresse: "", notes: "", solde_du: 0 };
 
@@ -105,9 +105,15 @@ export default function ClientsPage() {
               </div>
             </div>
             {c.telephone && (
-              <a href={`tel:${c.telephone}`} className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline mb-2">
-                <Phone size={14} /> {c.telephone}
-              </a>
+              <div className="flex items-center gap-2 mb-2">
+                <a href={`tel:${c.telephone}`} className="flex items-center gap-1.5 text-sm text-blue-600 hover:underline">
+                  <Phone size={14} /> {c.telephone}
+                </a>
+                <a href={`https://wa.me/212${c.telephone.replace(/^0/, "")}`} target="_blank" rel="noreferrer"
+                  className="flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full hover:bg-green-200 transition-colors">
+                  <MessageCircle size={12} /> WA
+                </a>
+              </div>
             )}
             {c.solde_du > 0 && (
               <div className="mt-2 bg-orange-50 rounded-lg px-3 py-1.5">

@@ -24,23 +24,28 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function load() {
-      const [{ count: clients }, { count: produits }, { data: sales }, { data: stockFaible }] =
+      const [{ count: clients }, { count: produits }, { data: sales }, { data: stockFaible }, { data: saleItems }] =
         await Promise.all([
           supabase.from("clients").select("*", { count: "exact", head: true }),
           supabase.from("products").select("*", { count: "exact", head: true }),
           supabase.from("sales").select("total, montant_paye"),
-          supabase.from("products").select("id").lt("stock", 3),
+          supabase.from("products").select("id").lte("stock", 2),
+          supabase.from("sale_items").select("quantite, prix_unitaire, product:products(prix_achat)"),
         ]);
 
       const totalVentes = sales?.reduce((s, v) => s + v.total, 0) ?? 0;
       const duFournisseur = sales?.reduce((s, v) => s + (v.total - v.montant_paye), 0) ?? 0;
+      const benefice = (saleItems ?? []).reduce((s: number, i: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }) => {
+        const achat = i.product?.prix_achat ?? 0;
+        return s + (i.prix_unitaire - achat) * i.quantite;
+      }, 0);
 
       setStats({
         totalVentes,
         totalClients: clients ?? 0,
         totalProduits: produits ?? 0,
         stockFaible: stockFaible?.length ?? 0,
-        benefice: 0,
+        benefice,
         duFournisseur,
       });
     }
