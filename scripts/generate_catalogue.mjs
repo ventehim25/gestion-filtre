@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IMG_DIR = path.join(__dirname, ".catalog_imgs");
 const HTML_PATH = path.join(__dirname, ".catalogue.html");
-const OUT_PATH = path.join(__dirname, "..", "public", "catalogue-filtropro.pdf");
+const OUT_DIR = path.join(__dirname, "..", "public");
 
 const supabase = createClient(
   "https://wehsvgoolozqzxsgwibb.supabase.co",
@@ -34,6 +34,11 @@ const CAT_ICON = {
   filtre_huile: "🛢️", filtre_air: "💨", filtre_carburant: "⛽",
   filtre_habitacle: "❄️", filtre_refroidissement: "🌡️", autre: "🔧",
 };
+
+// Classement voiture / bus-camion par préfixe (cf. src/lib/vehicleType.ts)
+const CAMION_PREFIXES = new Set(["OM", "OR", "OT", "AM", "AR", "AD", "AE", "AG", "PS"]);
+const refPrefix = (r) => (r.match(/^[A-Za-z]+/) || [""])[0].toUpperCase();
+const vehKind = (r) => (CAMION_PREFIXES.has(refPrefix(r)) ? "camion" : "voiture");
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -107,7 +112,7 @@ function card(p, makes) {
   return `<div class="card"><div class="ph">${img}</div><div class="ref">${esc(p.reference)}</div>${m}</div>`;
 }
 
-function buildHtml(byCat, vehMap) {
+function buildHtml(byCat, vehMap, meta) {
   const cats = CAT_ORDER.filter((c) => byCat[c] && byCat[c].length);
   const total = cats.reduce((s, c) => s + byCat[c].length, 0);
   const today = new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long" });
@@ -167,8 +172,8 @@ function buildHtml(byCat, vehMap) {
     <div class="brand">Filtro<b>Pro</b></div>
     <div class="tag">Pièces Auto · Maroc</div>
     <div class="line"></div>
-    <h1>Catalogue des Filtres</h1>
-    <div class="sub">Filtres à huile · air · carburant · habitacle</div>
+    <h1>${esc(meta.title)}</h1>
+    <div class="sub">${esc(meta.sub)}</div>
     <div class="meta">${total} références · ${today}</div>
   </div>
   <div class="toc"><h2>Sommaire</h2>${toc}</div>
@@ -190,31 +195,45 @@ async function main() {
 
   await downloadThumbs(products);
 
-  // Groupe + tri
-  const byCat = {};
-  for (const p of products) (byCat[p.categorie] ??= []).push(p);
-  for (const c of Object.keys(byCat)) byCat[c].sort((a, b) => refCompare(a.reference, b.reference));
+  // Sépare voitures / bus-camions, puis groupe + tri par catégorie
+  function groupByCat(list) {
+    const byCat = {};
+    for (const p of list) (byCat[p.categorie] ??= []).push(p);
+    for (const c of Object.keys(byCat)) byCat[c].sort((a, b) => refCompare(a.reference, b.reference));
+    return byCat;
+  }
+  const voitures = products.filter((p) => vehKind(p.reference) === "voiture");
+  const camions = products.filter((p) => vehKind(p.reference) === "camion");
+  console.log(`>>> Voitures: ${voitures.length} · Bus-camions: ${camions.length}`);
 
-  console.log(">>> Construction du HTML…");
-  fs.writeFileSync(HTML_PATH, buildHtml(byCat, vehMap));
+  const jobs = [
+    { list: voitures, file: "catalogue-voitures.pdf", footer: "FiltroPro — Catalogue Voitures",
+      title: "Catalogue Filtres Voitures", sub: "Filtres à huile · air · carburant · habitacle" },
+    { list: camions, file: "catalogue-bus-camion.pdf", footer: "FiltroPro — Catalogue Bus & Camions",
+      title: "Catalogue Filtres Bus & Camions", sub: "Poids lourds · bus · utilitaires" },
+  ];
 
   console.log(">>> Rendu PDF (Puppeteer)…");
   const browser = await puppeteer.launch({ headless: "new", args: ["--no-sandbox"] });
-  const page = await browser.newPage();
-  await page.goto("file://" + HTML_PATH.replace(/\\/g, "/"), { waitUntil: "networkidle0", timeout: 180000 });
-  if (!fs.existsSync(path.dirname(OUT_PATH))) fs.mkdirSync(path.dirname(OUT_PATH), { recursive: true });
-  await page.pdf({
-    path: OUT_PATH,
-    format: "A4",
-    printBackground: true,
-    margin: { top: "12mm", bottom: "14mm", left: "8mm", right: "8mm" },
-    displayHeaderFooter: true,
-    headerTemplate: "<div></div>",
-    footerTemplate: `<div style="width:100%;font-size:8px;color:#9ca3af;padding:0 12mm;display:flex;justify-content:space-between;">
-      <span>FiltroPro — Catalogue Filtres</span><span class="pageNumber"></span></div>`,
-  });
+  if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
+  for (const job of jobs) {
+    if (!job.list.length) { console.log(`   (${job.file} : aucune référence, ignoré)`); continue; }
+    fs.writeFileSync(HTML_PATH, buildHtml(groupByCat(job.list), vehMap, { title: job.title, sub: job.sub }));
+    const page = await browser.newPage();
+    await page.goto("file://" + HTML_PATH.replace(/\\/g, "/"), { waitUntil: "networkidle0", timeout: 180000 });
+    const out = path.join(OUT_DIR, job.file);
+    await page.pdf({
+      path: out, format: "A4", printBackground: true,
+      margin: { top: "12mm", bottom: "14mm", left: "8mm", right: "8mm" },
+      displayHeaderFooter: true, headerTemplate: "<div></div>",
+      footerTemplate: `<div style="width:100%;font-size:8px;color:#9ca3af;padding:0 12mm;display:flex;justify-content:space-between;">
+        <span>${job.footer}</span><span class="pageNumber"></span></div>`,
+    });
+    await page.close();
+    const mb = (fs.statSync(out).size / 1048576).toFixed(1);
+    console.log(`   ✓ ${job.file} (${job.list.length} réf · ${mb} Mo)`);
+  }
   await browser.close();
-  const mb = (fs.statSync(OUT_PATH).size / 1048576).toFixed(1);
-  console.log(`\n=== TERMINÉ === ${OUT_PATH} (${mb} Mo)`);
+  console.log(`\n=== TERMINÉ ===`);
 }
 main().catch((e) => { console.error(e); process.exit(1); });

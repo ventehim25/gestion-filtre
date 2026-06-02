@@ -109,6 +109,9 @@ export const translations = {
     pendingChanges: "Modifications",
     saveAll: "Tout enregistrer",
     saved: "Enregistré ✓",
+    vehCar: "Voitures",
+    vehTruck: "Bus-Camion",
+    vehAll: "Tous",
   },
   ar: {
     appName: "FiltroPro",
@@ -218,6 +221,9 @@ export const translations = {
     pendingChanges: "تعديلات",
     saveAll: "حفظ الكل",
     saved: "تم الحفظ ✓",
+    vehCar: "سيارات",
+    vehTruck: "حافلات-شاحنات",
+    vehAll: "الكل",
   },
 } as const;
 
