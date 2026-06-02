@@ -36,7 +36,7 @@ const CAT_ICON = {
 };
 
 // Classement voiture / bus-camion par préfixe (cf. src/lib/vehicleType.ts)
-const CAMION_PREFIXES = new Set(["OM", "OR", "OT", "AM", "AR", "AD", "AE", "AG", "PS"]);
+const CAMION_PREFIXES = new Set(["OM", "OR", "OT", "AM", "AR", "AD", "AE", "AG"]);
 const refPrefix = (r) => (r.match(/^[A-Za-z]+/) || [""])[0].toUpperCase();
 const vehKind = (r) => (CAMION_PREFIXES.has(refPrefix(r)) ? "camion" : "voiture");
 
