@@ -21,8 +21,37 @@ export type Database = {
         Insert: Omit<SaleItem, "id">;
         Update: Partial<Omit<SaleItem, "id">>;
       };
+      equivalences: {
+        Row: Equivalence;
+        Insert: Omit<Equivalence, "id">;
+        Update: Partial<Omit<Equivalence, "id">>;
+      };
+      applications: {
+        Row: Application;
+        Insert: Omit<Application, "id">;
+        Update: Partial<Omit<Application, "id">>;
+      };
     };
   };
+};
+
+export type Equivalence = {
+  id: string;
+  product_id: string;
+  marque: string;
+  reference: string;
+};
+
+export type Application = {
+  id: string;
+  product_id: string;
+  marque: string;
+  modele: string;
+  moteur: string | null;
+  code_moteur: string | null;
+  annee_debut: string | null;
+  annee_fin: string | null;
+  puissance: string | null;
 };
 
 export type ProductCategory =
@@ -45,6 +74,9 @@ export type Product = {
   stock: number;
   stock_min: number;
   notes: string | null;
+  dimensions?: string | null;
+  image_url?: string | null;
+  code_barre?: string | null;
 };
 
 export type Client = {

@@ -5,10 +5,11 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory } from "@/types/database";
-import { Search, Minus, Plus, Save, RotateCcw, Check, PackageX } from "lucide-react";
+import { Search, Minus, Plus, Save, RotateCcw, Check, PackageX, ScanLine, Camera, X, Link2 } from "lucide-react";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
+import BarcodeScanner from "@/components/BarcodeScanner";
 
 const CATEGORIES: ProductCategory[] = [
   "filtre_huile", "filtre_air", "filtre_carburant",
@@ -56,6 +57,16 @@ export default function StockPage() {
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // --- Scan code-barres ---
+  const [scanMode, setScanMode] = useState(false);
+  const [camOpen, setCamOpen] = useState(false);
+  const [scanInput, setScanInput] = useState("");
+  const [feedback, setFeedback] = useState<{ ok: boolean; msg: string } | null>(null);
+  const [linkCode, setLinkCode] = useState<string | null>(null); // code inconnu à associer
+  const [linkSearch, setLinkSearch] = useState("");
+  const scanFieldRef = useRef<HTMLInputElement | null>(null);
+  const fbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   async function load() {
     setLoading(true);
     const all: Product[] = [];
@@ -87,6 +98,58 @@ export default function StockPage() {
       return next;
     });
   }
+
+  function flash(ok: boolean, msg: string) {
+    setFeedback({ ok, msg });
+    if (fbTimer.current) clearTimeout(fbTimer.current);
+    fbTimer.current = setTimeout(() => setFeedback(null), 2800);
+  }
+
+  // +1 au stock sur un produit (via le système d'édition en attente)
+  function bump(p: Product) {
+    const nv = effStock(p) + 1;
+    setEdit(p, "stock", nv);
+    flash(true, `${p.reference} +1 → ${nv}`);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
+  }
+
+  // Traite un code scanné (douchette ou caméra)
+  function handleScan(raw: string) {
+    const code = raw.trim();
+    if (!code || linkCode) return; // ignore si une association est déjà en cours
+    const found = products.find(p =>
+      (p.code_barre && p.code_barre === code) ||
+      p.reference.toUpperCase() === code.toUpperCase());
+    if (found) {
+      bump(found);
+    } else {
+      setLinkCode(code);
+      setLinkSearch("");
+      flash(false, `Code inconnu : ${code} — associez-le à une référence`);
+    }
+  }
+
+  // Associe un code-barres inconnu à une référence (persiste immédiatement) puis +1
+  async function linkAndBump(p: Product) {
+    if (!linkCode) return;
+    await supabase.from("products").update({ code_barre: linkCode }).eq("id", p.id);
+    setProducts(prev => prev.map(x => x.id === p.id ? { ...x, code_barre: linkCode } : x));
+    setLinkCode(null);
+    setLinkSearch("");
+    bump({ ...p, code_barre: linkCode });
+    setTimeout(() => scanFieldRef.current?.focus(), 50);
+  }
+
+  const linkMatches = useMemo(() => {
+    if (!linkCode) return [];
+    const q = linkSearch.trim().toUpperCase();
+    if (!q) return [];
+    return products
+      .filter(p => p.reference.toUpperCase().includes(q) || p.nom_fr.toUpperCase().includes(q))
+      .sort((a, b) => refCompare(a.reference, b.reference))
+      .slice(0, 8);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkCode, linkSearch, products]);
 
   const filtered = useMemo(() => products.filter(p => {
     const matchRef = !refSearch || p.reference.toUpperCase().includes(refSearch) || p.nom_fr.toLowerCase().includes(refSearch.toLowerCase());
@@ -141,6 +204,11 @@ export default function StockPage() {
     <div>
       <Header title="stockEntry" action={
         <div className="flex items-center gap-2">
+          <button onClick={() => { setScanMode(v => !v); setTimeout(() => scanFieldRef.current?.focus(), 50); }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              scanMode ? "bg-red-600 text-white" : "btn-secondary"}`}>
+            <ScanLine size={16} /> <span className="hidden sm:inline">Scan</span>
+          </button>
           {pendingCount > 0 && (
             <button onClick={() => setEdits({})} className="btn-secondary flex items-center gap-2">
               <RotateCcw size={15} /> <span className="hidden sm:inline">{t("cancel")}</span>
@@ -169,6 +237,40 @@ export default function StockPage() {
           <p className="text-xl font-bold text-blue-400">{pendingCount}</p>
         </div>
       </div>
+
+      {/* Barre de scan */}
+      {scanMode && (
+        <div className="card p-4 mb-4 border-red-500/40">
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="relative flex-1 min-w-48">
+              <ScanLine size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400" />
+              <input
+                ref={scanFieldRef}
+                autoFocus
+                className="input ps-9 font-mono"
+                placeholder="Scannez ici (douchette) ou tapez le code + Entrée"
+                value={scanInput}
+                onChange={e => setScanInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === "Enter") { e.preventDefault(); handleScan(scanInput); setScanInput(""); }
+                }} />
+            </div>
+            <button onClick={() => setCamOpen(true)} className="btn-primary flex items-center gap-2 shrink-0">
+              <Camera size={16} /> Caméra
+            </button>
+          </div>
+          {feedback && (
+            <div className={`mt-3 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 ${
+              feedback.ok ? "bg-green-500/15 text-green-400" : "bg-yellow-500/15 text-yellow-400"}`}>
+              {feedback.ok ? <Check size={15} /> : <Link2 size={15} />} {feedback.msg}
+            </div>
+          )}
+          <p className="text-xs text-slate-500 mt-2">
+            Chaque scan ajoute <b>+1</b> au stock. Un code inconnu vous demande de l&apos;associer une seule fois, puis devient automatique.
+            N&apos;oubliez pas <b>« Tout enregistrer »</b> à la fin.
+          </p>
+        </div>
+      )}
 
       {/* Filtres */}
       <div className="card p-4 mb-4 flex flex-wrap gap-3 items-center">
@@ -260,6 +362,45 @@ export default function StockPage() {
           </span>
           <button onClick={() => setPage(p => Math.min(pageCount - 1, p + 1))} disabled={safePage >= pageCount - 1}
             className="btn-secondary disabled:opacity-40">›</button>
+        </div>
+      )}
+
+      {/* Scanner caméra */}
+      {camOpen && <BarcodeScanner onScan={handleScan} onClose={() => setCamOpen(false)} />}
+
+      {/* Association d'un code inconnu */}
+      {linkCode && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="card p-5 w-full max-w-md">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-100 flex items-center gap-2"><Link2 size={18} className="text-red-400" /> Associer un code-barres</h3>
+              <button onClick={() => { setLinkCode(null); setTimeout(() => scanFieldRef.current?.focus(), 50); }} className="text-slate-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <p className="text-sm text-slate-400 mb-1">Code scanné :</p>
+            <p className="font-mono text-lg text-slate-100 bg-slate-800/60 rounded-lg px-3 py-2 mb-4">{linkCode}</p>
+            <p className="text-sm text-slate-400 mb-2">Choisissez la référence à laquelle l&apos;associer :</p>
+            <div className="relative mb-2">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input autoFocus className="input ps-9 font-mono" placeholder="Tapez une référence (ex: OP540)"
+                value={linkSearch} onChange={e => setLinkSearch(e.target.value)} />
+            </div>
+            <div className="max-h-64 overflow-y-auto divide-y divide-slate-800">
+              {linkMatches.map(p => (
+                <button key={p.id} onClick={() => linkAndBump(p)}
+                  className="w-full flex items-center gap-3 px-2 py-2 hover:bg-slate-800/60 text-left rounded-lg transition-colors">
+                  <FilterImage reference={p.reference} categorie={p.categorie} imageUrl={p.image_url} wid={80} className="h-9 w-9 rounded object-contain bg-white shrink-0 border border-slate-700/50 p-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-mono text-sm text-slate-200">{p.reference}</p>
+                    <p className="text-xs text-slate-500 truncate">{p.nom_fr}</p>
+                  </div>
+                  <span className="ms-auto text-xs text-slate-400">stock {effStock(p)}</span>
+                </button>
+              ))}
+              {linkSearch.trim() && linkMatches.length === 0 && (
+                <p className="text-center text-slate-500 py-6 text-sm">{t("noRefFound")}</p>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
