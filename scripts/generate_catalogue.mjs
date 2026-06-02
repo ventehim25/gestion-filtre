@@ -9,7 +9,7 @@ import { createClient } from "@supabase/supabase-js";
 import puppeteer from "puppeteer";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const IMG_DIR = path.join(__dirname, ".catalog_imgs");
@@ -40,6 +40,10 @@ const TYPES = {
     pitch: "Pollen, poussières fines et mauvaises odeurs : le filtre d'habitacle purifie l'air de la cabine pour le confort et la santé de tous les passagers. À changer une fois par an.",
   },
 };
+// Coordonnées commerce (affichées sur couverture + pied de page)
+const TEL_DISPLAY = "06 02 35 02 90";
+const WA_DISPLAY = "+212 602-350290";
+
 const CAT_ORDER = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
 const CAT_LABEL = {
   filtre_huile: "Filtres à huile", filtre_air: "Filtres à air", filtre_carburant: "Filtres à carburant",
@@ -154,6 +158,9 @@ const STYLE = `
   .cover h1 { font-size: 40px; font-weight: 800; margin: 6px 0; line-height: 1.05; }
   .cover .sub { color: #f0c7c7; font-size: 15px; max-width: 360px; margin: 8px auto 0; }
   .cover .line { width: 64px; height: 3px; background: #dc2626; margin: 22px auto; border-radius: 3px; }
+  .cover .contact { position: relative; z-index: 1; margin-top: 20px; font-size: 13px; color: #fff;
+    background: rgba(220,38,38,0.20); border: 1px solid rgba(244,63,94,0.55); border-radius: 999px; padding: 9px 20px; display: inline-block; }
+  .cover .contact b { color: #fecaca; font-weight: 600; }
   .cover .meta { position: absolute; bottom: 22mm; left: 0; right: 0; color: #94a3b8; font-size: 12px; z-index: 1; }
   /* Intro marketing */
   .intro { padding: 24mm 20mm; page-break-after: always; }
@@ -205,6 +212,7 @@ function coverHtml({ icon, title, sub, count, heroFile }) {
       ${icon ? `<div class="icon">${icon}</div>` : ""}
       <h1>${esc(title)}</h1>
       <div class="sub">${esc(sub)}</div>
+      <div class="contact">📞 <b>${TEL_DISPLAY}</b>&nbsp;&nbsp;·&nbsp;&nbsp;💬 WhatsApp <b>${WA_DISPLAY}</b></div>
     </div>
     <div class="meta">${count} références · ${today()}</div></div>`;
 }
@@ -262,7 +270,7 @@ async function renderPdf(browser, html, outFile, footer) {
     margin: { top: "12mm", bottom: "14mm", left: "8mm", right: "8mm" },
     displayHeaderFooter: true, headerTemplate: "<div></div>",
     footerTemplate: `<div style="width:100%;font-size:8px;color:#9ca3af;padding:0 12mm;display:flex;justify-content:space-between;">
-      <span>${footer}</span><span class="pageNumber"></span></div>`,
+      <span>${footer} · Tél ${TEL_DISPLAY} · WhatsApp ${WA_DISPLAY}</span><span class="pageNumber"></span></div>`,
   });
   await page.close();
   const mb = (fs.statSync(out).size / 1048576).toFixed(1);
@@ -321,6 +329,6 @@ async function main() {
 export { TYPES, loadAll, downloadHeroes, buildTypeHtml };
 
 // N'exécute main() que si lancé directement (pas à l'import par un script de preview)
-if (import.meta.url === `file://${process.argv[1].replace(/\\/g, "/")}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((e) => { console.error(e); process.exit(1); });
 }

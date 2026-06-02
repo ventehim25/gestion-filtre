@@ -112,6 +112,10 @@ export const translations = {
     vehCar: "Voitures",
     vehTruck: "Bus-Camion",
     vehAll: "Tous",
+    catalogues: "Catalogues",
+    cataloguesTitle: "Catalogues PDF à envoyer aux clients",
+    cataloguesIntro: "Téléchargez ou partagez directement par WhatsApp le catalogue du type de filtre qui intéresse votre client.",
+    download: "Télécharger",
   },
   ar: {
     appName: "FiltroPro",
@@ -224,6 +228,10 @@ export const translations = {
     vehCar: "سيارات",
     vehTruck: "حافلات-شاحنات",
     vehAll: "الكل",
+    catalogues: "الكتالوجات",
+    cataloguesTitle: "كتالوجات PDF لإرسالها للزبناء",
+    cataloguesIntro: "حمّل أو شارك مباشرة عبر واتساب كتالوج نوع الفلتر الذي يهم زبونك.",
+    download: "تحميل",
   },
 } as const;
 
