@@ -34,3 +34,8 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# catalogue : cache vignettes & html temporaire (régénérables)
+scripts/.catalog_imgs/
+scripts/.catalogue.html
+scripts/_preview_*.png
