@@ -36,7 +36,9 @@ const CAT_ICON = {
 };
 
 // Classement voiture / bus-camion par préfixe (cf. src/lib/vehicleType.ts)
-const CAMION_PREFIXES = new Set(["OM", "OR", "OT", "AM", "AR", "AD", "AE", "AG"]);
+const CAMION_PREFIXES = new Set(["OM", "OR", "OT", "AM", "AD", "AE", "AG"]);
+// Préfixes exclus du catalogue (filtres "autre" non pertinents)
+const EXCLUDE_PREFIXES = new Set(["CW", "UE"]);
 const refPrefix = (r) => (r.match(/^[A-Za-z]+/) || [""])[0].toUpperCase();
 const vehKind = (r) => (CAMION_PREFIXES.has(refPrefix(r)) ? "camion" : "voiture");
 
@@ -107,7 +109,7 @@ function card(p, makes) {
   const hasImg = p.image_url && fs.existsSync(path.join(IMG_DIR, p.id + ".jpg"));
   const img = hasImg
     ? `<img src=".catalog_imgs/${p.id}.jpg" alt="${esc(p.reference)}"/>`
-    : `<div class="noimg">📷</div>`;
+    : `<div class="noimg"><div class="nosign">🚫</div><span>Photo non disponible</span></div>`;
   const m = makes && makes.length ? `<div class="makes">${esc(makes.slice(0, 4).join(" · "))}${makes.length > 4 ? " +" + (makes.length - 4) : ""}</div>` : "";
   return `<div class="card"><div class="ph">${img}</div><div class="ref">${esc(p.reference)}</div>${m}</div>`;
 }
@@ -162,7 +164,9 @@ function buildHtml(byCat, vehMap, meta) {
     page-break-inside: avoid; background: #fff; }
   .card .ph { height: 92px; display: flex; align-items: center; justify-content: center; background: #fff; }
   .card img { max-height: 92px; max-width: 100%; object-fit: contain; }
-  .card .noimg { font-size: 28px; color: #cbd5e1; }
+  .card .noimg { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; height: 92px; }
+  .card .noimg .nosign { font-size: 30px; line-height: 1; filter: grayscale(0.2); }
+  .card .noimg span { font-size: 7.5px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
   .card .ref { font-family: 'Consolas', monospace; font-weight: 700; font-size: 12px; margin-top: 4px; color: #111; }
   .card .makes { font-size: 8.5px; color: #6b7280; margin-top: 2px; line-height: 1.2;
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
@@ -202,8 +206,10 @@ async function main() {
     for (const c of Object.keys(byCat)) byCat[c].sort((a, b) => refCompare(a.reference, b.reference));
     return byCat;
   }
-  const voitures = products.filter((p) => vehKind(p.reference) === "voiture");
-  const camions = products.filter((p) => vehKind(p.reference) === "camion");
+  const kept = products.filter((p) => !EXCLUDE_PREFIXES.has(refPrefix(p.reference)));
+  console.log(`>>> ${products.length - kept.length} réf. exclues du catalogue (${[...EXCLUDE_PREFIXES].join(",")})`);
+  const voitures = kept.filter((p) => vehKind(p.reference) === "voiture");
+  const camions = kept.filter((p) => vehKind(p.reference) === "camion");
   console.log(`>>> Voitures: ${voitures.length} · Bus-camions: ${camions.length}`);
 
   const jobs = [

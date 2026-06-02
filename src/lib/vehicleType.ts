@@ -5,11 +5,11 @@ export type VehKind = "voiture" | "camion";
 
 // Préfixes considérés bus / camion / poids lourd / industriel.
 //  - Huile  : OM, OR, OT
-//  - Air    : AM (gros filtres), AR (filtres ronds radiaux), AD, AE, AG (éléments PL)
-//  (PS et PM = filtres carburant VOITURE, donc non listés)
+//  - Air    : AM (gros filtres), AD, AE, AG (éléments PL)
+//  (PS/PM = carburant VOITURE ; AR = air VOITURE, donc non listés)
 export const CAMION_PREFIXES = new Set([
   "OM", "OR", "OT",
-  "AM", "AR", "AD", "AE", "AG",
+  "AM", "AD", "AE", "AG",
 ]);
 
 export function refPrefix(reference: string): string {
