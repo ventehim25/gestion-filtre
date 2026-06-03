@@ -253,7 +253,7 @@ const STYLE = `
   .chead h2 { margin: 0; font-size: 19px; }
   .chead p { margin: 2px 0 0; font-size: 12px; color: rgba(255,255,255,0.8); }
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .card { border: 1px solid #e5e7eb; border-top: 3px solid var(--c); border-radius: 8px; padding: 7px 6px;
+  .card { border: 1px solid #e5e7eb; border-radius: 8px; padding: 7px 6px;
     text-align: center; page-break-inside: avoid; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
   .card .ph { height: 92px; display: flex; align-items: center; justify-content: center; background: #fff; }
   .card img { max-height: 92px; max-width: 100%; object-fit: contain; }
