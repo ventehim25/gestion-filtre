@@ -53,7 +53,7 @@ const SERIES_LABEL = {
 };
 const PREF_ORDER = {
   filtre_huile: ["OP", "OE", "OC", "OH", "OK"],
-  filtre_air: ["AP", "AK", "AR", "AS"],
+  filtre_air: ["AP", "AK", "AR"],
   filtre_carburant: ["PP", "PE", "PM", "PS", "PW"],
   filtre_habitacle: ["K"],
 };
@@ -190,6 +190,7 @@ function card(p, makes) {
 const STYLE = `
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #1f2937; }
+  :root { --c: #dc2626; --d: #7f1d1d; }  /* couleur d'accent par type (surchargée par doc) */
   /* Couverture */
   /* Hauteur = zone imprimable (297mm - marges haut 12mm - bas 15mm) pour éviter
      un débordement qui créait une page vide après la couverture. */
@@ -201,36 +202,41 @@ const STYLE = `
   .cover .ov { position: absolute; inset: 0;
     background:
       radial-gradient(130% 80% at 50% 30%, rgba(0,0,0,0.15), rgba(0,0,0,0.78) 100%),
-      linear-gradient(180deg, rgba(8,8,10,0.92) 0%, rgba(8,8,10,0.30) 34%, rgba(28,8,8,0.55) 70%, rgba(127,29,29,0.92) 100%); }
+      linear-gradient(180deg, rgba(8,8,10,0.92) 0%, rgba(8,8,10,0.30) 34%, rgba(8,8,10,0.55) 70%, rgba(8,8,10,0.90) 100%); }
+  .cover .tint { position: absolute; inset: 0; opacity: 0.55;
+    background: linear-gradient(180deg, transparent 46%, var(--d) 140%); }
   .cover .grain { position: absolute; inset: 0; opacity: 0.05;
     background-image: radial-gradient(rgba(255,255,255,0.7) 0.5px, transparent 0.5px); background-size: 3px 3px; }
   .cover .c { position: relative; z-index: 1; padding: 0 22mm; }
   .cover .brand { font-size: 34px; font-weight: 800; letter-spacing: 1px; margin-top: 14px; text-shadow: 0 2px 16px rgba(0,0,0,0.5); }
   .cover .brand b { color: #f43f5e; }
   .cover .tag { letter-spacing: 7px; font-size: 11px; color: #e2e8f0; margin-top: 5px; text-transform: uppercase; }
-  .cover .line { width: 70px; height: 3px; background: #dc2626; margin: 26px auto; border-radius: 3px; box-shadow: 0 0 18px rgba(220,38,38,0.8); }
+  .cover .line { width: 70px; height: 3px; background: var(--c); margin: 26px auto; border-radius: 3px; box-shadow: 0 0 18px var(--c); }
   .cover h1 { font-size: 50px; font-weight: 800; margin: 8px 0; line-height: 1.03; letter-spacing: -0.5px; text-shadow: 0 4px 28px rgba(0,0,0,0.65); }
   .cover .sub { color: #f3d3d3; font-size: 15px; max-width: 380px; margin: 12px auto 0; text-shadow: 0 1px 10px rgba(0,0,0,0.5); }
   .cover .contact { position: relative; z-index: 1; margin-top: 30px; font-size: 13px; color: #fff;
-    background: rgba(220,38,38,0.28); border: 1px solid rgba(244,63,94,0.6); border-radius: 999px;
+    background: rgba(0,0,0,0.42); border: 1px solid var(--c); border-radius: 999px;
     padding: 10px 22px; display: inline-block; backdrop-filter: blur(2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
   .cover .contact b { color: #fecaca; font-weight: 600; }
   .cover .meta { position: absolute; bottom: 16mm; left: 0; right: 0; color: #cbd5e1; font-size: 12px; z-index: 1; letter-spacing: 1px; }
   /* Sommaire */
   .toc { padding: 26mm 20mm; page-break-after: always; }
-  .toc h2 { font-size: 24px; border-bottom: 3px solid #dc2626; padding-bottom: 8px; color: #111827; }
+  .toc h2 { font-size: 24px; border-bottom: 3px solid var(--c); padding-bottom: 8px; color: #111827; }
   .tocrow { display: flex; align-items: baseline; gap: 8px; margin: 14px 0; font-size: 15px; color: #374151; }
   .tocrow .dots { flex: 1; border-bottom: 2px dotted #cbd5e1; }
   .tocrow-tot { font-weight: 700; color: #111827; margin-top: 18px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
   /* Page infos (filigrane cartouche + informations) */
   .info { position: relative; padding: 24mm 20mm; page-break-after: always; overflow: hidden; }
-  .info .cartouche { position: absolute; right: -34mm; top: 26mm; height: 215mm; opacity: 0.06; z-index: 0; transform: rotate(8deg); }
+  .info .cartouche { position: absolute; opacity: 0.06; z-index: 0; }
+  .info .cart-cyl { right: -34mm; top: 26mm; height: 215mm; transform: rotate(8deg); }
+  .info .cart-panel { right: -22mm; top: 70mm; width: 180mm; transform: rotate(-6deg); }
   .info .ic { position: relative; z-index: 1; }
-  .info .kicker { color: #dc2626; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; font-size: 12px; }
+  .info .kicker { color: var(--d); font-weight: 700; letter-spacing: 3px; text-transform: uppercase; font-size: 12px; }
   .info h2 { font-size: 28px; margin: 6px 0 14px; color: #111827; }
   .info .pitch { font-size: 15px; color: #374151; line-height: 1.75; max-width: 540px; }
-  .info .tip { margin: 16px 0; padding: 12px 16px; background: #fef2f2; border-left: 4px solid #dc2626;
-    border-radius: 8px; font-size: 13.5px; color: #7f1d1d; max-width: 560px; }
+  .info .tip { margin: 16px 0; padding: 12px 16px; background: #f8fafc; border-left: 4px solid var(--c);
+    border-radius: 8px; font-size: 13.5px; color: #334155; max-width: 560px; }
+  .info .tip b { color: var(--d); }
   .info .sub2 { margin: 22px 0 10px; font-size: 17px; color: #111827; }
   .info .blocks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; max-width: 560px; }
   .info .blk { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 16px; background: rgba(255,255,255,0.9); }
@@ -242,12 +248,12 @@ const STYLE = `
   .chapter { page-break-before: always; padding: 0 8mm; }
   .chapter.first { page-break-before: avoid; }
   .chead { display: flex; align-items: center; gap: 14px; padding: 13px 16px; margin-bottom: 12px;
-    background: linear-gradient(90deg, #111111, #7f1d1d); color: #fff; border-radius: 10px; }
+    background: linear-gradient(90deg, #111111 30%, var(--c) 130%); color: #fff; border-radius: 10px; }
   .chead .cicon { font-size: 28px; }
   .chead h2 { margin: 0; font-size: 19px; }
-  .chead p { margin: 2px 0 0; font-size: 12px; color: #f0c7c7; }
+  .chead p { margin: 2px 0 0; font-size: 12px; color: rgba(255,255,255,0.8); }
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-  .card { border: 1px solid #e5e7eb; border-top: 3px solid #dc2626; border-radius: 8px; padding: 7px 6px;
+  .card { border: 1px solid #e5e7eb; border-top: 3px solid var(--c); border-radius: 8px; padding: 7px 6px;
     text-align: center; page-break-inside: avoid; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.04); }
   .card .ph { height: 92px; display: flex; align-items: center; justify-content: center; background: #fff; }
   .card img { max-height: 92px; max-width: 100%; object-fit: contain; }
@@ -280,7 +286,7 @@ function montage(imgs, cls) {
 function coverHtml({ title, sub, count, bgFile }) {
   const bg = bgFile ? `<div class="bg" style="background-image:url('${bgFile}')"></div>` : "";
   return `<div class="cover">
-    ${bg}<div class="ov"></div><div class="grain"></div>
+    ${bg}<div class="ov"></div><div class="tint"></div><div class="grain"></div>
     <div class="c">${LOGO_SVG}
       <div class="brand">Filtro<b>Pro</b></div>
       <div class="tag">Pièces Auto · Maroc</div>
@@ -292,18 +298,44 @@ function coverHtml({ title, sub, count, bgFile }) {
     <div class="meta">${count} références · ${today()}</div></div>`;
 }
 
-// Silhouette de cartouche (filtre) — filigrane décoratif en arrière-plan
-function cartridgeSvg() {
+// Silhouette de cartouche cylindrique (huile / carburant) — filigrane décoratif
+function cartridgeSvg(color = "#dc2626") {
   let pleats = "";
   for (let x = 44; x <= 156; x += 7) pleats += `<path d="M${x} 42 V238"/>`;
-  return `<svg class="cartouche" viewBox="0 0 200 280" xmlns="http://www.w3.org/2000/svg">
-    <g fill="none" stroke="#dc2626" stroke-width="3" stroke-linecap="round">
+  return `<svg class="cartouche cart-cyl" viewBox="0 0 200 280" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round">
       <ellipse cx="100" cy="40" rx="62" ry="15"/>
       <path d="M38 40 V240"/><path d="M162 40 V240"/>
       <ellipse cx="100" cy="240" rx="62" ry="15"/>
       ${pleats}
       <ellipse cx="100" cy="40" rx="24" ry="6"/>
     </g></svg>`;
+}
+
+// Silhouette de filtre à air panneau (air / habitacle) — cadre + pliures accordéon
+function panelSvg(color = "#dc2626") {
+  let zig = "";
+  for (let x = 36, up = true; x <= 364; x += 16, up = !up) zig += (zig ? " L" : "M") + x + " " + (up ? 72 : 150);
+  return `<svg class="cartouche cart-panel" viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="18" y="44" width="364" height="132" rx="14"/>
+      <path d="${zig}"/>
+    </g></svg>`;
+}
+
+// Couleur d'accent par type (air rouge, huile jaune, carburant vert, habitacle bleu)
+const THEME = {
+  filtre_air: { c: "#dc2626", d: "#7f1d1d" },
+  filtre_huile: { c: "#eab308", d: "#854d0e" },
+  filtre_carburant: { c: "#22c55e", d: "#14532d" },
+  filtre_habitacle: { c: "#3b82f6", d: "#1e3a8a" },
+};
+const themeOf = (cat) => THEME[cat] || { c: "#dc2626", d: "#7f1d1d" };
+
+// Choisit la silhouette adaptée au type de filtre, dans la couleur du type
+function cartoucheFor(cat) {
+  const c = themeOf(cat).c;
+  return (cat === "filtre_air" || cat === "filtre_habitacle") ? panelSvg(c) : cartridgeSvg(c);
 }
 
 // Page SOMMAIRE : liste des séries de la catégorie avec leur nombre de réfs
@@ -320,7 +352,7 @@ function sommaireHtml(cat, order, byPre) {
 function infoHtml(cat, count) {
   const t = TYPES[cat];
   return `<div class="info">
-    ${cartridgeSvg()}
+    ${cartoucheFor(cat)}
     <div class="ic">
       <div class="kicker">${CAT_LABEL[cat]}</div>
       <h2>Pourquoi c'est essentiel ?</h2>
@@ -349,6 +381,9 @@ function buildTypeCatalog(cat, products, vehMap) {
       !/A$/i.test(p.reference) &&
       (vehMap[p.id]?.makes?.length > 0));
   }
+  if (cat === "filtre_air") {
+    list = list.filter((p) => refPrefix(p.reference) !== "AS"); // série AS retirée
+  }
   const byPre = {};
   for (const p of list) (byPre[refPrefix(p.reference)] ??= []).push(p);
   const pref = PREF_ORDER[cat] || [];
@@ -368,7 +403,9 @@ function buildTypeCatalog(cat, products, vehMap) {
       <div class="grid">${cards}</div></div>`;
   }).join("");
 
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
+  const theme = themeOf(cat);
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}
+    :root{--c:${theme.c};--d:${theme.d};}</style></head><body>
     ${coverHtml({ title: t.label, sub: "Catalogue voitures · " + CAT_LABEL[cat].toLowerCase(), count: total, bgFile: t.heroFile })}
     ${sommaireHtml(cat, order, byPre)}
     ${infoHtml(cat, total)}
@@ -381,9 +418,9 @@ function buildMultiHtml({ title, sub, bgFile }, byCat, vehMap) {
   const cats = CAT_ORDER.filter((c) => byCat[c] && byCat[c].length);
   const total = cats.reduce((s, c) => s + byCat[c].length, 0);
   const toc = cats.map((c) => `<div class="tocrow"><span>${CAT_ICON[c]} ${CAT_LABEL[c]}</span><span class="dots"></span><span>${byCat[c].length} réf.</span></div>`).join("");
-  const chapters = cats.map((c) => {
+  const chapters = cats.map((c, i) => {
     const cards = byCat[c].map((p) => card(p, vehMap[p.id]?.makes)).join("");
-    return `<div class="chapter"><div class="chead"><div class="cicon">${CAT_ICON[c]}</div>
+    return `<div class="chapter${i === 0 ? " first" : ""}"><div class="chead"><div class="cicon">${CAT_ICON[c]}</div>
       <div><h2>${CAT_LABEL[c]}</h2><p>${byCat[c].length} références disponibles</p></div></div>
       <div class="grid">${cards}</div></div>`;
   }).join("");
