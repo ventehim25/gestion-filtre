@@ -25,20 +25,37 @@ const supabase = createClient(
 const TYPES = {
   filtre_huile: {
     label: "Filtres à Huile", icon: "🛢️", hero: "photo-1486262715619-67b85e0b08d3",
-    pitch: "Le filtre à huile retient les impuretés et les particules métalliques en suspension dans l'huile moteur. Il protège les pièces mobiles et prolonge la durée de vie du moteur. À remplacer à chaque vidange.",
+    pitch: "Le filtre à huile retient les impuretés et les particules métalliques en suspension dans l'huile moteur. Il protège les pièces mobiles et prolonge la durée de vie du moteur.",
+    tip: "À remplacer à chaque vidange (environ 10 000 à 15 000 km).",
   },
   filtre_air: {
     label: "Filtres à Air", icon: "💨", hero: "photo-1486006920555-c77dcf18193c",
     pitch: "Un air propre, c'est une combustion optimale : plus de puissance, moins de consommation et un moteur préservé. Le filtre à air bloque poussières et impuretés avant l'admission.",
+    tip: "À contrôler à chaque révision et remplacer environ tous les 20 000 km (plus souvent en zone poussiéreuse).",
   },
   filtre_carburant: {
     label: "Filtres à Carburant", icon: "⛽", hero: "photo-1530046339160-ce3e530c7d2f",
     pitch: "Le filtre à carburant élimine les impuretés et l'eau présentes dans le carburant pour protéger le système d'injection. Indispensable aux moteurs diesel et essence modernes.",
+    tip: "À remplacer environ tous les 20 000 à 40 000 km — sur diesel, plus fréquemment.",
   },
   filtre_habitacle: {
     label: "Filtres d'Habitacle", icon: "❄️", hero: "photo-1600880292089-90a7e086ee0c",
-    pitch: "Pollen, poussières fines et mauvaises odeurs : le filtre d'habitacle purifie l'air de la cabine pour le confort et la santé de tous les passagers. À changer une fois par an.",
+    pitch: "Pollen, poussières fines et mauvaises odeurs : le filtre d'habitacle purifie l'air de la cabine pour le confort et la santé de tous les passagers.",
+    tip: "À remplacer une fois par an ou tous les 15 000 km.",
   },
+};
+// Libellés des séries (préfixes) + ordre d'affichage par catégorie
+const SERIES_LABEL = {
+  OP: "Vissables (OP)", OE: "Cartouche (OE)", OC: "Série OC", OH: "Série OH", OK: "Série OK",
+  AP: "Panneau (AP)", AK: "À boîtier (AK)", AR: "Cylindriques (AR)", AS: "Série AS",
+  PP: "Vissables gazole (PP)", PE: "Cartouche (PE)", PM: "Série PM", PS: "Séparateurs (PS)", PW: "Série PW",
+  K: "Habitacle (K)",
+};
+const PREF_ORDER = {
+  filtre_huile: ["OP", "OE", "OC", "OH", "OK"],
+  filtre_air: ["AP", "AK", "AR", "AS"],
+  filtre_carburant: ["PP", "PE", "PM", "PS", "PW"],
+  filtre_habitacle: ["K"],
 };
 // Coordonnées commerce (affichées sur couverture + pied de page)
 const TEL_DISPLAY = "06 02 35 02 90";
@@ -197,24 +214,28 @@ const STYLE = `
     padding: 10px 22px; display: inline-block; backdrop-filter: blur(2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
   .cover .contact b { color: #fecaca; font-weight: 600; }
   .cover .meta { position: absolute; bottom: 16mm; left: 0; right: 0; color: #cbd5e1; font-size: 12px; z-index: 1; letter-spacing: 1px; }
-  /* Intro marketing */
-  .intro { padding: 24mm 20mm; page-break-after: always; }
-  .intro .kicker { color: #dc2626; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; font-size: 12px; }
-  .intro h2 { font-size: 26px; margin: 6px 0 14px; color: #111827; }
-  .intro .pitch { font-size: 15px; color: #374151; line-height: 1.75; max-width: 560px; }
-  .intro .band { margin: 22px 0; height: 120px; border-radius: 14px; overflow: hidden;
-    display: grid; grid-template-columns: repeat(8, 1fr); border: 1px solid #e5e7eb; }
-  .intro .band > div { background-size: cover; background-position: center; background-color: #fff; }
-  .benefits { display: flex; gap: 12px; }
-  .benefit { flex: 1; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 12px; text-align: center; }
-  .benefit .bi { font-size: 22px; }
-  .benefit .bt { font-weight: 700; font-size: 13px; margin-top: 6px; color: #111827; }
-  .benefit .bd { font-size: 11px; color: #6b7280; margin-top: 3px; line-height: 1.3; }
-  /* Sommaire (bus-camion multi-sections) */
-  .toc { padding: 24mm 20mm; page-break-after: always; }
-  .toc h2 { font-size: 22px; border-bottom: 3px solid #dc2626; padding-bottom: 8px; }
-  .tocrow { display: flex; align-items: baseline; gap: 8px; margin: 13px 0; font-size: 15px; }
+  /* Sommaire */
+  .toc { padding: 26mm 20mm; page-break-after: always; }
+  .toc h2 { font-size: 24px; border-bottom: 3px solid #dc2626; padding-bottom: 8px; color: #111827; }
+  .tocrow { display: flex; align-items: baseline; gap: 8px; margin: 14px 0; font-size: 15px; color: #374151; }
   .tocrow .dots { flex: 1; border-bottom: 2px dotted #cbd5e1; }
+  .tocrow-tot { font-weight: 700; color: #111827; margin-top: 18px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
+  /* Page infos (filigrane cartouche + informations) */
+  .info { position: relative; padding: 24mm 20mm; page-break-after: always; overflow: hidden; }
+  .info .cartouche { position: absolute; right: -34mm; top: 26mm; height: 215mm; opacity: 0.06; z-index: 0; transform: rotate(8deg); }
+  .info .ic { position: relative; z-index: 1; }
+  .info .kicker { color: #dc2626; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; font-size: 12px; }
+  .info h2 { font-size: 28px; margin: 6px 0 14px; color: #111827; }
+  .info .pitch { font-size: 15px; color: #374151; line-height: 1.75; max-width: 540px; }
+  .info .tip { margin: 16px 0; padding: 12px 16px; background: #fef2f2; border-left: 4px solid #dc2626;
+    border-radius: 8px; font-size: 13.5px; color: #7f1d1d; max-width: 560px; }
+  .info .sub2 { margin: 22px 0 10px; font-size: 17px; color: #111827; }
+  .info .blocks { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; max-width: 560px; }
+  .info .blk { border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 16px; background: rgba(255,255,255,0.9); }
+  .info .blk .bt { font-weight: 700; font-size: 14px; color: #111827; }
+  .info .blk .bd { font-size: 12px; color: #6b7280; margin-top: 4px; line-height: 1.35; }
+  .info .infocontact { margin-top: 22px; font-size: 13px; color: #374151;
+    background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 999px; padding: 10px 18px; display: inline-block; }
   /* Chapitres / grille */
   .chapter { page-break-before: always; padding: 0 8mm; }
   .chapter.first { page-break-before: avoid; }
@@ -269,72 +290,86 @@ function coverHtml({ title, sub, count, bgFile }) {
     <div class="meta">${count} références · ${today()}</div></div>`;
 }
 
-// Page d'intro marketing (réutilisée par tous les catalogues par type)
-function introHtml(cat, count, stripImgs) {
+// Silhouette de cartouche (filtre) — filigrane décoratif en arrière-plan
+function cartridgeSvg() {
+  let pleats = "";
+  for (let x = 44; x <= 156; x += 7) pleats += `<path d="M${x} 42 V238"/>`;
+  return `<svg class="cartouche" viewBox="0 0 200 280" xmlns="http://www.w3.org/2000/svg">
+    <g fill="none" stroke="#dc2626" stroke-width="3" stroke-linecap="round">
+      <ellipse cx="100" cy="40" rx="62" ry="15"/>
+      <path d="M38 40 V240"/><path d="M162 40 V240"/>
+      <ellipse cx="100" cy="240" rx="62" ry="15"/>
+      ${pleats}
+      <ellipse cx="100" cy="40" rx="24" ry="6"/>
+    </g></svg>`;
+}
+
+// Page SOMMAIRE : liste des séries de la catégorie avec leur nombre de réfs
+function sommaireHtml(cat, order, byPre) {
+  const rows = order.map((pre) =>
+    `<div class="tocrow"><span>${TYPES[cat]?.icon || ""} ${SERIES_LABEL[pre] || "Série " + pre}</span><span class="dots"></span><span>${byPre[pre].length} réf.</span></div>`
+  ).join("");
+  const total = order.reduce((s, p) => s + byPre[p].length, 0);
+  return `<div class="toc"><h2>Sommaire</h2>${rows}
+    <div class="tocrow tocrow-tot"><span>Total</span><span class="dots"></span><span>${total} réf.</span></div></div>`;
+}
+
+// Page INFOS : filigrane cartouche en arrière-plan + informations (sans vignettes)
+function infoHtml(cat, count) {
   const t = TYPES[cat];
-  const band = stripImgs && stripImgs.length ? montage(stripImgs, "band") : "";
-  return `<div class="intro">
-    <div class="kicker">${t.icon} ${CAT_LABEL[cat]}</div>
-    <h2>Pourquoi c'est essentiel ?</h2>
-    <p class="pitch">${esc(t.pitch)}</p>
-    ${band}
-    <div class="benefits">
-      <div class="benefit"><div class="bi">✓</div><div class="bt">Qualité d'origine</div><div class="bd">Références Filtron / MANN+HUMMEL</div></div>
-      <div class="benefit"><div class="bi">🚗</div><div class="bt">Large compatibilité</div><div class="bd">${count} références voitures</div></div>
-      <div class="benefit"><div class="bi">📍</div><div class="bt">Disponible au Maroc</div><div class="bd">Tél ${TEL_DISPLAY}</div></div>
+  return `<div class="info">
+    ${cartridgeSvg()}
+    <div class="ic">
+      <div class="kicker">${CAT_LABEL[cat]}</div>
+      <h2>Pourquoi c'est essentiel ?</h2>
+      <p class="pitch">${esc(t.pitch)}</p>
+      ${t.tip ? `<div class="tip"><b>Quand le changer&nbsp;?</b> ${esc(t.tip)}</div>` : ""}
+      <h3 class="sub2">Pourquoi FiltroPro&nbsp;?</h3>
+      <div class="blocks">
+        <div class="blk"><div class="bt">✓ Qualité d'origine</div><div class="bd">Références Filtron / MANN+HUMMEL.</div></div>
+        <div class="blk"><div class="bt">📦 Large stock</div><div class="bd">${count} références voitures disponibles.</div></div>
+        <div class="blk"><div class="bt">🔎 Recherche facile</div><div class="bd">Par référence, véhicule ou VIN.</div></div>
+        <div class="blk"><div class="bt">🚚 Livraison & conseil</div><div class="bd">Service rapide partout au Maroc.</div></div>
+      </div>
+      <div class="infocontact">📞 <b>${TEL_DISPLAY}</b> &nbsp;·&nbsp; WhatsApp <b>${WA_DISPLAY}</b> &nbsp;·&nbsp; ${SLOGAN}</div>
     </div>
   </div>`;
 }
 
-// Catalogue d'UN type (voitures) : couverture + intro marketing + grille
-function buildTypeHtml(cat, products, vehMap) {
+// Catalogue d'UN type (voitures) : couverture + sommaire + infos + sections par série
+function buildTypeCatalog(cat, products, vehMap) {
   const t = TYPES[cat];
-  const list = [...products].sort((a, b) => refCompare(a.reference, b.reference));
-  const cards = list.map((p) => card(p, vehMap[p.id]?.makes)).join("");
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ title: t.label, sub: "Catalogue voitures · " + CAT_LABEL[cat].toLowerCase(), count: list.length, bgFile: t.heroFile })}
-    ${introHtml(cat, list.length, pickImgs(products, 8))}
-    <div class="chapter first">
-      <div class="chead"><div class="cicon">${t.icon}</div><div><h2>${CAT_LABEL[cat]}</h2><p>${list.length} références disponibles</p></div></div>
-      <div class="grid">${cards}</div>
-    </div>
-  </body></html>`;
-}
-
-// Titres des séries de filtres à huile (sous-sections)
-const OIL_TITLES = {
-  OP: "Filtres à huile vissables — série OP",
-  OE: "Filtres à huile cartouche — série OE",
-  OC: "Filtres à huile — série OC",
-};
-
-// Catalogue Huile : filtré (sans OK651/4-2X, sans réfs finissant par A, uniquement
-// celles ayant un type véhicule) et découpé en sous-sections titrées par série (OP en tête).
-function buildOilHtml(products, vehMap) {
-  const cat = "filtre_huile";
-  const t = TYPES[cat];
-  const list = products.filter((p) =>
-    p.reference.toUpperCase() !== "OK651/4-2X" &&
-    !/A$/i.test(p.reference) &&
-    (vehMap[p.id]?.makes?.length > 0)
-  );
+  // Filtrage spécifique au catalogue Huile
+  let list = products;
+  if (cat === "filtre_huile") {
+    list = list.filter((p) =>
+      p.reference.toUpperCase() !== "OK651/4-2X" &&
+      !/A$/i.test(p.reference) &&
+      (vehMap[p.id]?.makes?.length > 0));
+  }
   const byPre = {};
   for (const p of list) (byPre[refPrefix(p.reference)] ??= []).push(p);
-  const order = ["OP", "OE", "OC", "OH", "OK"].filter((x) => byPre[x]);
-  for (const k of Object.keys(byPre)) if (!order.includes(k)) order.push(k);
+  const pref = PREF_ORDER[cat] || [];
+  const order = Object.keys(byPre).sort((a, b) => {
+    const ia = pref.indexOf(a), ib = pref.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b);
+  });
+  for (const k of order) byPre[k].sort((a, b) => refCompare(a.reference, b.reference));
+  const total = list.length;
 
   const sections = order.map((pre, i) => {
-    const items = byPre[pre].sort((a, b) => refCompare(a.reference, b.reference));
-    const title = OIL_TITLES[pre] || `Filtres à huile — série ${pre}`;
+    const items = byPre[pre];
+    const title = SERIES_LABEL[pre] || `Série ${pre}`;
     const cards = items.map((p) => card(p, vehMap[p.id]?.makes)).join("");
     return `<div class="chapter${i === 0 ? " first" : ""}"><div class="chead"><div class="cicon">${t.icon}</div>
-      <div><h2>${title}</h2><p>${items.length} références</p></div></div>
+      <div><h2>${CAT_LABEL[cat]} — ${title}</h2><p>${items.length} références</p></div></div>
       <div class="grid">${cards}</div></div>`;
   }).join("");
 
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ title: t.label, sub: "Catalogue voitures · filtres à huile", count: list.length, bgFile: t.heroFile })}
-    ${introHtml(cat, list.length, pickImgs(list, 8))}
+    ${coverHtml({ title: t.label, sub: "Catalogue voitures · " + CAT_LABEL[cat].toLowerCase(), count: total, bgFile: t.heroFile })}
+    ${sommaireHtml(cat, order, byPre)}
+    ${infoHtml(cat, total)}
     ${sections}
   </body></html>`;
 }
@@ -350,9 +385,25 @@ function buildMultiHtml({ title, sub, bgFile }, byCat, vehMap) {
       <div><h2>${CAT_LABEL[c]}</h2><p>${byCat[c].length} références disponibles</p></div></div>
       <div class="grid">${cards}</div></div>`;
   }).join("");
+  const info = `<div class="info">${cartridgeSvg()}<div class="ic">
+    <div class="kicker">Bus & Camions</div>
+    <h2>Filtres poids lourds & utilitaires</h2>
+    <p class="pitch">Une gamme complète de filtres à huile, air, carburant et habitacle pour bus, camions, véhicules utilitaires, engins agricoles et de chantier. Références Filtron adaptées aux conditions les plus exigeantes.</p>
+    <div class="tip"><b>Bon à savoir&nbsp;:</b> sur poids lourd et usage intensif, des intervalles d'entretien plus courts protègent le moteur et l'injection.</div>
+    <h3 class="sub2">Pourquoi FiltroPro&nbsp;?</h3>
+    <div class="blocks">
+      <div class="blk"><div class="bt">✓ Qualité d'origine</div><div class="bd">Références Filtron / MANN+HUMMEL.</div></div>
+      <div class="blk"><div class="bt">📦 Large stock</div><div class="bd">${total} références bus & camions.</div></div>
+      <div class="blk"><div class="bt">🔎 Recherche facile</div><div class="bd">Par référence, véhicule ou VIN.</div></div>
+      <div class="blk"><div class="bt">🚚 Livraison & conseil</div><div class="bd">Service rapide partout au Maroc.</div></div>
+    </div>
+    <div class="infocontact">📞 <b>${TEL_DISPLAY}</b> &nbsp;·&nbsp; WhatsApp <b>${WA_DISPLAY}</b> &nbsp;·&nbsp; ${SLOGAN}</div>
+  </div></div>`;
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
     ${coverHtml({ title, sub, count: total, bgFile })}
-    <div class="toc"><h2>Sommaire</h2>${toc}</div>
+    <div class="toc"><h2>Sommaire</h2>${toc}
+      <div class="tocrow tocrow-tot"><span>Total</span><span class="dots"></span><span>${total} réf.</span></div></div>
+    ${info}
     ${chapters}</body></html>`;
 }
 
@@ -406,8 +457,7 @@ async function main() {
   for (const cat of Object.keys(TYPES)) {
     const list = voitures.filter((p) => p.categorie === cat);
     if (!list.length) { console.log(`   (${cat} : aucune réf, ignoré)`); continue; }
-    const html = cat === "filtre_huile" ? buildOilHtml(list, vehMap) : buildTypeHtml(cat, list, vehMap);
-    await renderPdf(browser, html, FILES[cat]);
+    await renderPdf(browser, buildTypeCatalog(cat, list, vehMap), FILES[cat]);
   }
 
   // Catalogue Bus & Camions combiné
@@ -424,7 +474,7 @@ async function main() {
   console.log(`\n=== TERMINÉ ===`);
 }
 
-export { TYPES, loadAll, buildTypeHtml, buildOilHtml };
+export { TYPES, loadAll, buildTypeCatalog };
 
 // N'exécute main() que si lancé directement (pas à l'import par un script de preview)
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
