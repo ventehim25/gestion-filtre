@@ -263,6 +263,11 @@ const STYLE = `
   .card .ref { font-family: 'Consolas', monospace; font-weight: 700; font-size: 12px; margin-top: 5px; color: #111; }
   .card .makes { font-size: 8.5px; color: #6b7280; margin-top: 2px; line-height: 1.2;
     overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  /* Mode sobre (bus-camion) : sans bande colorée, pour comparaison */
+  .plain .chead { background: none; color: #111827; border-radius: 0; padding: 4px 2px 10px;
+    margin-bottom: 12px; border-bottom: 2px solid #e5e7eb; }
+  .plain .chead p { color: #6b7280; }
+  .plain .card { border-top: 1px solid #e5e7eb; }
 `;
 
 const today = () => new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long" });
@@ -438,7 +443,7 @@ function buildMultiHtml({ title, sub, bgFile }, byCat, vehMap) {
     </div>
     <div class="infocontact">📞 <b>${TEL_DISPLAY}</b> &nbsp;·&nbsp; WhatsApp <b>${WA_DISPLAY}</b> &nbsp;·&nbsp; ${SLOGAN}</div>
   </div></div>`;
-  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body class="plain">
     ${coverHtml({ title, sub, count: total, bgFile })}
     <div class="toc"><h2>Sommaire</h2>${toc}
       <div class="tocrow tocrow-tot"><span>Total</span><span class="dots"></span><span>${total} réf.</span></div></div>
