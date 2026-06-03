@@ -191,7 +191,9 @@ const STYLE = `
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #1f2937; }
   /* Couverture */
-  .cover { position: relative; height: 297mm; color: #fff; background: #0a0a0c;
+  /* Hauteur = zone imprimable (297mm - marges haut 12mm - bas 15mm) pour éviter
+     un débordement qui créait une page vide après la couverture. */
+  .cover { position: relative; height: 268mm; color: #fff; background: #0a0a0c;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; page-break-after: always; overflow: hidden; }
   .cover .bg { position: absolute; inset: 0; background-size: cover; background-position: center;
