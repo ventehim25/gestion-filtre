@@ -6,6 +6,7 @@ import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Sale, Client, Product, SaleItem, SaleStatus } from "@/types/database";
 import { Plus, Trash2, Printer } from "lucide-react";
+import ProductPicker from "@/components/ProductPicker";
 
 type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string };
 
@@ -22,49 +23,59 @@ export default function VentesPage() {
   const [notes, setNotes] = useState("");
 
   async function load() {
-    const [{ data: s }, { data: c }, { data: p }] = await Promise.all([
+    const [{ data: s }, { data: c }] = await Promise.all([
       supabase.from("sales").select("*, client:clients(*)").order("created_at", { ascending: false }),
       supabase.from("clients").select("*").order("nom"),
-      supabase.from("products").select("*").order("nom_fr"),
     ]);
     setSales((s as unknown as (Sale & { client: Client })[]) ?? []);
     setClients(c ?? []);
-    setProducts(p ?? []);
+
+    // Tous les produits (Supabase limite à 1000/requête → pagination)
+    const all: Product[] = [];
+    for (let i = 0; i < 20; i++) {
+      const { data } = await supabase.from("products").select("*").order("reference").range(i * 1000, i * 1000 + 999);
+      if (!data || data.length === 0) break;
+      all.push(...data);
+      if (data.length < 1000) break;
+    }
+    setProducts(all);
   }
 
   useEffect(() => { load(); }, []);
 
   function addLine() {
-    if (!products[0]) return;
-    setLines([...lines, { product_id: products[0].id, quantite: 1, prix_unitaire: products[0].prix_vente, nom: products[0].nom_fr }]);
+    setLines([...lines, { product_id: "", quantite: 1, prix_unitaire: 0, nom: "" }]);
   }
 
   function updateLine(i: number, field: keyof LineItem, val: string | number) {
     const updated = [...lines];
-    if (field === "product_id") {
-      const p = products.find(p => p.id === val);
-      if (p) updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.nom_fr };
-    } else {
-      (updated[i] as Record<string, unknown>)[field] = val;
-    }
+    (updated[i] as Record<string, unknown>)[field] = val;
+    setLines(updated);
+  }
+
+  function setLineProduct(i: number, p: Product) {
+    const updated = [...lines];
+    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.nom_fr };
     setLines(updated);
   }
 
   const total = lines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
 
   async function save() {
-    if (!clientId || lines.length === 0) return;
+    const validLines = lines.filter(l => l.product_id && l.quantite > 0);
+    if (!clientId || validLines.length === 0) return;
+    const saleTotal = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
     const { data: sale } = await supabase.from("sales").insert({
       client_id: clientId, date: new Date().toISOString().split("T")[0],
-      total, montant_paye: statut === "paye" ? total : montantPaye,
+      total: saleTotal, montant_paye: statut === "paye" ? saleTotal : montantPaye,
       statut, notes: notes || null,
     }).select().single();
 
     if (sale) {
       await supabase.from("sale_items").insert(
-        lines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire }))
+        validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire }))
       );
-      for (const l of lines) {
+      for (const l of validLines) {
         await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
       }
     }
@@ -127,9 +138,9 @@ export default function VentesPage() {
               </div>
               {lines.map((l, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2 mb-2">
-                  <select className="input col-span-5" value={l.product_id} onChange={e => updateLine(i, "product_id", e.target.value)}>
-                    {products.map(p => <option key={p.id} value={p.id}>{p.nom_fr}</option>)}
-                  </select>
+                  <div className="col-span-5">
+                    <ProductPicker products={products} value={l.product_id} onSelect={(p) => setLineProduct(i, p)} />
+                  </div>
                   <input type="number" className="input col-span-2" value={l.quantite} onChange={e => updateLine(i, "quantite", +e.target.value)} min={1} />
                   <input type="number" className="input col-span-3" value={l.prix_unitaire} onChange={e => updateLine(i, "prix_unitaire", +e.target.value)} />
                   <button onClick={() => setLines(lines.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-600 flex items-center justify-center"><Trash2 size={15} /></button>
