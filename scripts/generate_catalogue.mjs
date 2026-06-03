@@ -43,6 +43,7 @@ const TYPES = {
 // Coordonnées commerce (affichées sur couverture + pied de page)
 const TEL_DISPLAY = "06 02 35 02 90";
 const WA_DISPLAY = "+212 602-350290";
+const SLOGAN = "Votre spécialiste du filtre auto au Maroc";
 
 const CAT_ORDER = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
 const CAT_LABEL = {
@@ -132,18 +133,6 @@ async function downloadThumbs(products, concurrency = 12) {
   console.log(`>>> Vignettes prêtes (ok:${ok} fail:${fail})`);
 }
 
-// Visuels de marque Filtron (photo qualité + pictogrammes officiels par type)
-async function downloadFiltronAssets() {
-  const A = {
-    "fil_robot.jpg": "https://filtron.eu/content/dam/website/filtron/filtron_kv_robot_600x340_en.jpg",
-    "picto_filtre_huile.png": "https://filtron.eu/adobe/dynamicmedia/deliver/dm-aid--db3fe965-d7db-40b6-8b32-5098c012b60c/oil-filters-pictogram.png",
-    "picto_filtre_air.png": "https://filtron.eu/adobe/dynamicmedia/deliver/dm-aid--0feaffdc-5cb0-4ea2-85c2-8b8f6af16c7a/air-filters-pictogram.png",
-    "picto_filtre_carburant.png": "https://filtron.eu/adobe/dynamicmedia/deliver/dm-aid--48f57364-f8c8-4eff-83fb-321cc68aee68/fuel-filters-pictogram.png",
-    "picto_filtre_habitacle.png": "https://filtron.eu/adobe/dynamicmedia/deliver/dm-aid--88bef34c-c9db-4e03-8e80-61fbb06cc948/cabin-filters-pictogram.png",
-  };
-  for (const [name, url] of Object.entries(A)) await fetchToFile(url, path.join(IMG_DIR, name));
-}
-
 function esc(s) {
   return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
@@ -156,6 +145,7 @@ const LOGO_SVG = `<svg width="72" height="72" viewBox="0 0 48 48" fill="none" xm
   <g stroke="#fff" stroke-width="2.6" stroke-linecap="round" fill="none">
     <path d="M13 18 C 19.5 13.5, 28.5 13.5, 35 18"/><path d="M13 24 C 19.5 19.5, 28.5 19.5, 35 24"/><path d="M13 30 C 19.5 25.5, 28.5 25.5, 35 30"/>
   </g><circle cx="35" cy="18" r="2.1" fill="#fff"/></svg>`;
+const LOGO_DATAURI = "data:image/svg+xml;base64," + Buffer.from(LOGO_SVG).toString("base64");
 
 function card(p, makes) {
   const hasImg = p.image_url && fs.existsSync(path.join(IMG_DIR, p.id + ".jpg"));
@@ -186,7 +176,9 @@ const STYLE = `
   .cover .sub { color: #f0c7c7; font-size: 14px; max-width: 360px; margin: 8px auto 0; }
   .cover .photo { width: 152mm; margin: 28px auto 0; border-radius: 14px; overflow: hidden;
     border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 12px 34px rgba(0,0,0,0.55); }
-  .cover .photo img { width: 100%; display: block; }
+  .cover .pmontage { display: grid; grid-template-columns: repeat(5, 1fr); background: #fff; }
+  .cover .pmontage > div { padding-top: 100%; background-size: contain; background-repeat: no-repeat;
+    background-position: center; background-color: #fff; border: 1px solid #f1f1f1; }
   .cover .contact { position: relative; z-index: 1; margin-top: 22px; font-size: 13px; color: #fff;
     background: rgba(220,38,38,0.20); border: 1px solid rgba(244,63,94,0.55); border-radius: 999px; padding: 9px 20px; display: inline-block; }
   .cover .contact b { color: #fecaca; font-weight: 600; }
@@ -246,14 +238,11 @@ function montage(imgs, cls) {
   return `<div class="${cls}">${imgs.map((s) => `<div style="background-image:url('${s}')"></div>`).join("")}</div>`;
 }
 
-// Assets de marque Filtron (téléchargés par downloadFiltronAssets, en cache)
-const ROBOT = () => (fs.existsSync(path.join(IMG_DIR, "fil_robot.jpg")) ? ".catalog_imgs/fil_robot.jpg" : null);
-const pictoFor = (cat) => (fs.existsSync(path.join(IMG_DIR, `picto_${cat}.png`)) ? `.catalog_imgs/picto_${cat}.png` : null);
-
-// Couverture commune : fond dégradé sombre + pictogramme officiel + photo qualité Filtron encadrée
-function coverHtml({ icon, pictoFile, photoFile, title, sub, count }) {
-  const ic = pictoFile ? `<img class="picto" src="${pictoFile}" alt=""/>` : (icon ? `<div class="icon">${icon}</div>` : "");
-  const photo = photoFile ? `<div class="photo"><img src="${photoFile}" alt="Filtres Filtron — qualité MANN+HUMMEL"/></div>` : "";
+// Couverture commune : fond dégradé sombre + emoji type + mosaïque ORIGINALE
+// (nos propres photos produits) encadrée — contenu maison, pas d'image copiée.
+function coverHtml({ icon, title, sub, count, coverImgs }) {
+  const ic = icon ? `<div class="icon">${icon}</div>` : "";
+  const photo = coverImgs && coverImgs.length ? `<div class="photo">${montage(coverImgs, "pmontage")}</div>` : "";
   return `<div class="cover">
     <div class="c">${LOGO_SVG}
       <div class="brand">Filtro<b>Pro</b></div>
@@ -291,7 +280,7 @@ function buildTypeHtml(cat, products, vehMap) {
   const list = [...products].sort((a, b) => refCompare(a.reference, b.reference));
   const cards = list.map((p) => card(p, vehMap[p.id]?.makes)).join("");
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ icon: t.icon, pictoFile: pictoFor(cat), photoFile: ROBOT(), title: t.label, sub: "Catalogue voitures · " + CAT_LABEL[cat].toLowerCase(), count: list.length })}
+    ${coverHtml({ icon: t.icon, title: t.label, sub: "Catalogue voitures · " + CAT_LABEL[cat].toLowerCase(), count: list.length, coverImgs: pickImgs(products, 15) })}
     ${introHtml(cat, list.length, pickImgs(products, 8))}
     <div class="chapter first">
       <div class="chead"><div class="cicon">${t.icon}</div><div><h2>${CAT_LABEL[cat]}</h2><p>${list.length} références disponibles</p></div></div>
@@ -332,7 +321,7 @@ function buildOilHtml(products, vehMap) {
   }).join("");
 
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ icon: t.icon, pictoFile: pictoFor(cat), photoFile: ROBOT(), title: t.label, sub: "Catalogue voitures · filtres à huile", count: list.length })}
+    ${coverHtml({ icon: t.icon, title: t.label, sub: "Catalogue voitures · filtres à huile", count: list.length, coverImgs: pickImgs(list, 15) })}
     ${introHtml(cat, list.length, pickImgs(list, 8))}
     ${sections}
   </body></html>`;
@@ -350,22 +339,23 @@ function buildMultiHtml({ title, sub }, byCat, vehMap) {
       <div class="grid">${cards}</div></div>`;
   }).join("");
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ icon: "🚚", pictoFile: null, photoFile: ROBOT(), title, sub, count: total })}
+    ${coverHtml({ icon: "🚚", title, sub, count: total, coverImgs: pickImgs(cats.flatMap((c) => byCat[c]), 15) })}
     <div class="toc"><h2>Sommaire</h2>${toc}</div>
     ${chapters}</body></html>`;
 }
 
-async function renderPdf(browser, html, outFile, footer) {
+async function renderPdf(browser, html, outFile) {
   fs.writeFileSync(HTML_PATH, html);
   const page = await browser.newPage();
   await page.goto("file://" + HTML_PATH.replace(/\\/g, "/"), { waitUntil: "networkidle0", timeout: 180000 });
   const out = path.join(OUT_DIR, outFile);
   await page.pdf({
     path: out, format: "A4", printBackground: true,
-    margin: { top: "12mm", bottom: "14mm", left: "8mm", right: "8mm" },
+    margin: { top: "12mm", bottom: "15mm", left: "8mm", right: "8mm" },
     displayHeaderFooter: true, headerTemplate: "<div></div>",
-    footerTemplate: `<div style="width:100%;font-size:8px;color:#9ca3af;padding:0 12mm;display:flex;justify-content:space-between;">
-      <span>${footer} · Tél ${TEL_DISPLAY} · WhatsApp ${WA_DISPLAY}</span><span class="pageNumber"></span></div>`,
+    footerTemplate: `<div style="width:100%;font-size:8px;color:#9ca3af;padding:0 12mm;display:flex;align-items:center;justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:5px;"><img src="${LOGO_DATAURI}" style="height:12px;width:12px;"/><b style="color:#dc2626;">FiltroPro</b> &nbsp;·&nbsp; ${SLOGAN} &nbsp;·&nbsp; Tél ${TEL_DISPLAY} &nbsp;·&nbsp; WhatsApp ${WA_DISPLAY}</span>
+      <span class="pageNumber"></span></div>`,
   });
   await page.close();
   const mb = (fs.statSync(out).size / 1048576).toFixed(1);
@@ -386,8 +376,6 @@ async function main() {
   } catch (e) { console.log("   (vue product_vehicles indisponible)", e.message); }
 
   await downloadThumbs(products);
-  console.log(">>> Téléchargement des visuels Filtron (photo qualité + pictogrammes)…");
-  await downloadFiltronAssets();
 
   const voitures = products.filter((p) => classifyKind(p.reference, vehMap[p.id]?.makes) === "voiture");
   const camions = products.filter((p) => classifyKind(p.reference, vehMap[p.id]?.makes) === "camion");
@@ -405,7 +393,7 @@ async function main() {
     const list = voitures.filter((p) => p.categorie === cat);
     if (!list.length) { console.log(`   (${cat} : aucune réf, ignoré)`); continue; }
     const html = cat === "filtre_huile" ? buildOilHtml(list, vehMap) : buildTypeHtml(cat, list, vehMap);
-    await renderPdf(browser, html, FILES[cat], `FiltroPro — ${TYPES[cat].label} (voitures)`);
+    await renderPdf(browser, html, FILES[cat]);
   }
 
   // Catalogue Bus & Camions combiné
@@ -415,14 +403,14 @@ async function main() {
     for (const c of Object.keys(byCat)) byCat[c].sort((a, b) => refCompare(a.reference, b.reference));
     await renderPdf(browser, buildMultiHtml(
       { title: "Filtres Bus & Camions", sub: "Poids lourds · bus · utilitaires" },
-      byCat, vehMap), "catalogue-bus-camion.pdf", "FiltroPro — Bus & Camions");
+      byCat, vehMap), "catalogue-bus-camion.pdf");
   }
 
   await browser.close();
   console.log(`\n=== TERMINÉ ===`);
 }
 
-export { TYPES, loadAll, downloadFiltronAssets, buildTypeHtml, buildOilHtml };
+export { TYPES, loadAll, buildTypeHtml, buildOilHtml };
 
 // N'exécute main() que si lancé directement (pas à l'import par un script de preview)
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
