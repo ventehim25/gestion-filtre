@@ -137,6 +137,19 @@ function esc(s) {
   return String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 }
 
+// Photos de couverture (scènes auto, licence libre Unsplash — AUCUN filtre dessus).
+async function downloadHeroes() {
+  for (const t of Object.values(TYPES)) {
+    const dest = path.join(IMG_DIR, `hero_${t.hero}.jpg`);
+    await fetchToFile(`https://images.unsplash.com/${t.hero}?auto=format&fit=crop&w=1600&q=80`, dest);
+    t.heroFile = fs.existsSync(dest) ? `.catalog_imgs/hero_${t.hero}.jpg` : null;
+  }
+  const gid = "photo-1606577924006-27d39b132ae2"; // disque de frein / atelier (bus-camion)
+  const gdest = path.join(IMG_DIR, `hero_${gid}.jpg`);
+  await fetchToFile(`https://images.unsplash.com/${gid}?auto=format&fit=crop&w=1600&q=80`, gdest);
+  return fs.existsSync(gdest) ? `.catalog_imgs/hero_${gid}.jpg` : null;
+}
+
 const LOGO_SVG = `<svg width="72" height="72" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs><linearGradient id="g" x1="6" y1="3" x2="42" y2="45" gradientUnits="userSpaceOnUse">
     <stop stop-color="#f43f5e"/><stop offset="0.6" stop-color="#dc2626"/><stop offset="1" stop-color="#7f1d1d"/>
@@ -161,28 +174,29 @@ const STYLE = `
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #1f2937; }
   /* Couverture */
-  .cover { position: relative; height: 297mm; color: #fff;
-    background: linear-gradient(162deg, #0a0a0c 0%, #2a0808 58%, #7f1d1d 125%);
+  .cover { position: relative; height: 297mm; color: #fff; background: #0a0a0c;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     text-align: center; page-break-after: always; overflow: hidden; }
+  .cover .bg { position: absolute; inset: 0; background-size: cover; background-position: center;
+    filter: contrast(1.08) brightness(0.92) saturate(1.05); }
+  .cover .ov { position: absolute; inset: 0;
+    background:
+      radial-gradient(130% 80% at 50% 30%, rgba(0,0,0,0.15), rgba(0,0,0,0.78) 100%),
+      linear-gradient(180deg, rgba(8,8,10,0.92) 0%, rgba(8,8,10,0.30) 34%, rgba(28,8,8,0.55) 70%, rgba(127,29,29,0.92) 100%); }
+  .cover .grain { position: absolute; inset: 0; opacity: 0.05;
+    background-image: radial-gradient(rgba(255,255,255,0.7) 0.5px, transparent 0.5px); background-size: 3px 3px; }
   .cover .c { position: relative; z-index: 1; padding: 0 22mm; }
-  .cover .brand { font-size: 30px; font-weight: 800; letter-spacing: 1px; margin-top: 12px; }
+  .cover .brand { font-size: 34px; font-weight: 800; letter-spacing: 1px; margin-top: 14px; text-shadow: 0 2px 16px rgba(0,0,0,0.5); }
   .cover .brand b { color: #f43f5e; }
-  .cover .tag { letter-spacing: 6px; font-size: 11px; color: #cbd5e1; margin-top: 4px; text-transform: uppercase; }
-  .cover .line { width: 64px; height: 3px; background: #dc2626; margin: 20px auto; border-radius: 3px; }
-  .cover .picto { width: 60px; height: 60px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.95; margin: 4px 0 6px; }
-  .cover .icon { font-size: 56px; margin: 4px 0 6px; }
-  .cover h1 { font-size: 38px; font-weight: 800; margin: 4px 0; line-height: 1.05; }
-  .cover .sub { color: #f0c7c7; font-size: 14px; max-width: 360px; margin: 8px auto 0; }
-  .cover .photo { width: 152mm; margin: 28px auto 0; border-radius: 14px; overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 12px 34px rgba(0,0,0,0.55); }
-  .cover .pmontage { display: grid; grid-template-columns: repeat(5, 1fr); background: #fff; }
-  .cover .pmontage > div { padding-top: 100%; background-size: contain; background-repeat: no-repeat;
-    background-position: center; background-color: #fff; border: 1px solid #f1f1f1; }
-  .cover .contact { position: relative; z-index: 1; margin-top: 22px; font-size: 13px; color: #fff;
-    background: rgba(220,38,38,0.20); border: 1px solid rgba(244,63,94,0.55); border-radius: 999px; padding: 9px 20px; display: inline-block; }
+  .cover .tag { letter-spacing: 7px; font-size: 11px; color: #e2e8f0; margin-top: 5px; text-transform: uppercase; }
+  .cover .line { width: 70px; height: 3px; background: #dc2626; margin: 26px auto; border-radius: 3px; box-shadow: 0 0 18px rgba(220,38,38,0.8); }
+  .cover h1 { font-size: 50px; font-weight: 800; margin: 8px 0; line-height: 1.03; letter-spacing: -0.5px; text-shadow: 0 4px 28px rgba(0,0,0,0.65); }
+  .cover .sub { color: #f3d3d3; font-size: 15px; max-width: 380px; margin: 12px auto 0; text-shadow: 0 1px 10px rgba(0,0,0,0.5); }
+  .cover .contact { position: relative; z-index: 1; margin-top: 30px; font-size: 13px; color: #fff;
+    background: rgba(220,38,38,0.28); border: 1px solid rgba(244,63,94,0.6); border-radius: 999px;
+    padding: 10px 22px; display: inline-block; backdrop-filter: blur(2px); box-shadow: 0 6px 20px rgba(0,0,0,0.4); }
   .cover .contact b { color: #fecaca; font-weight: 600; }
-  .cover .meta { position: absolute; bottom: 16mm; left: 0; right: 0; color: #94a3b8; font-size: 12px; z-index: 1; }
+  .cover .meta { position: absolute; bottom: 16mm; left: 0; right: 0; color: #cbd5e1; font-size: 12px; z-index: 1; letter-spacing: 1px; }
   /* Intro marketing */
   .intro { padding: 24mm 20mm; page-break-after: always; }
   .intro .kicker { color: #dc2626; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; font-size: 12px; }
@@ -238,20 +252,18 @@ function montage(imgs, cls) {
   return `<div class="${cls}">${imgs.map((s) => `<div style="background-image:url('${s}')"></div>`).join("")}</div>`;
 }
 
-// Couverture commune : fond dégradé sombre + emoji type + mosaïque ORIGINALE
-// (nos propres photos produits) encadrée — contenu maison, pas d'image copiée.
-function coverHtml({ icon, title, sub, count, coverImgs }) {
-  const ic = icon ? `<div class="icon">${icon}</div>` : "";
-  const photo = coverImgs && coverImgs.length ? `<div class="photo">${montage(coverImgs, "pmontage")}</div>` : "";
+// Couverture premium plein cadre : photo automobile cinématographique (licence libre,
+// AUCUN filtre dessus) + halo sombre/rouge + typo en gros. Original, pas de plagiat.
+function coverHtml({ title, sub, count, bgFile }) {
+  const bg = bgFile ? `<div class="bg" style="background-image:url('${bgFile}')"></div>` : "";
   return `<div class="cover">
+    ${bg}<div class="ov"></div><div class="grain"></div>
     <div class="c">${LOGO_SVG}
       <div class="brand">Filtro<b>Pro</b></div>
       <div class="tag">Pièces Auto · Maroc</div>
       <div class="line"></div>
-      ${ic}
       <h1>${esc(title)}</h1>
       <div class="sub">${esc(sub)}</div>
-      ${photo}
       <div class="contact">📞 <b>${TEL_DISPLAY}</b>&nbsp;&nbsp;·&nbsp;&nbsp;💬 WhatsApp <b>${WA_DISPLAY}</b></div>
     </div>
     <div class="meta">${count} références · ${today()}</div></div>`;
@@ -280,7 +292,7 @@ function buildTypeHtml(cat, products, vehMap) {
   const list = [...products].sort((a, b) => refCompare(a.reference, b.reference));
   const cards = list.map((p) => card(p, vehMap[p.id]?.makes)).join("");
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ icon: t.icon, title: t.label, sub: "Catalogue voitures · " + CAT_LABEL[cat].toLowerCase(), count: list.length, coverImgs: pickImgs(products, 15) })}
+    ${coverHtml({ title: t.label, sub: "Catalogue voitures · " + CAT_LABEL[cat].toLowerCase(), count: list.length, bgFile: t.heroFile })}
     ${introHtml(cat, list.length, pickImgs(products, 8))}
     <div class="chapter first">
       <div class="chead"><div class="cicon">${t.icon}</div><div><h2>${CAT_LABEL[cat]}</h2><p>${list.length} références disponibles</p></div></div>
@@ -321,14 +333,14 @@ function buildOilHtml(products, vehMap) {
   }).join("");
 
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ icon: t.icon, title: t.label, sub: "Catalogue voitures · filtres à huile", count: list.length, coverImgs: pickImgs(list, 15) })}
+    ${coverHtml({ title: t.label, sub: "Catalogue voitures · filtres à huile", count: list.length, bgFile: t.heroFile })}
     ${introHtml(cat, list.length, pickImgs(list, 8))}
     ${sections}
   </body></html>`;
 }
 
 // Catalogue multi-sections (bus-camion) : couverture + sommaire + chapitres
-function buildMultiHtml({ title, sub }, byCat, vehMap) {
+function buildMultiHtml({ title, sub, bgFile }, byCat, vehMap) {
   const cats = CAT_ORDER.filter((c) => byCat[c] && byCat[c].length);
   const total = cats.reduce((s, c) => s + byCat[c].length, 0);
   const toc = cats.map((c) => `<div class="tocrow"><span>${CAT_ICON[c]} ${CAT_LABEL[c]}</span><span class="dots"></span><span>${byCat[c].length} réf.</span></div>`).join("");
@@ -339,7 +351,7 @@ function buildMultiHtml({ title, sub }, byCat, vehMap) {
       <div class="grid">${cards}</div></div>`;
   }).join("");
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ icon: "🚚", title, sub, count: total, coverImgs: pickImgs(cats.flatMap((c) => byCat[c]), 15) })}
+    ${coverHtml({ title, sub, count: total, bgFile })}
     <div class="toc"><h2>Sommaire</h2>${toc}</div>
     ${chapters}</body></html>`;
 }
@@ -376,6 +388,8 @@ async function main() {
   } catch (e) { console.log("   (vue product_vehicles indisponible)", e.message); }
 
   await downloadThumbs(products);
+  console.log(">>> Téléchargement des photos de couverture…");
+  const busHero = await downloadHeroes();
 
   const voitures = products.filter((p) => classifyKind(p.reference, vehMap[p.id]?.makes) === "voiture");
   const camions = products.filter((p) => classifyKind(p.reference, vehMap[p.id]?.makes) === "camion");
@@ -402,7 +416,7 @@ async function main() {
     for (const p of camions) (byCat[p.categorie] ??= []).push(p);
     for (const c of Object.keys(byCat)) byCat[c].sort((a, b) => refCompare(a.reference, b.reference));
     await renderPdf(browser, buildMultiHtml(
-      { title: "Filtres Bus & Camions", sub: "Poids lourds · bus · utilitaires" },
+      { title: "Filtres Bus & Camions", sub: "Poids lourds · bus · utilitaires", bgFile: busHero },
       byCat, vehMap), "catalogue-bus-camion.pdf");
   }
 
