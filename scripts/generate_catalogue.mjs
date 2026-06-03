@@ -105,17 +105,16 @@ async function downloadThumbs(products, concurrency = 12) {
   console.log(`>>> Vignettes prêtes (ok:${ok} fail:${fail})`);
 }
 
-async function downloadHeroes() {
-  for (const t of Object.values(TYPES)) {
-    const dest = path.join(IMG_DIR, `hero_${t.hero}.jpg`);
-    await fetchToFile(`https://images.unsplash.com/${t.hero}?auto=format&fit=crop&w=1400&q=80`, dest);
-    t.heroFile = fs.existsSync(dest) ? `.catalog_imgs/hero_${t.hero}.jpg` : null;
-  }
-  // héros générique (garage) pour le catalogue bus-camion
-  const gid = "photo-1530046339160-ce3e530c7d2f";
-  const gdest = path.join(IMG_DIR, `hero_${gid}.jpg`);
-  await fetchToFile(`https://images.unsplash.com/${gid}?auto=format&fit=crop&w=1400&q=80`, gdest);
-  return fs.existsSync(gdest) ? `.catalog_imgs/hero_${gid}.jpg` : null;
+// Visuels de marque Filtron (photo qualité + pictogrammes officiels par type)
+async function downloadFiltronAssets() {
+  const A = {
+    "fil_robot.jpg": "https://filtron.eu/content/dam/website/filtron/filtron_kv_robot_600x340_en.jpg",
+    "picto_filtre_huile.png": "https://filtron.eu/adobe/dynamicmedia/deliver/dm-aid--db3fe965-d7db-40b6-8b32-5098c012b60c/oil-filters-pictogram.png",
+    "picto_filtre_air.png": "https://filtron.eu/adobe/dynamicmedia/deliver/dm-aid--0feaffdc-5cb0-4ea2-85c2-8b8f6af16c7a/air-filters-pictogram.png",
+    "picto_filtre_carburant.png": "https://filtron.eu/adobe/dynamicmedia/deliver/dm-aid--48f57364-f8c8-4eff-83fb-321cc68aee68/fuel-filters-pictogram.png",
+    "picto_filtre_habitacle.png": "https://filtron.eu/adobe/dynamicmedia/deliver/dm-aid--88bef34c-c9db-4e03-8e80-61fbb06cc948/cabin-filters-pictogram.png",
+  };
+  for (const [name, url] of Object.entries(A)) await fetchToFile(url, path.join(IMG_DIR, name));
 }
 
 function esc(s) {
@@ -145,29 +144,34 @@ const STYLE = `
   * { box-sizing: border-box; }
   body { font-family: 'Segoe UI', Arial, sans-serif; margin: 0; color: #1f2937; }
   /* Couverture */
-  .cover { position: relative; height: 297mm; color: #fff; display: flex; flex-direction: column;
-    align-items: center; justify-content: center; text-align: center; page-break-after: always; overflow: hidden; }
-  .cover .bg { position: absolute; inset: 0; background-size: cover; background-position: center; }
-  .cover .ov { position: absolute; inset: 0;
-    background: linear-gradient(160deg, rgba(8,8,10,0.94) 0%, rgba(40,8,8,0.84) 52%, rgba(127,29,29,0.72) 100%); }
-  .cover .c { position: relative; z-index: 1; padding: 0 24mm; }
+  .cover { position: relative; height: 297mm; color: #fff;
+    background: linear-gradient(162deg, #0a0a0c 0%, #2a0808 58%, #7f1d1d 125%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; page-break-after: always; overflow: hidden; }
+  .cover .c { position: relative; z-index: 1; padding: 0 22mm; }
   .cover .brand { font-size: 30px; font-weight: 800; letter-spacing: 1px; margin-top: 12px; }
   .cover .brand b { color: #f43f5e; }
   .cover .tag { letter-spacing: 6px; font-size: 11px; color: #cbd5e1; margin-top: 4px; text-transform: uppercase; }
-  .cover .icon { font-size: 60px; margin: 34px 0 10px; }
-  .cover h1 { font-size: 40px; font-weight: 800; margin: 6px 0; line-height: 1.05; }
-  .cover .sub { color: #f0c7c7; font-size: 15px; max-width: 360px; margin: 8px auto 0; }
-  .cover .line { width: 64px; height: 3px; background: #dc2626; margin: 22px auto; border-radius: 3px; }
-  .cover .contact { position: relative; z-index: 1; margin-top: 20px; font-size: 13px; color: #fff;
+  .cover .line { width: 64px; height: 3px; background: #dc2626; margin: 20px auto; border-radius: 3px; }
+  .cover .picto { width: 60px; height: 60px; object-fit: contain; filter: brightness(0) invert(1); opacity: 0.95; margin: 4px 0 6px; }
+  .cover .icon { font-size: 56px; margin: 4px 0 6px; }
+  .cover h1 { font-size: 38px; font-weight: 800; margin: 4px 0; line-height: 1.05; }
+  .cover .sub { color: #f0c7c7; font-size: 14px; max-width: 360px; margin: 8px auto 0; }
+  .cover .photo { width: 152mm; margin: 28px auto 0; border-radius: 14px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.18); box-shadow: 0 12px 34px rgba(0,0,0,0.55); }
+  .cover .photo img { width: 100%; display: block; }
+  .cover .contact { position: relative; z-index: 1; margin-top: 22px; font-size: 13px; color: #fff;
     background: rgba(220,38,38,0.20); border: 1px solid rgba(244,63,94,0.55); border-radius: 999px; padding: 9px 20px; display: inline-block; }
   .cover .contact b { color: #fecaca; font-weight: 600; }
-  .cover .meta { position: absolute; bottom: 22mm; left: 0; right: 0; color: #94a3b8; font-size: 12px; z-index: 1; }
+  .cover .meta { position: absolute; bottom: 16mm; left: 0; right: 0; color: #94a3b8; font-size: 12px; z-index: 1; }
   /* Intro marketing */
   .intro { padding: 24mm 20mm; page-break-after: always; }
   .intro .kicker { color: #dc2626; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; font-size: 12px; }
   .intro h2 { font-size: 26px; margin: 6px 0 14px; color: #111827; }
   .intro .pitch { font-size: 15px; color: #374151; line-height: 1.75; max-width: 560px; }
-  .intro .band { margin: 22px 0; height: 150px; border-radius: 14px; background-size: cover; background-position: center; }
+  .intro .band { margin: 22px 0; height: 120px; border-radius: 14px; overflow: hidden;
+    display: grid; grid-template-columns: repeat(8, 1fr); border: 1px solid #e5e7eb; }
+  .intro .band > div { background-size: cover; background-position: center; background-color: #fff; }
   .benefits { display: flex; gap: 12px; }
   .benefit { flex: 1; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 12px; text-align: center; }
   .benefit .bi { font-size: 22px; }
@@ -201,20 +205,57 @@ const STYLE = `
 
 const today = () => new Date().toLocaleDateString("fr-FR", { year: "numeric", month: "long" });
 
-// Couverture commune
-function coverHtml({ icon, title, sub, count, heroFile }) {
-  const bg = heroFile ? `style="background-image:url('${heroFile}')"` : "";
-  return `<div class="cover"><div class="bg" ${bg}></div><div class="ov"></div>
+// Sélectionne n photos de filtres (cache) réparties dans la liste, pour la mosaïque
+function pickImgs(products, n) {
+  const imgs = products
+    .filter((p) => p.image_url && fs.existsSync(path.join(IMG_DIR, p.id + ".jpg")))
+    .map((p) => `.catalog_imgs/${p.id}.jpg`);
+  if (!imgs.length) return [];
+  const out = [];
+  for (let i = 0; i < n; i++) out.push(imgs[(i * 13) % imgs.length]);
+  return out;
+}
+function montage(imgs, cls) {
+  return `<div class="${cls}">${imgs.map((s) => `<div style="background-image:url('${s}')"></div>`).join("")}</div>`;
+}
+
+// Assets de marque Filtron (téléchargés par downloadFiltronAssets, en cache)
+const ROBOT = () => (fs.existsSync(path.join(IMG_DIR, "fil_robot.jpg")) ? ".catalog_imgs/fil_robot.jpg" : null);
+const pictoFor = (cat) => (fs.existsSync(path.join(IMG_DIR, `picto_${cat}.png`)) ? `.catalog_imgs/picto_${cat}.png` : null);
+
+// Couverture commune : fond dégradé sombre + pictogramme officiel + photo qualité Filtron encadrée
+function coverHtml({ icon, pictoFile, photoFile, title, sub, count }) {
+  const ic = pictoFile ? `<img class="picto" src="${pictoFile}" alt=""/>` : (icon ? `<div class="icon">${icon}</div>` : "");
+  const photo = photoFile ? `<div class="photo"><img src="${photoFile}" alt="Filtres Filtron — qualité MANN+HUMMEL"/></div>` : "";
+  return `<div class="cover">
     <div class="c">${LOGO_SVG}
       <div class="brand">Filtro<b>Pro</b></div>
       <div class="tag">Pièces Auto · Maroc</div>
       <div class="line"></div>
-      ${icon ? `<div class="icon">${icon}</div>` : ""}
+      ${ic}
       <h1>${esc(title)}</h1>
       <div class="sub">${esc(sub)}</div>
+      ${photo}
       <div class="contact">📞 <b>${TEL_DISPLAY}</b>&nbsp;&nbsp;·&nbsp;&nbsp;💬 WhatsApp <b>${WA_DISPLAY}</b></div>
     </div>
     <div class="meta">${count} références · ${today()}</div></div>`;
+}
+
+// Page d'intro marketing (réutilisée par tous les catalogues par type)
+function introHtml(cat, count, stripImgs) {
+  const t = TYPES[cat];
+  const band = stripImgs && stripImgs.length ? montage(stripImgs, "band") : "";
+  return `<div class="intro">
+    <div class="kicker">${t.icon} ${CAT_LABEL[cat]}</div>
+    <h2>Pourquoi c'est essentiel ?</h2>
+    <p class="pitch">${esc(t.pitch)}</p>
+    ${band}
+    <div class="benefits">
+      <div class="benefit"><div class="bi">✓</div><div class="bt">Qualité d'origine</div><div class="bd">Références Filtron / MANN+HUMMEL</div></div>
+      <div class="benefit"><div class="bi">🚗</div><div class="bt">Large compatibilité</div><div class="bd">${count} références voitures</div></div>
+      <div class="benefit"><div class="bi">📍</div><div class="bt">Disponible au Maroc</div><div class="bd">Tél ${TEL_DISPLAY}</div></div>
+    </div>
+  </div>`;
 }
 
 // Catalogue d'UN type (voitures) : couverture + intro marketing + grille
@@ -222,20 +263,9 @@ function buildTypeHtml(cat, products, vehMap) {
   const t = TYPES[cat];
   const list = [...products].sort((a, b) => refCompare(a.reference, b.reference));
   const cards = list.map((p) => card(p, vehMap[p.id]?.makes)).join("");
-  const band = t.heroFile ? `<div class="band" style="background-image:url('${t.heroFile}')"></div>` : "";
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ icon: t.icon, title: t.label, sub: "Catalogue voitures · " + CAT_LABEL[cat].toLowerCase(), count: list.length, heroFile: t.heroFile })}
-    <div class="intro">
-      <div class="kicker">${t.icon} ${CAT_LABEL[cat]}</div>
-      <h2>Pourquoi c'est essentiel ?</h2>
-      <p class="pitch">${esc(t.pitch)}</p>
-      ${band}
-      <div class="benefits">
-        <div class="benefit"><div class="bi">✓</div><div class="bt">Qualité d'origine</div><div class="bd">Références Filtron / MANN+HUMMEL</div></div>
-        <div class="benefit"><div class="bi">🚗</div><div class="bt">Large compatibilité</div><div class="bd">${list.length} références voitures</div></div>
-        <div class="benefit"><div class="bi">📍</div><div class="bt">Disponible au Maroc</div><div class="bd">Livraison & conseil</div></div>
-      </div>
-    </div>
+    ${coverHtml({ icon: t.icon, pictoFile: pictoFor(cat), photoFile: ROBOT(), title: t.label, sub: "Catalogue voitures · " + CAT_LABEL[cat].toLowerCase(), count: list.length })}
+    ${introHtml(cat, list.length, pickImgs(products, 8))}
     <div class="chapter first">
       <div class="chead"><div class="cicon">${t.icon}</div><div><h2>${CAT_LABEL[cat]}</h2><p>${list.length} références disponibles</p></div></div>
       <div class="grid">${cards}</div>
@@ -243,8 +273,46 @@ function buildTypeHtml(cat, products, vehMap) {
   </body></html>`;
 }
 
+// Titres des séries de filtres à huile (sous-sections)
+const OIL_TITLES = {
+  OP: "Filtres à huile vissables — série OP",
+  OE: "Filtres à huile cartouche — série OE",
+  OC: "Filtres à huile — série OC",
+};
+
+// Catalogue Huile : filtré (sans OK651/4-2X, sans réfs finissant par A, uniquement
+// celles ayant un type véhicule) et découpé en sous-sections titrées par série (OP en tête).
+function buildOilHtml(products, vehMap) {
+  const cat = "filtre_huile";
+  const t = TYPES[cat];
+  const list = products.filter((p) =>
+    p.reference.toUpperCase() !== "OK651/4-2X" &&
+    !/A$/i.test(p.reference) &&
+    (vehMap[p.id]?.makes?.length > 0)
+  );
+  const byPre = {};
+  for (const p of list) (byPre[refPrefix(p.reference)] ??= []).push(p);
+  const order = ["OP", "OE", "OC", "OH", "OK"].filter((x) => byPre[x]);
+  for (const k of Object.keys(byPre)) if (!order.includes(k)) order.push(k);
+
+  const sections = order.map((pre, i) => {
+    const items = byPre[pre].sort((a, b) => refCompare(a.reference, b.reference));
+    const title = OIL_TITLES[pre] || `Filtres à huile — série ${pre}`;
+    const cards = items.map((p) => card(p, vehMap[p.id]?.makes)).join("");
+    return `<div class="chapter${i === 0 ? " first" : ""}"><div class="chead"><div class="cicon">${t.icon}</div>
+      <div><h2>${title}</h2><p>${items.length} références</p></div></div>
+      <div class="grid">${cards}</div></div>`;
+  }).join("");
+
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
+    ${coverHtml({ icon: t.icon, pictoFile: pictoFor(cat), photoFile: ROBOT(), title: t.label, sub: "Catalogue voitures · filtres à huile", count: list.length })}
+    ${introHtml(cat, list.length, pickImgs(list, 8))}
+    ${sections}
+  </body></html>`;
+}
+
 // Catalogue multi-sections (bus-camion) : couverture + sommaire + chapitres
-function buildMultiHtml({ title, sub, heroFile }, byCat, vehMap) {
+function buildMultiHtml({ title, sub }, byCat, vehMap) {
   const cats = CAT_ORDER.filter((c) => byCat[c] && byCat[c].length);
   const total = cats.reduce((s, c) => s + byCat[c].length, 0);
   const toc = cats.map((c) => `<div class="tocrow"><span>${CAT_ICON[c]} ${CAT_LABEL[c]}</span><span class="dots"></span><span>${byCat[c].length} réf.</span></div>`).join("");
@@ -255,7 +323,7 @@ function buildMultiHtml({ title, sub, heroFile }, byCat, vehMap) {
       <div class="grid">${cards}</div></div>`;
   }).join("");
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><style>${STYLE}</style></head><body>
-    ${coverHtml({ icon: "🚚", title, sub, count: total, heroFile })}
+    ${coverHtml({ icon: "🚚", pictoFile: null, photoFile: ROBOT(), title, sub, count: total })}
     <div class="toc"><h2>Sommaire</h2>${toc}</div>
     ${chapters}</body></html>`;
 }
@@ -291,8 +359,8 @@ async function main() {
   } catch (e) { console.log("   (vue product_vehicles indisponible)", e.message); }
 
   await downloadThumbs(products);
-  console.log(">>> Téléchargement des photos de couverture…");
-  const busHero = await downloadHeroes();
+  console.log(">>> Téléchargement des visuels Filtron (photo qualité + pictogrammes)…");
+  await downloadFiltronAssets();
 
   const voitures = products.filter((p) => vehKind(p.reference) === "voiture");
   const camions = products.filter((p) => vehKind(p.reference) === "camion");
@@ -309,7 +377,8 @@ async function main() {
   for (const cat of Object.keys(TYPES)) {
     const list = voitures.filter((p) => p.categorie === cat);
     if (!list.length) { console.log(`   (${cat} : aucune réf, ignoré)`); continue; }
-    await renderPdf(browser, buildTypeHtml(cat, list, vehMap), FILES[cat], `FiltroPro — ${TYPES[cat].label} (voitures)`);
+    const html = cat === "filtre_huile" ? buildOilHtml(list, vehMap) : buildTypeHtml(cat, list, vehMap);
+    await renderPdf(browser, html, FILES[cat], `FiltroPro — ${TYPES[cat].label} (voitures)`);
   }
 
   // Catalogue Bus & Camions combiné
@@ -318,7 +387,7 @@ async function main() {
     for (const p of camions) (byCat[p.categorie] ??= []).push(p);
     for (const c of Object.keys(byCat)) byCat[c].sort((a, b) => refCompare(a.reference, b.reference));
     await renderPdf(browser, buildMultiHtml(
-      { title: "Filtres Bus & Camions", sub: "Poids lourds · bus · utilitaires", heroFile: busHero },
+      { title: "Filtres Bus & Camions", sub: "Poids lourds · bus · utilitaires" },
       byCat, vehMap), "catalogue-bus-camion.pdf", "FiltroPro — Bus & Camions");
   }
 
@@ -326,7 +395,7 @@ async function main() {
   console.log(`\n=== TERMINÉ ===`);
 }
 
-export { TYPES, loadAll, downloadHeroes, buildTypeHtml };
+export { TYPES, loadAll, downloadFiltronAssets, buildTypeHtml, buildOilHtml };
 
 // N'exécute main() que si lancé directement (pas à l'import par un script de preview)
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
