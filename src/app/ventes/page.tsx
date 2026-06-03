@@ -26,6 +26,7 @@ export default function VentesPage() {
   const [camOpen, setCamOpen] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [linkCode, setLinkCode] = useState<string | null>(null);
+  const [scanInput, setScanInput] = useState("");
   const fbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function load() {
@@ -188,6 +189,16 @@ export default function VentesPage() {
                   <button onClick={() => setCamOpen(true)} className="flex items-center gap-1 text-xs py-1 px-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium"><ScanLine size={12} /> Scanner</button>
                   <button onClick={addLine} className="btn-secondary text-xs py-1 px-2 flex items-center gap-1"><Plus size={12} /> Ajouter ligne</button>
                 </div>
+              </div>
+              <div className="relative mb-2">
+                <ScanLine size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-red-400" />
+                <input
+                  className="input ps-9 font-mono"
+                  placeholder="Scannez ici (douchette) ou tapez le code + Entrée"
+                  value={scanInput}
+                  onChange={e => setScanInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); handleScan(scanInput); setScanInput(""); } }}
+                />
               </div>
               {feedback && (
                 <div className="mb-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-500/15 text-green-400 flex items-center gap-2">
