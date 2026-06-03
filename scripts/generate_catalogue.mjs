@@ -39,7 +39,7 @@ const TYPES = {
     tip: "À remplacer environ tous les 20 000 à 40 000 km — sur diesel, plus fréquemment.",
   },
   filtre_habitacle: {
-    label: "Filtres d'Habitacle", icon: "❄️", hero: "photo-1600880292089-90a7e086ee0c",
+    label: "Filtres d'Habitacle", icon: "❄️", hero: "photo-1756195343297-3311a8289044",
     pitch: "Pollen, poussières fines et mauvaises odeurs : le filtre d'habitacle purifie l'air de la cabine pour le confort et la santé de tous les passagers.",
     tip: "À remplacer une fois par an ou tous les 15 000 km.",
   },
