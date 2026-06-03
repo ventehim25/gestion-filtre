@@ -9,7 +9,7 @@ import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck } from
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
-import { vehKind } from "@/lib/vehicleType";
+import { classifyKind } from "@/lib/vehicleType";
 
 const CATEGORIES: ProductCategory[] = [
   "filtre_huile", "filtre_air", "filtre_carburant",

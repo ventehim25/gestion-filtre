@@ -51,11 +51,38 @@ const CAT_LABEL = {
 };
 const CAT_ICON = { filtre_huile: "🛢️", filtre_air: "💨", filtre_carburant: "⛽", filtre_habitacle: "❄️", filtre_refroidissement: "🌡️", autre: "🔧" };
 
-// Classement voiture / bus-camion par préfixe (cf. src/lib/vehicleType.ts)
-const CAMION_PREFIXES = new Set(["OM", "OR", "OT", "AM", "AD", "AE", "AG"]);
+// Classement voiture / bus-camion (cf. src/lib/vehicleType.ts — garder synchro)
+const CAMION_PREFIXES = new Set(["OM", "OR", "OT", "AM", "AD", "AE", "AG", "PK"]);
 const EXCLUDE_PREFIXES = new Set(["CW", "UE"]); // filtres "autre" non pertinents
+const HEAVY_KEYWORDS = [
+  "TRUCK", "BUS", "TRACTOR", "TRACTEUR", "DENNIS", "DEUTZ", "ERF", "SCANIA",
+  "IVECO", "DAF", "KAMAZ", "LIEBHERR", "CASE-IH", "CASE IH", "NEW HOLLAND",
+  "CLAAS", "FENDT", "JOHN DEERE", "MASSEY", "VALTRA", "ZETOR", "URSUS", "LANDINI",
+  "JELCZ", "AUTOSAN", "KRAZ", "MAZ", "URAL", "TATRA", "LIAZ", "AVIA", "MULTICAR",
+  "MANITOU", "MAGNI", "EVOBUS", "SETRA", "NEOPLAN", "SOLARIS", "VAN HOOL",
+  "IRISBUS", "VDL", "BOVA", "BREDA", "MENARINI", "BELL EQUIPMENT", "JCB",
+  "CATERPILLAR", "KOMATSU", "TEREX", "BOMAG", "DOOSAN", "KUBOTA", "YANMAR",
+  "STEYR", "TEMSA", "OTOKAR", "BUMAR", "AGRIFULL", "ANTONIO CARRARO", "AKERMAN",
+  "ANDORIA", "HANOMAG", "ASHOK LEYLAND", "AUWAERTER", "BUESSING", "AGRIA",
+  "AEBI", "AMMANN", "BAUTZ",
+];
 const refPrefix = (r) => (r.match(/^[A-Za-z]+/) || [""])[0].toUpperCase();
-const vehKind = (r) => (CAMION_PREFIXES.has(refPrefix(r)) ? "camion" : "voiture");
+const isHeavyMake = (m) => { const u = (m || "").toUpperCase(); return HEAVY_KEYWORDS.some((k) => u.includes(k)); };
+function pmIsCamion(r) {
+  const m = r.toUpperCase().match(/^PM\s*(\d+)(?:\/(\d+))?/);
+  if (!m) return false;
+  const num = +m[1], variant = m[2] ? +m[2] : 0;
+  return num >= 800 && (num < 815 || (num === 815 && variant === 0));
+}
+function classifyKind(reference, makes) {
+  if (CAMION_PREFIXES.has(refPrefix(reference))) return "camion";
+  if (pmIsCamion(reference)) return "camion";
+  if (makes && makes.length) {
+    const heavy = makes.filter(isHeavyMake).length;
+    if (heavy > 0 && heavy >= makes.length - heavy) return "camion";
+  }
+  return "voiture";
+}
 
 function refCompare(a, b) {
   const parse = (r) => {
@@ -362,8 +389,8 @@ async function main() {
   console.log(">>> Téléchargement des visuels Filtron (photo qualité + pictogrammes)…");
   await downloadFiltronAssets();
 
-  const voitures = products.filter((p) => vehKind(p.reference) === "voiture");
-  const camions = products.filter((p) => vehKind(p.reference) === "camion");
+  const voitures = products.filter((p) => classifyKind(p.reference, vehMap[p.id]?.makes) === "voiture");
+  const camions = products.filter((p) => classifyKind(p.reference, vehMap[p.id]?.makes) === "camion");
 
   if (!fs.existsSync(OUT_DIR)) fs.mkdirSync(OUT_DIR, { recursive: true });
   console.log(">>> Rendu PDF (Puppeteer)…");
