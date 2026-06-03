@@ -1,12 +1,13 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Sale, Client, Product, SaleItem, SaleStatus } from "@/types/database";
-import { Plus, Trash2, Printer } from "lucide-react";
+import { Plus, Trash2, Printer, ScanLine, Check, Link2, X } from "lucide-react";
 import ProductPicker from "@/components/ProductPicker";
+import BarcodeScanner from "@/components/BarcodeScanner";
 
 type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string };
 
@@ -21,6 +22,11 @@ export default function VentesPage() {
   const [statut, setStatut] = useState<SaleStatus>("paye");
   const [montantPaye, setMontantPaye] = useState(0);
   const [notes, setNotes] = useState("");
+  // Scan code-barres
+  const [camOpen, setCamOpen] = useState(false);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [linkCode, setLinkCode] = useState<string | null>(null);
+  const fbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   async function load() {
     const [{ data: s }, { data: c }] = await Promise.all([
@@ -57,6 +63,50 @@ export default function VentesPage() {
     const updated = [...lines];
     updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.nom_fr };
     setLines(updated);
+  }
+
+  function flash(msg: string) {
+    setFeedback(msg);
+    if (fbTimer.current) clearTimeout(fbTimer.current);
+    fbTimer.current = setTimeout(() => setFeedback(null), 2500);
+  }
+
+  // Ajoute un produit au panier (+1 s'il y est déjà)
+  function addProductToCart(p: Product) {
+    setLines(prev => {
+      const idx = prev.findIndex(l => l.product_id === p.id);
+      if (idx >= 0) {
+        const u = [...prev];
+        u[idx] = { ...u[idx], quantite: u[idx].quantite + 1 };
+        return u;
+      }
+      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: p.prix_vente, nom: p.nom_fr }];
+    });
+    flash(`${p.reference} ajouté ✓`);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
+  }
+
+  // Traite un code scanné (caméra ou douchette)
+  function handleScan(raw: string) {
+    const code = raw.trim();
+    if (!code || linkCode) return;
+    const found = products.find(p =>
+      (p.code_barre && p.code_barre === code) || p.reference.toUpperCase() === code.toUpperCase());
+    if (found) {
+      addProductToCart(found);
+    } else {
+      setCamOpen(false);
+      setLinkCode(code);
+    }
+  }
+
+  // Associe un code inconnu à une référence (mémorisé) puis l'ajoute au panier
+  async function linkAndAdd(p: Product) {
+    if (!linkCode) return;
+    await supabase.from("products").update({ code_barre: linkCode }).eq("id", p.id);
+    setProducts(prev => prev.map(x => x.id === p.id ? { ...x, code_barre: linkCode } : x));
+    addProductToCart({ ...p, code_barre: linkCode });
+    setLinkCode(null);
   }
 
   const total = lines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
@@ -134,8 +184,16 @@ export default function VentesPage() {
             <div className="mb-3">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs text-slate-500">{t("products")}</label>
-                <button onClick={addLine} className="btn-secondary text-xs py-1 px-2 flex items-center gap-1"><Plus size={12} /> Ajouter ligne</button>
+                <div className="flex gap-2">
+                  <button onClick={() => setCamOpen(true)} className="flex items-center gap-1 text-xs py-1 px-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium"><ScanLine size={12} /> Scanner</button>
+                  <button onClick={addLine} className="btn-secondary text-xs py-1 px-2 flex items-center gap-1"><Plus size={12} /> Ajouter ligne</button>
+                </div>
               </div>
+              {feedback && (
+                <div className="mb-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-green-500/15 text-green-400 flex items-center gap-2">
+                  <Check size={15} /> {feedback}
+                </div>
+              )}
               {lines.map((l, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2 mb-2">
                   <div className="col-span-5">
@@ -205,6 +263,25 @@ export default function VentesPage() {
         </table>
         {sales.length === 0 && <p className="text-center text-slate-400 py-10">{t("noData")}</p>}
       </div>
+
+      {/* Scanner caméra */}
+      {camOpen && <BarcodeScanner onScan={handleScan} onClose={() => setCamOpen(false)} />}
+
+      {/* Association d'un code inconnu */}
+      {linkCode && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
+          <div className="card p-5 w-full max-w-md">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-slate-100 flex items-center gap-2"><Link2 size={18} className="text-red-400" /> Associer un code-barres</h3>
+              <button onClick={() => setLinkCode(null)} className="text-slate-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <p className="text-sm text-slate-400 mb-1">Code scanné :</p>
+            <p className="font-mono text-lg text-slate-100 bg-slate-800/60 rounded-lg px-3 py-2 mb-4">{linkCode}</p>
+            <p className="text-sm text-slate-400 mb-2">Choisissez la référence correspondante :</p>
+            <ProductPicker products={products} value="" onSelect={(p) => linkAndAdd(p)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
