@@ -5,7 +5,7 @@
    - Images produits (Scene7 / Unsplash) : cache-first (photos dispo hors-ligne).
    - Écritures (POST/PATCH/DELETE) : réseau direct (échec si hors-ligne -> à gérer côté app).
 */
-const VERSION = "v2";
+const VERSION = "v3";
 const STATIC = "fp-static-" + VERSION;
 const DATA = "fp-data-" + VERSION;
 const IMG = "fp-img-" + VERSION;
