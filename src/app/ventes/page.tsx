@@ -187,6 +187,26 @@ export default function VentesPage() {
     if (savedOnline) load();
   }
 
+  // Envoie un DEVIS (panier en cours) au client par WhatsApp, sans enregistrer la vente
+  function sendDevis() {
+    const validLines = lines.filter(l => l.product_id && l.quantite > 0);
+    if (validLines.length === 0) return;
+    const client = clients.find(c => c.id === clientId);
+    const tot = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
+    const date = new Date().toLocaleDateString("fr-FR");
+    const L = validLines.map(l => `• ${l.nom}  ×${l.quantite} = ${(l.quantite * l.prix_unitaire).toFixed(2)} MAD`).join("\n");
+    const text = [
+      "📝 *Devis — FiltroPro*",
+      client ? `👤 ${client.nom}` : "",
+      `📅 ${date}`,
+      "————————————", L, "————————————",
+      `🧮 *TOTAL : ${tot.toFixed(2)} MAD*`,
+      "", "Devis indicatif, sous réserve de disponibilité.",
+      "📞 06 02 35 02 90",
+    ].filter(Boolean).join("\n");
+    sendWhatsApp(client?.telephone, text);
+  }
+
   // Envoie la fiche d'une vente déjà enregistrée (récupère ses articles)
   async function whatsForSale(s: Sale & { client: Client }) {
     const { data } = await supabase.from("sale_items")
@@ -315,8 +335,11 @@ export default function VentesPage() {
               )}
             </div>
 
-            <div className="flex gap-2 justify-end">
+            <div className="flex gap-2 justify-end items-center flex-wrap">
               <button onClick={() => setShowForm(false)} className="btn-secondary">{t("cancel")}</button>
+              <button onClick={sendDevis} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600/90 hover:bg-green-500 text-white text-sm font-medium" title="Envoyer un devis au client (sans enregistrer)">
+                <MessageCircle size={15} /> Devis
+              </button>
               <button onClick={save} className="btn-primary">{t("save")}</button>
             </div>
           </div>

@@ -1,97 +1,265 @@
 "use client";
 export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
-import Header from "@/components/Header";
+import { useRouter } from "next/navigation";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { TrendingUp, Users, Package, AlertTriangle } from "lucide-react";
+import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star } from "lucide-react";
+import BrandLogo from "@/components/BrandLogo";
+import Logo from "@/components/Logo";
+import VoiceButton from "@/components/VoiceButton";
 
 type Stats = {
-  totalVentes: number;
-  totalClients: number;
-  totalProduits: number;
-  stockFaible: number;
-  benefice: number;
-  duFournisseur: number;
+  totalVentes: number; totalClients: number; totalProduits: number;
+  stockFaible: number; benefice: number; duFournisseur: number;
 };
+
+const BRANDS = [
+  { name: "FILTRON", slug: "filtron", color: "#1b4f9c" },
+  { name: "MANN-FILTER", slug: "mann-filter", color: "#c8102e" },
+  { name: "MAHLE", slug: "mahle", color: "#e2001a" },
+  { name: "BOSCH", slug: "bosch", color: "#ea0016" },
+  { name: "TRW", slug: "trw", color: "#d81e05" },
+  { name: "GATES", slug: "gates", color: "#111111" },
+  { name: "LUK", slug: "luk", color: "#111111" },
+  { name: "SKF", slug: "skf", color: "#0033a0" },
+  { name: "BREMBO", slug: "brembo", color: "#e2001a" },
+  { name: "PURFLUX", slug: "purflux", color: "#0a59a8" },
+  { name: "VALEO", slug: "valeo", color: "#00a651" },
+  { name: "FEBI", slug: "febi", color: "#d81e05" },
+  { name: "SACHS", slug: "sachs", color: "#1a1a1a" },
+  { name: "NGK", slug: "ngk", color: "#e60012" },
+  { name: "HENGST", slug: "hengst", color: "#1f6fc0" },
+  { name: "MONROE", slug: "monroe", color: "#e8631a" },
+];
+
+const REVIEWS = [
+  { name: "Karim B.", city: "Fès", text: "J'ai trouvé mon filtre en 2 minutes par référence. Service rapide et pro." },
+  { name: "Mohammed A.", city: "Meknès", text: "Très bon prix et livraison à l'heure. Le catalogue est très complet." },
+  { name: "Youssef E.", city: "Ifrane", text: "Enfin une plateforme claire pour trouver le bon filtre. Je recommande !" },
+];
+
+const FEATURES = [
+  { icon: Package, title: "+3 000 RÉFÉRENCES", sub: "Catalogue Filtron complet" },
+  { icon: Search, title: "RECHERCHE RAPIDE", sub: "Référence · véhicule · VIN" },
+  { icon: ShieldCheck, title: "QUALITÉ MANN+HUMMEL", sub: "Filtres d'origine garantis" },
+  { icon: Truck, title: "LIVRAISON AU MAROC", sub: "Tournées & WhatsApp" },
+];
+
+const HERO = [
+  "photo-1486262715619-67b85e0b08d3", // moteur
+  "photo-1606577924006-27d39b132ae2", // disque de frein
+  "photo-1600880292089-90a7e086ee0c", // mécanicien / garage (nouveau)
+  "photo-1530046339160-ce3e530c7d2f", // garage
+  "photo-1486006920555-c77dcf18193c", // moteur / pièces (nouveau)
+];
 
 export default function Dashboard() {
   const { t } = useLang();
-  const [stats, setStats] = useState<Stats>({
-    totalVentes: 0, totalClients: 0, totalProduits: 0,
-    stockFaible: 0, benefice: 0, duFournisseur: 0,
-  });
+  const router = useRouter();
+  const [q, setQ] = useState("");
+  const [idx, setIdx] = useState(0);
+  const [stats, setStats] = useState<Stats>({ totalVentes: 0, totalClients: 0, totalProduits: 0, stockFaible: 0, benefice: 0, duFournisseur: 0 });
+  const [dbError, setDbError] = useState("");
+
+  useEffect(() => {
+    const tmr = setInterval(() => setIdx((i) => (i + 1) % HERO.length), 5000);
+    return () => clearInterval(tmr);
+  }, []);
 
   useEffect(() => {
     async function load() {
-      const [{ count: clients }, { count: produits }, { data: sales }, { data: stockFaible }, { data: saleItems }] =
-        await Promise.all([
-          supabase.from("clients").select("*", { count: "exact", head: true }),
-          supabase.from("products").select("*", { count: "exact", head: true }),
-          supabase.from("sales").select("total, montant_paye"),
-          supabase.from("products").select("id").lte("stock", 2),
-          supabase.from("sale_items").select("quantite, prix_unitaire, product:products(prix_achat)"),
-        ]);
-
+      const [r1, r2, r3, r4, r5] = await Promise.all([
+        supabase.from("clients").select("*", { count: "exact", head: true }),
+        supabase.from("products").select("*", { count: "exact", head: true }),
+        supabase.from("sales").select("total, montant_paye"),
+        supabase.from("products").select("id").gt("stock", 0).lte("stock", 2),
+        supabase.from("sale_items").select("quantite, prix_unitaire, product:products(prix_achat)"),
+      ]);
+      const errors = [r1.error, r2.error, r3.error, r4.error, r5.error].filter(Boolean);
+      if (errors.length > 0) { setDbError(errors.map((e) => e?.message).join(" | ")); return; }
+      const sales = r3.data; const stockFaible = r4.data; const saleItems = r5.data;
       const totalVentes = sales?.reduce((s, v) => s + v.total, 0) ?? 0;
       const duFournisseur = sales?.reduce((s, v) => s + (v.total - v.montant_paye), 0) ?? 0;
-      const benefice = (saleItems ?? []).reduce((s: number, i: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }) => {
-        const achat = i.product?.prix_achat ?? 0;
-        return s + (i.prix_unitaire - achat) * i.quantite;
-      }, 0);
-
-      setStats({
-        totalVentes,
-        totalClients: clients ?? 0,
-        totalProduits: produits ?? 0,
-        stockFaible: stockFaible?.length ?? 0,
-        benefice,
-        duFournisseur,
-      });
+      const benefice = (saleItems ?? []).reduce((s: number, i: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }) => s + (i.prix_unitaire - (i.product?.prix_achat ?? 0)) * i.quantite, 0);
+      setStats({ totalVentes, totalClients: r1.count ?? 0, totalProduits: r2.count ?? 0, stockFaible: stockFaible?.length ?? 0, benefice, duFournisseur });
     }
     load();
   }, []);
 
+  function go(e: React.FormEvent) {
+    e.preventDefault();
+    if (q.trim()) router.push(`/recherche?q=${encodeURIComponent(q.trim())}`);
+  }
+
   const cards = [
-    { label: t("totalSales"), value: `${stats.totalVentes.toFixed(0)} ${t("moroccanDirham")}`, icon: TrendingUp, color: "text-blue-600 bg-blue-50" },
-    { label: t("totalClients"), value: stats.totalClients, icon: Users, color: "text-green-600 bg-green-50" },
-    { label: t("totalProducts"), value: stats.totalProduits, icon: Package, color: "text-purple-600 bg-purple-50" },
-    { label: t("lowStock"), value: stats.stockFaible, icon: AlertTriangle, color: "text-red-600 bg-red-50" },
+    { label: t("totalSales"), value: `${stats.totalVentes.toFixed(0)} ${t("moroccanDirham")}`, icon: TrendingUp, grad: "from-red-500 to-red-600" },
+    { label: t("totalClients"), value: stats.totalClients, icon: Users, grad: "from-red-600 to-rose-700" },
+    { label: t("totalProducts"), value: stats.totalProduits, icon: Package, grad: "from-rose-500 to-red-600" },
+    { label: t("lowStock"), value: stats.stockFaible, icon: AlertTriangle, grad: "from-red-700 to-rose-900" },
   ];
 
   return (
     <div>
-      <Header title="dashboard" />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {cards.map((c) => (
-          <div key={c.label} className="card p-5">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-sm text-slate-500">{c.label}</span>
-              <span className={`p-2 rounded-lg ${c.color}`}>
-                <c.icon size={18} />
-              </span>
+      {/* HERO : carrousel + recherche */}
+      <div className="relative rounded-2xl overflow-hidden mb-6 min-h-[300px] md:min-h-[360px] flex items-center">
+        {HERO.map((id, i) => (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            key={id}
+            src={`https://images.unsplash.com/${id}?auto=format&fit=crop&w=1600&q=80`}
+            alt="Atelier automobile"
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${i === idx ? "opacity-100" : "opacity-0"}`}
+          />
+        ))}
+        <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/40" />
+
+        <div className="relative w-full px-6 md:px-10 py-8">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-red-500 text-[11px] font-semibold tracking-[0.25em] uppercase">Pièces &amp; Filtres Auto · Maroc</span>
+          </div>
+          <h1 className="text-3xl md:text-5xl font-bold text-white tracking-tight">{t("appName")}</h1>
+          <p className="text-slate-300 text-sm md:text-base mt-2 mb-5 max-w-lg">
+            Trouvez le bon filtre en quelques secondes — par référence, véhicule ou marque.
+          </p>
+
+          {/* Barre de recherche */}
+          <form onSubmit={go} className="flex flex-col sm:flex-row gap-2 max-w-xl">
+            <div className="relative flex-1">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={q}
+                onChange={(e) => setQ(e.target.value.toUpperCase())}
+                placeholder="Référence (ex: OP540, AP082, K1175…)"
+                className="w-full bg-white/10 backdrop-blur border border-white/20 text-white placeholder-slate-400 rounded-xl ps-10 pe-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+              />
             </div>
-            <p className="text-2xl font-bold text-slate-800">{c.value}</p>
+            <div className="flex gap-2 items-stretch">
+              <VoiceButton className="w-12 rounded-xl" onResult={(txt) => { setQ(txt.toUpperCase()); router.push(`/recherche?q=${encodeURIComponent(txt.trim())}`); }} />
+              <button type="submit" className="flex-1 bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-xl font-semibold transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-950/40">
+                <Search size={18} /> Rechercher
+              </button>
+            </div>
+          </form>
+
+          {/* Accès rapides */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button onClick={() => router.push("/recherche?tab=vehicule")} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white text-sm px-4 py-2 rounded-lg transition-colors">
+              <Car size={15} /> {t("tabByVehicle")}
+            </button>
+            <button onClick={() => router.push("/recherche?tab=vehicule")} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white text-sm px-4 py-2 rounded-lg transition-colors">
+              <Tag size={15} /> {t("make")}
+            </button>
+          </div>
+
+          {/* Indicateurs carrousel */}
+          <div className="flex gap-1.5 mt-5">
+            {HERO.map((_, i) => (
+              <button key={i} onClick={() => setIdx(i)} className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-red-500" : "w-1.5 bg-white/40"}`} aria-label={`image ${i + 1}`} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {dbError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm font-mono">{dbError}</div>}
+
+      {/* Bandeau grandes marques */}
+      <div className="card p-5 mb-6 overflow-hidden">
+        <p className="text-[11px] text-slate-500 font-semibold tracking-[0.2em] uppercase mb-3 flex items-center gap-2">
+          <span className="h-1 w-1 rounded-full bg-red-500" /> Grandes marques compatibles
+        </p>
+        <div className="relative overflow-hidden">
+          <div className="absolute left-0 top-0 bottom-0 w-16 z-10 bg-gradient-to-r from-[var(--surface)] to-transparent pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-16 z-10 bg-gradient-to-l from-[var(--surface)] to-transparent pointer-events-none" />
+          <div className="flex gap-4 animate-marquee w-max py-1">
+            {[...BRANDS, ...BRANDS].map((b, i) => (
+              <BrandLogo key={i} name={b.name} slug={b.slug} color={b.color} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Cartes stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {cards.map((c) => (
+          <div key={c.label} className="card p-5 hover:-translate-y-0.5 flex items-center gap-4">
+            <div className={`h-12 w-12 shrink-0 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${c.grad} shadow-lg`}>
+              <c.icon size={22} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs text-slate-500 font-medium truncate">{c.label}</p>
+              <p className="text-xl font-bold text-slate-100 mt-0.5">{c.value}</p>
+            </div>
           </div>
         ))}
       </div>
 
+      {/* Dû fournisseur / Bénéfice */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-5">
-          <h3 className="font-semibold text-slate-700 mb-1">{t("toSupplier")}</h3>
-          <p className="text-3xl font-bold text-orange-600">
-            {stats.duFournisseur.toFixed(2)} {t("moroccanDirham")}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">Montant dû à votre fournisseur</p>
+        <div className="card p-6 flex items-start gap-4">
+          <div className="h-11 w-11 shrink-0 rounded-xl bg-orange-500/15 text-orange-400 flex items-center justify-center"><Wallet size={20} /></div>
+          <div>
+            <h3 className="font-semibold text-slate-300">{t("toSupplier")}</h3>
+            <p className="text-3xl font-bold text-orange-400 mt-1">{stats.duFournisseur.toFixed(2)} {t("moroccanDirham")}</p>
+            <p className="text-xs text-slate-500 mt-1">Montant dû à votre fournisseur</p>
+          </div>
         </div>
-        <div className="card p-5">
-          <h3 className="font-semibold text-slate-700 mb-1">{t("profit")}</h3>
-          <p className="text-3xl font-bold text-green-600">
-            {stats.benefice.toFixed(2)} {t("moroccanDirham")}
-          </p>
-          <p className="text-xs text-slate-400 mt-1">Bénéfice net estimé</p>
+        <div className="card p-6 flex items-start gap-4">
+          <div className="h-11 w-11 shrink-0 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center"><TrendingUp size={20} /></div>
+          <div>
+            <h3 className="font-semibold text-slate-300">{t("profit")}</h3>
+            <p className="text-3xl font-bold text-emerald-400 mt-1">{stats.benefice.toFixed(2)} {t("moroccanDirham")}</p>
+            <p className="text-xs text-slate-500 mt-1">Bénéfice net estimé</p>
+          </div>
         </div>
       </div>
+
+      {/* Bande atouts / garanties */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+        {FEATURES.map((f) => (
+          <div key={f.title} className="card p-5 text-center">
+            <div className="h-11 w-11 mx-auto rounded-xl bg-red-500/15 text-red-400 flex items-center justify-center mb-3"><f.icon size={22} /></div>
+            <h4 className="font-bold text-slate-100 text-sm tracking-wide">{f.title}</h4>
+            <p className="text-xs text-slate-500 mt-1">{f.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Avis clients */}
+      <div className="mt-8">
+        <h3 className="text-center font-bold text-slate-100 text-lg mb-1">Avis clients</h3>
+        <p className="text-center text-xs text-slate-500 mb-4">Ce que disent nos clients</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {REVIEWS.map((r) => (
+            <div key={r.name} className="card p-5">
+              <div className="flex gap-0.5 mb-2 text-red-500">
+                {[...Array(5)].map((_, i) => <Star key={i} size={15} fill="currentColor" />)}
+              </div>
+              <p className="text-sm text-slate-300 italic">“{r.text}”</p>
+              <div className="mt-3 flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs">{r.name[0]}</div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-200">{r.name}</div>
+                  <div className="text-xs text-slate-500">{r.city}</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <footer className="mt-8 pt-6 border-t border-slate-800 flex flex-col items-center gap-3">
+        <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} className="btn-secondary inline-flex items-center gap-2">
+          <ArrowUp size={15} /> Retour en haut
+        </button>
+        <div className="flex items-center gap-2">
+          <Logo size={28} />
+          <span className="font-bold text-slate-200">{t("appName")}</span>
+        </div>
+        <p className="text-xs text-slate-500">Pièces &amp; Filtres Auto · Maroc — © 2026</p>
+      </footer>
     </div>
   );
 }
