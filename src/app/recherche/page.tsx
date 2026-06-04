@@ -137,18 +137,22 @@ export default function RecherchePage() {
     if (q.length < 2) { setRefResults([]); setSearched(false); return; }
     setRefLoading(true);
     setSearched(true);
+    // On enlève les espaces et on cherche le numéro N'IMPORTE OÙ dans la référence
+    // -> permet de dire/taper juste "540" pour trouver OP540, AP540, etc.
+    const clean = q.replace(/\s+/g, "");
     const sel = "*, equivalences(*), applications(*), compatibilites(vehicules(*))";
     const [{ data: direct }, { data: eqMatches }] = await Promise.all([
-      supabase.from("products").select(sel).ilike("reference", `${q}%`).limit(50),
-      supabase.from("equivalences").select("product_id").ilike("reference", `${q}%`).limit(50),
+      supabase.from("products").select(sel).ilike("reference", `%${clean}%`).limit(60),
+      supabase.from("equivalences").select("product_id").ilike("reference", `%${clean}%`).limit(60),
     ]);
     let all = [...((direct as unknown as RefResult[]) ?? [])];
     const ids = [...new Set((eqMatches ?? []).map((e: { product_id: string }) => e.product_id))]
       .filter(id => !all.some(p => p.id === id));
     if (ids.length) {
-      const { data: viaEq } = await supabase.from("products").select(sel).in("id", ids).limit(50);
+      const { data: viaEq } = await supabase.from("products").select(sel).in("id", ids).limit(60);
       all = [...all, ...((viaEq as unknown as RefResult[]) ?? [])];
     }
+    all.sort((a, b) => a.reference.localeCompare(b.reference, undefined, { numeric: true, sensitivity: "base" }));
     setRefResults(all);
     setRefLoading(false);
   }
@@ -230,17 +234,20 @@ export default function RecherchePage() {
             <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
               <Tag size={18} /> {t("refSearchTitle")}
             </h3>
-            <div className="relative">
-              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                autoFocus
-                className="input ps-10 text-lg font-mono uppercase"
-                placeholder={t("refSearchPlaceholder")}
-                value={refQuery}
-                onChange={e => { const v = e.target.value.toUpperCase(); setRefQuery(v); searchRef(v); }}
-              />
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  autoFocus
+                  className="input ps-10 text-lg font-mono uppercase"
+                  placeholder="Tape ou dis juste le numéro (ex : 540, 82, 1175…)"
+                  value={refQuery}
+                  onChange={e => { const v = e.target.value.toUpperCase(); setRefQuery(v); searchRef(v); }}
+                />
+              </div>
+              <VoiceButton className="w-12 rounded-lg" onResult={(txt) => { const v = txt.replace(/\s+/g, "").toUpperCase(); setRefQuery(v); searchRef(v); }} />
             </div>
-            <p className="text-xs text-slate-400 mt-2">{t("refSearchHint")}</p>
+            <p className="text-xs text-slate-400 mt-2">Pas besoin de dire « OP » ou « AP » — juste le numéro, et choisis dans la liste.</p>
           </div>
 
           {refLoading && <p className="text-center text-slate-400 py-6">{t("loading")}</p>}
