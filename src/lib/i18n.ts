@@ -4,6 +4,7 @@ export const translations = {
   fr: {
     appName: "FiltroPro",
     dashboard: "Tableau de bord",
+    myDay: "Mon Quotidien",
     products: "Produits",
     clients: "Clients",
     sales: "Ventes",
@@ -122,6 +123,7 @@ export const translations = {
   ar: {
     appName: "FiltroPro",
     dashboard: "لوحة القيادة",
+    myDay: "يومياتي",
     products: "المنتجات",
     clients: "الزبائن",
     sales: "المبيعات",
