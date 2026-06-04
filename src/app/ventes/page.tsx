@@ -5,9 +5,17 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Sale, Client, Product, SaleItem, SaleStatus } from "@/types/database";
-import { Plus, Trash2, Printer, ScanLine, Check, Link2, X } from "lucide-react";
+import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw } from "lucide-react";
 import ProductPicker from "@/components/ProductPicker";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import { addPending, getPending, syncPending } from "@/lib/offlineSales";
+import { buildReceipt, sendWhatsApp } from "@/lib/whatsapp";
+
+type LastSale = {
+  clientNom: string; clientTel: string | null; ville: string; date: string;
+  lines: { nom: string; quantite: number; prix_unitaire: number }[];
+  total: number; statut: SaleStatus; montant_paye: number; offline: boolean;
+};
 
 type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string };
 
@@ -28,6 +36,10 @@ export default function VentesPage() {
   const [linkCode, setLinkCode] = useState<string | null>(null);
   const [scanInput, setScanInput] = useState("");
   const fbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Hors-ligne + reçu
+  const [pendingCount, setPendingCount] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSale, setLastSale] = useState<LastSale | null>(null);
 
   async function load() {
     const [{ data: s }, { data: c }] = await Promise.all([
@@ -48,7 +60,27 @@ export default function VentesPage() {
     setProducts(all);
   }
 
-  useEffect(() => { load(); }, []);
+  async function doSync() {
+    setSyncing(true);
+    const { left } = await syncPending(supabase);
+    setPendingCount(left);
+    setSyncing(false);
+    if (left === 0) load();
+  }
+
+  useEffect(() => {
+    setPendingCount(getPending().length);
+    (async () => {
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const { left } = await syncPending(supabase);
+        setPendingCount(left);
+      }
+      load();
+    })();
+    const onOnline = async () => { const { left } = await syncPending(supabase); setPendingCount(left); if (left === 0) load(); };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, []);
 
   function addLine() {
     setLines([...lines, { product_id: "", quantite: 1, prix_unitaire: 0, nom: "" }]);
@@ -115,23 +147,55 @@ export default function VentesPage() {
   async function save() {
     const validLines = lines.filter(l => l.product_id && l.quantite > 0);
     if (!clientId || validLines.length === 0) return;
+    const client = clients.find(c => c.id === clientId);
     const saleTotal = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
-    const { data: sale } = await supabase.from("sales").insert({
-      client_id: clientId, date: new Date().toISOString().split("T")[0],
-      total: saleTotal, montant_paye: statut === "paye" ? saleTotal : montantPaye,
-      statut, notes: notes || null,
-    }).select().single();
+    const montant = statut === "paye" ? saleTotal : montantPaye;
+    const date = new Date().toISOString().split("T")[0];
 
-    if (sale) {
-      await supabase.from("sale_items").insert(
-        validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire }))
-      );
-      for (const l of validLines) {
-        await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
-      }
+    let savedOnline = false;
+    if (typeof navigator === "undefined" || navigator.onLine) {
+      try {
+        const { data: sale, error } = await supabase.from("sales").insert({
+          client_id: clientId, date, total: saleTotal, montant_paye: montant, statut, notes: notes || null,
+        }).select().single();
+        if (error || !sale) throw error || new Error("insert");
+        const { error: e2 } = await supabase.from("sale_items").insert(
+          validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire }))
+        );
+        if (e2) throw e2;
+        for (const l of validLines) await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
+        savedOnline = true;
+      } catch { savedOnline = false; }
     }
-    setShowForm(false); setLines([]); setClientId(""); setNotes(""); setMontantPaye(0);
-    load();
+
+    if (!savedOnline) {
+      addPending({
+        localId: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
+        client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
+        lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom })),
+        total: saleTotal, statut, montant_paye: montant, notes: notes || null, createdAt: Date.now(),
+      });
+      setPendingCount(getPending().length);
+    }
+
+    setLastSale({
+      clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, ville: client?.ville ?? "", date,
+      lines: validLines.map(l => ({ nom: l.nom, quantite: l.quantite, prix_unitaire: l.prix_unitaire })),
+      total: saleTotal, statut, montant_paye: montant, offline: !savedOnline,
+    });
+    setShowForm(false); setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye");
+    if (savedOnline) load();
+  }
+
+  // Envoie la fiche d'une vente déjà enregistrée (récupère ses articles)
+  async function whatsForSale(s: Sale & { client: Client }) {
+    const { data } = await supabase.from("sale_items")
+      .select("quantite, prix_unitaire, product:products(nom_fr)").eq("sale_id", s.id);
+    const lns = (data ?? []).map((i: { quantite: number; prix_unitaire: number; product: { nom_fr: string } | null }) =>
+      ({ nom: i.product?.nom_fr ?? "Produit", quantite: i.quantite, prix_unitaire: i.prix_unitaire }));
+    sendWhatsApp(s.client?.telephone, buildReceipt({
+      clientNom: s.client?.nom, date: s.date, lines: lns, total: s.total, statut: s.statut, montant_paye: s.montant_paye,
+    }));
   }
 
   function printReceipt(s: Sale & { client: Client }) {
@@ -169,6 +233,17 @@ export default function VentesPage() {
           <Plus size={16} /> {t("addSale")}
         </button>
       } />
+
+      {pendingCount > 0 && (
+        <div className="card p-3 mb-4 flex items-center justify-between" style={{ borderColor: "rgba(234,179,8,0.4)" }}>
+          <span className="text-sm text-yellow-400 flex items-center gap-2">
+            <CloudOff size={16} /> {pendingCount} vente(s) enregistrée(s) hors-ligne — en attente de synchronisation
+          </span>
+          <button onClick={doSync} disabled={syncing} className="btn-secondary text-xs flex items-center gap-1 disabled:opacity-50">
+            <RefreshCw size={14} className={syncing ? "animate-spin" : ""} /> Synchroniser
+          </button>
+        </div>
+      )}
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -266,7 +341,10 @@ export default function VentesPage() {
                 <td className="px-4 py-3 font-semibold">{s.total.toFixed(2)} MAD</td>
                 <td className="px-4 py-3"><span className={badgeClass(s.statut)}>{t(s.statut === "paye" ? "paid" : s.statut === "partiel" ? "partial" : "pending")}</span></td>
               <td className="px-4 py-3">
-                <button onClick={() => printReceipt(s)} className="text-slate-400 hover:text-blue-600" title={t("printReceipt")}><Printer size={15} /></button>
+                <div className="flex items-center gap-3">
+                  <button onClick={() => whatsForSale(s)} className="text-green-500 hover:text-green-400" title="Envoyer la fiche sur WhatsApp"><MessageCircle size={16} /></button>
+                  <button onClick={() => printReceipt(s)} className="text-slate-400 hover:text-blue-600" title={t("printReceipt")}><Printer size={15} /></button>
+                </div>
               </td>
               </tr>
             ))}
@@ -290,6 +368,27 @@ export default function VentesPage() {
             <p className="font-mono text-lg text-slate-100 bg-slate-800/60 rounded-lg px-3 py-2 mb-4">{linkCode}</p>
             <p className="text-sm text-slate-400 mb-2">Choisissez la référence correspondante :</p>
             <ProductPicker products={products} value="" onSelect={(p) => linkAndAdd(p)} />
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation après-vente + envoi de la fiche */}
+      {lastSale && (
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-[60] p-4">
+          <div className="card p-6 w-full max-w-sm text-center">
+            <div className="text-4xl mb-2">{lastSale.offline ? "📴" : "✅"}</div>
+            <h3 className="font-semibold text-slate-100 mb-1">
+              {lastSale.offline ? "Vente enregistrée hors-ligne" : "Vente enregistrée"}
+            </h3>
+            <p className="text-sm text-slate-400">{lastSale.clientNom || "Client"} · <b className="text-blue-400">{lastSale.total.toFixed(2)} MAD</b></p>
+            {lastSale.offline && <p className="text-xs text-yellow-400 mt-2">Elle sera synchronisée automatiquement dès le retour d&apos;internet.</p>}
+            <div className="flex flex-col gap-2 mt-5">
+              <button onClick={() => sendWhatsApp(lastSale.clientTel, buildReceipt(lastSale))}
+                className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium">
+                <MessageCircle size={18} /> Envoyer la fiche au client (WhatsApp)
+              </button>
+              <button onClick={() => setLastSale(null)} className="btn-secondary">Fermer</button>
+            </div>
           </div>
         </div>
       )}
