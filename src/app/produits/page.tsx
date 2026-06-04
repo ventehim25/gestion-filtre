@@ -139,7 +139,7 @@ export default function ProduitsPage() {
     const matchRef = !refSearch || p.reference.toUpperCase().startsWith(refSearch);
     const matchBrand = !brandFilter || p.nom_fr.includes(brandFilter);
     const matchCat = !catFilter || p.categorie === catFilter;
-    const matchKind = !kindFilter || vehKind(p.reference) === kindFilter;
+    const matchKind = !kindFilter || classifyKind(p.reference, vehMap[p.id]?.makes) === kindFilter;
     return matchSearch && matchRef && matchBrand && matchCat && matchKind;
   }).sort((a, b) => refCompare(a.reference, b.reference));
 
