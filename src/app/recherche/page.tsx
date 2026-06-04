@@ -1,0 +1,480 @@
+"use client";
+export const dynamic = "force-dynamic";
+import { useEffect, useState } from "react";
+import Header from "@/components/Header";
+import { useLang } from "@/context/LangContext";
+import { supabase } from "@/lib/supabase";
+import { Product, Equivalence, Application } from "@/types/database";
+import { Car, Search, Package, Tag, Repeat, Sparkles } from "lucide-react";
+import FilterImage from "@/components/FilterImage";
+import StockBadge from "@/components/StockBadge";
+import CategoryIcon from "@/components/CategoryIcon";
+import VoiceButton from "@/components/VoiceButton";
+
+type Vehicule = {
+  id: string;
+  marque: string;
+  modele: string;
+  annee_debut: number;
+  annee_fin: number | null;
+  motorisation: string;
+  carburant: string;
+  cylindree: string | null;
+};
+
+type RefResult = Product & {
+  equivalences: Equivalence[];
+  compatibilites: { vehicules: Vehicule | null }[];
+  applications: Application[];
+};
+
+const WMI_MAP: Record<string, string> = {
+  VF1: "Renault", VF2: "Renault", VF3: "Peugeot", VF6: "Citroën", VF7: "Citroën",
+  UU1: "Dacia", UU2: "Dacia",
+  WVW: "Volkswagen", WV1: "Volkswagen", WV2: "Volkswagen",
+  WBA: "BMW", WBS: "BMW", WBX: "BMW",
+  WDB: "Mercedes", WDD: "Mercedes", WDC: "Mercedes",
+  WF0: "Ford", WFO: "Ford",
+  JTD: "Toyota", JTN: "Toyota", JT2: "Toyota",
+  KMH: "Hyundai", KMF: "Hyundai",
+  KNA: "Kia", KNM: "Kia",
+  JN1: "Nissan", JN3: "Nissan",
+  TMB: "Skoda", TMA: "Skoda",
+  VSS: "Seat", VSE: "Seat",
+  ZFA: "Fiat", ZFF: "Fiat",
+  MAT: "Opel", W0L: "Opel",
+  SHH: "Honda", JHM: "Honda",
+  VF8: "Renault", NM0: "Ford",
+};
+
+function decodeWmi(vin: string): string | null {
+  if (vin.length < 3) return null;
+  return WMI_MAP[vin.substring(0, 3).toUpperCase()] ?? null;
+}
+
+// Année modèle = 10ᵉ caractère du VIN (norme ISO). Lettres => 2010+, chiffres => 2001-2009.
+const YEAR_CODES: Record<string, number> = {
+  "1": 2001, "2": 2002, "3": 2003, "4": 2004, "5": 2005, "6": 2006, "7": 2007, "8": 2008, "9": 2009,
+  A: 2010, B: 2011, C: 2012, D: 2013, E: 2014, F: 2015, G: 2016, H: 2017, J: 2018, K: 2019,
+  L: 2020, M: 2021, N: 2022, P: 2023, R: 2024, S: 2025, T: 2026, V: 2027, W: 2028, X: 2029, Y: 2030,
+};
+function decodeYear(vin: string): string {
+  if (vin.length < 10) return "";
+  const y = YEAR_CODES[vin[9].toUpperCase()];
+  return y ? String(y) : "";
+}
+
+export default function RecherchePage() {
+  const { t } = useLang();
+  const [tab, setTab] = useState<"ref" | "smart" | "vehicule">("ref");
+
+  // ---------- Recherche rapide véhicule (texte libre sur les applications) ----------
+  const [smartQ, setSmartQ] = useState("");
+  const [smartRes, setSmartRes] = useState<{ product: Product; app: Application }[]>([]);
+  const [smartLoading, setSmartLoading] = useState(false);
+  const [smartDone, setSmartDone] = useState(false);
+
+  async function smartSearch(raw: string) {
+    const toks = raw.trim().split(/\s+/).map(s => s.replace(/[^a-z0-9./]/gi, "")).filter(s => s.length >= 2);
+    if (toks.length === 0) { setSmartRes([]); setSmartDone(false); return; }
+    setSmartLoading(true); setSmartDone(true);
+    const main = [...toks].sort((a, b) => b.length - a.length)[0];
+    const { data } = await supabase.from("applications")
+      .select("*, products(*)")
+      .or(`marque.ilike.%${main}%,modele.ilike.%${main}%,moteur.ilike.%${main}%,code_moteur.ilike.%${main}%`)
+      .limit(1000);
+    const rows = (data ?? []) as unknown as (Application & { products: Product | null })[];
+    const matched = rows.filter(a => {
+      const hay = `${a.marque} ${a.modele} ${a.moteur ?? ""} ${a.code_moteur ?? ""} ${a.annee_debut ?? ""} ${a.annee_fin ?? ""} ${a.puissance ?? ""}`.toLowerCase();
+      return toks.every(tk => hay.includes(tk.toLowerCase()));
+    });
+    const seen = new Set<string>();
+    const out: { product: Product; app: Application }[] = [];
+    for (const a of matched) {
+      if (a.products && !seen.has(a.product_id)) { seen.add(a.product_id); out.push({ product: a.products, app: a }); }
+    }
+    setSmartRes(out.slice(0, 80));
+    setSmartLoading(false);
+  }
+
+  // Recherche initiale depuis l'accueil (?q= / ?tab=)
+  useEffect(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const tb = sp.get("tab");
+    const qp = sp.get("q");
+    if (tb === "vehicule") setTab("vehicule");
+    if (qp) { setTab("ref"); setRefQuery(qp.toUpperCase()); searchRef(qp); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const categoryLabel = (cat: string) => {
+    const map: Record<string, string> = {
+      filtre_huile: t("filterOil"), filtre_air: t("filterAir"),
+      filtre_carburant: t("filterFuel"), filtre_habitacle: t("filterCabin"),
+      filtre_refroidissement: t("filterCooling"), autre: t("other"),
+    };
+    return map[cat] ?? cat;
+  };
+
+  const catColor = (cat: string) => {
+    const map: Record<string, string> = {
+      filtre_huile: "bg-amber-100 text-amber-700",
+      filtre_air: "bg-sky-100 text-sky-700",
+      filtre_carburant: "bg-rose-100 text-rose-700",
+      filtre_habitacle: "bg-emerald-100 text-emerald-700",
+    };
+    return map[cat] ?? "bg-slate-100 text-slate-600";
+  };
+
+  // ---------- Recherche par référence ----------
+  const [refQuery, setRefQuery] = useState("");
+  const [refResults, setRefResults] = useState<RefResult[]>([]);
+  const [refLoading, setRefLoading] = useState(false);
+  const [searched, setSearched] = useState(false);
+
+  async function searchRef(raw: string) {
+    const q = raw.trim();
+    if (q.length < 2) { setRefResults([]); setSearched(false); return; }
+    setRefLoading(true);
+    setSearched(true);
+    const sel = "*, equivalences(*), applications(*), compatibilites(vehicules(*))";
+    const [{ data: direct }, { data: eqMatches }] = await Promise.all([
+      supabase.from("products").select(sel).ilike("reference", `${q}%`).limit(50),
+      supabase.from("equivalences").select("product_id").ilike("reference", `${q}%`).limit(50),
+    ]);
+    let all = [...((direct as unknown as RefResult[]) ?? [])];
+    const ids = [...new Set((eqMatches ?? []).map((e: { product_id: string }) => e.product_id))]
+      .filter(id => !all.some(p => p.id === id));
+    if (ids.length) {
+      const { data: viaEq } = await supabase.from("products").select(sel).in("id", ids).limit(50);
+      all = [...all, ...((viaEq as unknown as RefResult[]) ?? [])];
+    }
+    setRefResults(all);
+    setRefLoading(false);
+  }
+
+  // ---------- Recherche par véhicule ----------
+  const [vehicules, setVehicules] = useState<Vehicule[]>([]);
+  const [vin, setVin] = useState("");
+  const [makeFilter, setMakeFilter] = useState("");
+  const [modelFilter, setModelFilter] = useState("");
+  const [yearFilter, setYearFilter] = useState("");
+  const [engineFilter, setEngineFilter] = useState("");
+  const [fuelFilter, setFuelFilter] = useState("");
+  const [selectedVehicule, setSelectedVehicule] = useState<Vehicule | null>(null);
+  const [compatibles, setCompatibles] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    supabase.from("vehicules").select("*").order("marque").then(({ data }) => setVehicules(data ?? []));
+  }, []);
+
+  const vinDetected = decodeWmi(vin);
+  const vinYear = decodeYear(vin);
+  useEffect(() => {
+    if (vinDetected) {
+      setMakeFilter(vinDetected); setModelFilter(""); setEngineFilter(""); setFuelFilter("");
+      setYearFilter(vinYear || "");
+    }
+  }, [vinDetected, vinYear]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const makes = [...new Set(vehicules.map(v => v.marque))].sort();
+  const models = [...new Set(vehicules.filter(v => !makeFilter || v.marque === makeFilter).map(v => v.modele))].sort();
+  const filteredByMakeModel = vehicules.filter(v => (!makeFilter || v.marque === makeFilter) && (!modelFilter || v.modele === modelFilter));
+  const years = [...new Set(filteredByMakeModel.flatMap(v => {
+    const arr: number[] = [];
+    for (let y = v.annee_debut; y <= (v.annee_fin ?? 2026); y++) arr.push(y);
+    return arr;
+  }))].sort((a, b) => b - a);
+  const filteredByYear = filteredByMakeModel.filter(v => !yearFilter || (v.annee_debut <= +yearFilter && (!v.annee_fin || v.annee_fin >= +yearFilter)));
+  const engines = [...new Set(filteredByYear.map(v => v.motorisation))].sort();
+  const matchingVehicules = filteredByYear.filter(v => (!engineFilter || v.motorisation === engineFilter) && (!fuelFilter || v.carburant === fuelFilter));
+
+  async function searchCompatibles() {
+    if (matchingVehicules.length === 0) return;
+    setLoading(true);
+    const { data } = await supabase.from("compatibilites").select("product_id, products(*)").in("vehicule_id", matchingVehicules.map(v => v.id));
+    const unique: Record<string, Product> = {};
+    (data ?? []).forEach((row: { product_id: string; products: unknown }) => {
+      if (row.products && !unique[row.product_id]) unique[row.product_id] = row.products as Product;
+    });
+    setCompatibles(Object.values(unique));
+    setSelectedVehicule(matchingVehicules[0] ?? null);
+    setLoading(false);
+  }
+
+  return (
+    <div>
+      <Header title="vehicleSearch" />
+
+      {/* Onglets */}
+      <div className="flex gap-2 mb-4">
+        <button onClick={() => setTab("ref")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "ref" ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}>
+          <Tag size={16} /> {t("tabByRef")}
+        </button>
+        <button onClick={() => setTab("smart")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "smart" ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}>
+          <Sparkles size={16} /> Recherche rapide
+        </button>
+        <button onClick={() => setTab("vehicule")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "vehicule" ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}>
+          <Car size={16} /> {t("tabByVehicle")}
+        </button>
+      </div>
+
+      {/* ============ ONGLET RÉFÉRENCE ============ */}
+      {tab === "ref" && (
+        <>
+          <div className="card p-5 mb-4">
+            <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
+              <Tag size={18} /> {t("refSearchTitle")}
+            </h3>
+            <div className="relative">
+              <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                autoFocus
+                className="input ps-10 text-lg font-mono uppercase"
+                placeholder={t("refSearchPlaceholder")}
+                value={refQuery}
+                onChange={e => { const v = e.target.value.toUpperCase(); setRefQuery(v); searchRef(v); }}
+              />
+            </div>
+            <p className="text-xs text-slate-400 mt-2">{t("refSearchHint")}</p>
+          </div>
+
+          {refLoading && <p className="text-center text-slate-400 py-6">{t("loading")}</p>}
+
+          {!refLoading && searched && refResults.length === 0 && (
+            <div className="card p-10 text-center text-slate-400">
+              <Search size={40} className="mx-auto mb-3 opacity-20" />
+              <p>{t("noRefFound")}</p>
+            </div>
+          )}
+
+          <div className="space-y-3">
+            {refResults.map(p => {
+              const vehs = (p.compatibilites ?? []).map(c => c.vehicules).filter(Boolean) as Vehicule[];
+              const apps = p.applications ?? [];
+              return (
+                <div key={p.id} className="card p-4 flex gap-4">
+                  <FilterImage reference={p.reference} categorie={p.categorie} imageUrl={p.image_url} wid={200} className="h-20 w-20 rounded-lg object-contain bg-white shrink-0 self-start border border-slate-700/60 p-1" />
+                  <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>
+                      <div className="text-xl font-bold font-mono text-slate-800 mt-1">{p.reference}</div>
+                      <div className="text-sm text-slate-500">{p.nom_fr}</div>
+                      {p.dimensions && <div className="text-xs text-slate-500 mt-1">📐 {p.dimensions}</div>}
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-blue-600">{p.prix_vente} MAD</div>
+                      <div className="mt-1.5 flex justify-end"><StockBadge stock={p.stock} stockMin={p.stock_min} /></div>
+                    </div>
+                  </div>
+
+                  {apps.length > 0 ? (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Car size={13} /> {t("vehiclesFit")} <span className="text-slate-300 font-normal">({apps.length})</span></div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {apps.slice(0, 24).map((a) => (
+                          <span key={a.id} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                            <strong>{a.marque}</strong> {a.modele}{a.moteur ? ` · ${a.moteur}` : ""}
+                            {a.annee_debut ? ` · ${a.annee_debut}${a.annee_fin ? `→${a.annee_fin}` : ""}` : ""}
+                          </span>
+                        ))}
+                        {apps.length > 24 && <span className="text-xs text-slate-400 px-1">+{apps.length - 24}</span>}
+                      </div>
+                    </div>
+                  ) : vehs.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Car size={13} /> {t("vehiclesFit")}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {vehs.slice(0, 12).map((v, i) => (
+                          <span key={i} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                            {v.marque} {v.modele} · {v.motorisation}
+                          </span>
+                        ))}
+                        {vehs.length > 12 && <span className="text-xs text-slate-400 px-1">+{vehs.length - 12}</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {(p.equivalences ?? []).length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Repeat size={13} /> {t("equivalents")}</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {(p.equivalences ?? []).map(e => (
+                          <span key={e.id} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
+                            <strong>{e.marque}</strong> {e.reference}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {/* ============ ONGLET RECHERCHE RAPIDE ============ */}
+      {tab === "smart" && (
+        <>
+          <div className="card p-5 mb-4">
+            <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><Sparkles size={18} /> Trouvez le filtre par véhicule</h3>
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input autoFocus className="input ps-10 text-lg"
+                  placeholder="Ex : Clio 1.5 dci · Logan · Golf 1.9 tdi…"
+                  value={smartQ}
+                  onChange={e => setSmartQ(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") smartSearch(smartQ); }} />
+              </div>
+              <VoiceButton className="w-12 rounded-lg" onResult={(txt) => { setSmartQ(txt); smartSearch(txt); }} />
+              <button onClick={() => smartSearch(smartQ)} className="btn-primary px-5">OK</button>
+            </div>
+            <p className="text-xs text-slate-400 mt-2">Tape ou dicte une marque / modèle / moteur. Recherche dans les vraies applications Filtron.</p>
+          </div>
+
+          {smartLoading && <p className="text-center text-slate-400 py-6">{t("loading")}</p>}
+          {!smartLoading && smartDone && smartRes.length === 0 && (
+            <div className="card p-10 text-center text-slate-400"><Car size={40} className="mx-auto mb-3 opacity-20" /><p>{t("noCompatible")}</p></div>
+          )}
+          <div className="space-y-3">
+            {smartRes.map(({ product: p, app: a }) => (
+              <div key={p.id} className="card p-4 flex gap-4">
+                <FilterImage reference={p.reference} categorie={p.categorie} imageUrl={p.image_url} wid={200} className="h-20 w-20 rounded-lg object-contain bg-white shrink-0 self-start border border-slate-700/60 p-1" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div>
+                      <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>
+                      <div className="text-xl font-bold font-mono text-slate-800 mt-1">{p.reference}</div>
+                      <div className="text-sm text-slate-500">{p.nom_fr}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-lg font-bold text-blue-600">{p.prix_vente} MAD</div>
+                      <div className="mt-1.5 flex justify-end"><StockBadge stock={p.stock} stockMin={p.stock_min} /></div>
+                    </div>
+                  </div>
+                  <div className="mt-2 text-xs bg-emerald-50 text-emerald-700 inline-flex items-center gap-1.5 px-2 py-1 rounded">
+                    <Car size={13} /> {a.marque} {a.modele}{a.moteur ? ` · ${a.moteur}` : ""}{a.annee_debut ? ` · ${a.annee_debut}${a.annee_fin ? `→${a.annee_fin}` : ""}` : ""}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ============ ONGLET VÉHICULE ============ */}
+      {tab === "vehicule" && (
+        <>
+          <div className="card p-5 mb-4">
+            <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><Car size={18} /> {t("searchByVin")}</h3>
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input className="input ps-9 font-mono uppercase" placeholder={t("vinPlaceholder")} value={vin} maxLength={17} onChange={e => setVin(e.target.value.toUpperCase())} />
+            </div>
+            {vinDetected && (
+              <p className="mt-2 text-sm text-green-400 bg-green-500/10 px-3 py-1.5 rounded-md inline-flex items-center gap-2">
+                <Car size={14} /> <strong>{t("vinDetected")} :</strong> {vinDetected}{vinYear ? ` · ${vinYear}` : ""}
+                <span className="text-slate-400 text-xs">— choisissez le modèle</span>
+              </p>
+            )}
+          </div>
+
+          <div className="card p-5 mb-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">{t("make")}</label>
+                <select className="input" value={makeFilter} onChange={e => { setMakeFilter(e.target.value); setModelFilter(""); setEngineFilter(""); setFuelFilter(""); setYearFilter(""); }}>
+                  <option value="">{t("allMakes")}</option>
+                  {makes.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">{t("model")}</label>
+                <select className="input" value={modelFilter} onChange={e => { setModelFilter(e.target.value); setEngineFilter(""); setFuelFilter(""); setYearFilter(""); }}>
+                  <option value="">{t("allModels")}</option>
+                  {models.map(m => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">{t("year")}</label>
+                <select className="input" value={yearFilter} onChange={e => { setYearFilter(e.target.value); setEngineFilter(""); }}>
+                  <option value="">{t("allYears")}</option>
+                  {years.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">{t("engine")}</label>
+                <select className="input" value={engineFilter} onChange={e => setEngineFilter(e.target.value)}>
+                  <option value="">{t("allEngines")}</option>
+                  {engines.map(e => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">{t("fuel")}</label>
+                <select className="input" value={fuelFilter} onChange={e => setFuelFilter(e.target.value)}>
+                  <option value="">{t("allFuels")}</option>
+                  <option value="diesel">{t("diesel")}</option>
+                  <option value="essence">{t("essence")}</option>
+                  <option value="hybride">{t("hybride")}</option>
+                </select>
+              </div>
+            </div>
+
+            {matchingVehicules.length > 0 && (
+              <div className="flex items-center justify-between bg-blue-50 rounded-lg px-4 py-2 mb-3">
+                <span className="text-sm text-blue-700">
+                  <strong>{matchingVehicules.length}</strong> véhicule{matchingVehicules.length > 1 ? "s" : ""}
+                  {makeFilter && ` — ${makeFilter}${modelFilter ? ` ${modelFilter}` : ""}${yearFilter ? ` (${yearFilter})` : ""}${engineFilter ? ` ${engineFilter}` : ""}`}
+                </span>
+              </div>
+            )}
+
+            <button onClick={searchCompatibles} disabled={matchingVehicules.length === 0 || loading} className="btn-primary flex items-center gap-2 disabled:opacity-40">
+              <Package size={16} /> {loading ? t("loading") : t("compatibleProducts")}
+            </button>
+          </div>
+
+          {selectedVehicule !== null && (
+            <div className="card overflow-hidden">
+              <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
+                <Car size={16} className="text-blue-600" />
+                <span className="font-semibold text-slate-700">{t("compatibleProducts")}</span>
+                <span className="text-slate-400 text-sm">— {compatibles.length}</span>
+              </div>
+              {compatibles.length === 0 ? (
+                <p className="text-center text-slate-400 py-10">{t("noCompatible")}</p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>{[t("reference"), t("name"), t("category"), t("sellPrice"), t("stock")].map(h => (
+                      <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>
+                    ))}</tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {compatibles.map(p => (
+                      <tr key={p.id} className={p.stock <= p.stock_min ? "bg-red-50" : "hover:bg-slate-50"}>
+                        <td className="px-4 py-3 font-mono text-xs text-slate-600">{p.reference}</td>
+                        <td className="px-4 py-3"><div className="font-medium">{p.nom_fr}</div></td>
+                        <td className="px-4 py-3 text-slate-600">{categoryLabel(p.categorie)}</td>
+                        <td className="px-4 py-3 font-medium text-blue-600">{p.prix_vente} MAD</td>
+                        <td className="px-4 py-3"><span className={`font-semibold ${p.stock <= p.stock_min ? "text-red-600" : "text-green-600"}`}>{p.stock}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
