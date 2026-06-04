@@ -117,6 +117,7 @@ export const translations = {
     cataloguesIntro: "Téléchargez ou partagez directement par WhatsApp le catalogue du type de filtre qui intéresse votre client.",
     download: "Télécharger",
     reorder: "Réappro",
+    labels: "Étiquettes",
   },
   ar: {
     appName: "FiltroPro",
@@ -234,6 +235,7 @@ export const translations = {
     cataloguesIntro: "حمّل أو شارك مباشرة عبر واتساب كتالوج نوع الفلتر الذي يهم زبونك.",
     download: "تحميل",
     reorder: "إعادة الطلب",
+    labels: "ملصقات",
   },
 } as const;
 
