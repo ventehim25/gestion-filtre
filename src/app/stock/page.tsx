@@ -5,11 +5,12 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory } from "@/types/database";
-import { Search, Minus, Plus, Save, RotateCcw, Check, PackageX, ScanLine, Camera, X, Link2 } from "lucide-react";
+import { Search, Minus, Plus, Save, RotateCcw, Check, PackageX, ScanLine, Camera, X, Link2, CloudOff, RefreshCw } from "lucide-react";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
 import BarcodeScanner from "@/components/BarcodeScanner";
+import { queueStock, pendingStockCount, syncStock } from "@/lib/offlineStock";
 
 const CATEGORIES: ProductCategory[] = [
   "filtre_huile", "filtre_air", "filtre_carburant",
@@ -47,6 +48,7 @@ export default function StockPage() {
   const [edits, setEdits] = useState<Record<string, Edit>>({});
   const [saving, setSaving] = useState(false);
   const [savedFlash, setSavedFlash] = useState(false);
+  const [pendingSync, setPendingSync] = useState(0); // modifs stock hors-ligne en attente
 
   // Filtres
   const [refSearch, setRefSearch] = useState("");
@@ -80,6 +82,21 @@ export default function StockPage() {
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
+
+  // Synchronisation des modifs de stock faites hors-ligne (au montage + retour réseau)
+  useEffect(() => {
+    setPendingSync(pendingStockCount());
+    (async () => {
+      if (typeof navigator === "undefined" || navigator.onLine) {
+        const { left } = await syncStock(supabase);
+        setPendingSync(left);
+      }
+    })();
+    const onOnline = async () => { const { left } = await syncStock(supabase); setPendingSync(left); if (left === 0) load(); };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Valeur effective (modifiée ou d'origine)
   const effStock = (p: Product) => edits[p.id]?.stock ?? p.stock;
@@ -177,15 +194,27 @@ export default function StockPage() {
     const ids = Object.keys(edits);
     if (ids.length === 0) return;
     setSaving(true);
+    const payloads: Record<string, Edit> = {};
     for (const id of ids) {
-      const p = products.find(x => x.id === id);
-      if (!p) continue;
-      const payload: Edit = {};
-      if (edits[id].stock !== undefined) payload.stock = edits[id].stock;
-      if (edits[id].stock_min !== undefined) payload.stock_min = edits[id].stock_min;
-      await supabase.from("products").update(payload).eq("id", id);
+      payloads[id] = {};
+      if (edits[id].stock !== undefined) payloads[id].stock = edits[id].stock;
+      if (edits[id].stock_min !== undefined) payloads[id].stock_min = edits[id].stock_min;
     }
-    // Met à jour l'état local sans recharger toute la base
+    let onlineOk = false;
+    if (typeof navigator === "undefined" || navigator.onLine) {
+      try {
+        for (const id of ids) {
+          const { error } = await supabase.from("products").update(payloads[id]).eq("id", id);
+          if (error) throw error;
+        }
+        onlineOk = true;
+      } catch { onlineOk = false; }
+    }
+    if (!onlineOk) {
+      queueStock(payloads);          // mise en file hors-ligne
+      setPendingSync(pendingStockCount());
+    }
+    // Met à jour l'affichage local (optimiste) dans tous les cas
     setProducts(prev => prev.map(p => edits[p.id]
       ? { ...p, stock: effStock(p), stock_min: effMin(p) }
       : p));
@@ -193,6 +222,14 @@ export default function StockPage() {
     setSaving(false);
     setSavedFlash(true);
     setTimeout(() => setSavedFlash(false), 2000);
+  }
+
+  async function doSyncStock() {
+    setSaving(true);
+    const { left } = await syncStock(supabase);
+    setPendingSync(left);
+    setSaving(false);
+    if (left === 0) load();
   }
 
   function focusNext(idx: number) {
@@ -221,6 +258,17 @@ export default function StockPage() {
           </button>
         </div>
       } />
+
+      {pendingSync > 0 && (
+        <div className="card p-3 mb-4 flex items-center justify-between" style={{ borderColor: "rgba(234,179,8,0.4)" }}>
+          <span className="text-sm text-yellow-400 flex items-center gap-2">
+            <CloudOff size={16} /> {pendingSync} modification(s) de stock hors-ligne — en attente de synchronisation
+          </span>
+          <button onClick={doSyncStock} disabled={saving} className="btn-secondary text-xs flex items-center gap-1 disabled:opacity-50">
+            <RefreshCw size={14} className={saving ? "animate-spin" : ""} /> Synchroniser
+          </button>
+        </div>
+      )}
 
       {/* Bandeau d'info */}
       <div className="grid grid-cols-3 gap-3 mb-4">
