@@ -31,8 +31,31 @@ export type Database = {
         Insert: Omit<Application, "id">;
         Update: Partial<Omit<Application, "id">>;
       };
+      garages: {
+        Row: Garage;
+        Insert: Omit<Garage, "id" | "created_at">;
+        Update: Partial<Omit<Garage, "id" | "created_at">>;
+      };
     };
   };
+};
+
+export type GarageStatut = "a_livrer" | "preparee" | "livre" | "reporte";
+
+export type Garage = {
+  id: string;
+  created_at: string;
+  nom: string;
+  telephone: string | null;
+  ville: string | null;
+  region: string | null;
+  latitude: number;
+  longitude: number;
+  statut: GarageStatut;
+  note: string | null;
+  refs_demandees: string | null;
+  photo_url: string | null;
+  jour: number | null;
 };
 
 export type Equivalence = {

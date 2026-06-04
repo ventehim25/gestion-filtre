@@ -5,17 +5,18 @@
    - Images produits (Scene7 / Unsplash) : cache-first (photos dispo hors-ligne).
    - Écritures (POST/PATCH/DELETE) : réseau direct (échec si hors-ligne -> à gérer côté app).
 */
-const VERSION = "v3";
+const VERSION = "v4";
 const STATIC = "fp-static-" + VERSION;
 const DATA = "fp-data-" + VERSION;
 const IMG = "fp-img-" + VERSION;
+const TILES = "fp-tiles-" + VERSION;
 
 self.addEventListener("install", () => self.skipWaiting());
 
 self.addEventListener("activate", (event) => {
   event.waitUntil((async () => {
     const keys = await caches.keys();
-    await Promise.all(keys.filter((k) => ![STATIC, DATA, IMG].includes(k)).map((k) => caches.delete(k)));
+    await Promise.all(keys.filter((k) => ![STATIC, DATA, IMG, TILES].includes(k)).map((k) => caches.delete(k)));
     await self.clients.claim();
   })());
 });
@@ -36,6 +37,23 @@ self.addEventListener("fetch", (event) => {
       } catch {
         const cached = await cache.match(req);
         return cached || new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+    })());
+    return;
+  }
+
+  // --- Tuiles de carte OpenStreetMap (cache-first : carte dispo hors-ligne sur les zones déjà vues) ---
+  if (req.method === "GET" && url.hostname.endsWith("tile.openstreetmap.org")) {
+    event.respondWith((async () => {
+      const cache = await caches.open(TILES);
+      const cached = await cache.match(req);
+      if (cached) return cached;
+      try {
+        const res = await fetch(req);
+        if (res && (res.ok || res.type === "opaque")) cache.put(req, res.clone());
+        return res;
+      } catch {
+        return cached || Response.error();
       }
     })());
     return;

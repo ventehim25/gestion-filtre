@@ -23,12 +23,12 @@ Travailler en **français**. Autonomie totale : agir sans demander, puis rapport
 - Fetch externe en PowerShell : forcer `Tls12`.
 
 ## Design / marque
-- Thème **sombre**, accents **ROUGE & NOIR** (PAS de jaune ni orange). Nom : **FiltroPro**.
+- Thème **sombre**, accents **doré & brillant**. Nom : **FiltroPro**.
 - Logo : `src/components/Logo.tsx` (hexagone rouge + courbes de filtration).
 - UI bilingue FR/AR (RTL), devise MAD.
 
 ## Règle données
-- **Ne JAMAIS inventer de référence** de pièce. Au moindre doute, ignorer.
+- **Ne JAMAIS inventer de référence** de pièce. Au moindre doute, questionner.
 - Source de vérité véhicules : table `applications` (vraies données Filtron) > `compatibilites` (mapping fait main).
 - Photos produit : Scene7 via `FilterImage.tsx`. Équivalences = numéros OE (aftermarket indisponible gratuitement).
 
