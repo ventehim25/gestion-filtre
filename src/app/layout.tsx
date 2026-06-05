@@ -3,6 +3,7 @@ import "./globals.css";
 import { LangProvider } from "@/context/LangContext";
 import Sidebar from "@/components/Sidebar";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import InstallPrompt from "@/components/InstallPrompt";
 
 export const metadata: Metadata = {
   title: "FiltroPro — Pièces & Filtres Auto · Maroc",
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <LangProvider>
           <ServiceWorkerRegister />
+          <InstallPrompt />
           <Sidebar />
           <main className="md:ms-56 min-h-screen p-4 md:p-6 pt-16 md:pt-6">
             {children}
