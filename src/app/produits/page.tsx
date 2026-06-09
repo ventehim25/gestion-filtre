@@ -29,6 +29,17 @@ const categoryKeys: Record<ProductCategory, keyof ReturnType<typeof useLang>["t"
 
 const empty = { nom_fr: "", nom_ar: "", reference: "", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0 };
 
+// Garde au plus n équivalences de références différentes (pas de doublon de réf)
+function distinctEquivs<T extends { reference: string }>(list: T[], n: number): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const e of list) {
+    const k = e.reference.trim().toUpperCase();
+    if (k && !seen.has(k)) { seen.add(k); out.push(e); if (out.length >= n) break; }
+  }
+  return out;
+}
+
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe
 function refCompare(a: string, b: string) {
   const parse = (r: string): [string, number, number, string] => {
@@ -234,18 +245,29 @@ export default function ProduitsPage() {
             <div className="mt-5 pt-4 border-t border-slate-200">
               <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><Repeat size={15} /> {t("equivalents")}</label>
               {equivs.length === 0 && <p className="text-xs text-slate-400 mb-2">{t("noEquiv")}</p>}
-              <div className="space-y-1.5 mb-2">
-                {(showAllEquivs ? equivs : equivs.slice(0, 4)).map((e, i) => (
-                  <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-md px-2 py-1">
-                    <span className="text-xs font-semibold text-indigo-700 w-20 shrink-0">{e.marque}</span>
-                    <span className="text-sm font-mono flex-1">{e.reference}</span>
-                    <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={15} /></button>
+              <div className="mb-2">
+                {showAllEquivs ? (
+                  <div className="space-y-1.5">
+                    {equivs.map((e, i) => (
+                      <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-md px-2 py-1">
+                        <span className="text-xs font-semibold text-indigo-700 w-20 shrink-0">{e.marque}</span>
+                        <span className="text-sm font-mono flex-1">{e.reference}</span>
+                        <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={15} /></button>
+                      </div>
+                    ))}
+                    <button type="button" onClick={() => setShowAllEquivs(false)} className="text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-1">Réduire <ChevronUp size={13} /></button>
                   </div>
-                ))}
-                {equivs.length > 4 && (
-                  <button type="button" onClick={() => setShowAllEquivs(v => !v)} className="text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-1 px-1 py-0.5">
-                    {showAllEquivs ? <>Réduire <ChevronUp size={13} /></> : <>Voir tout (+{equivs.length - 4}) <ChevronDown size={13} /></>}
-                  </button>
+                ) : equivs.length === 0 ? null : (
+                  <div className="flex flex-nowrap items-center gap-1.5 overflow-hidden">
+                    {distinctEquivs(equivs, 2).map((e, i) => (
+                      <span key={i} className="shrink-0 whitespace-nowrap text-xs bg-slate-50 rounded px-2 py-1"><b className="text-indigo-700">{e.marque}</b> <span className="font-mono">{e.reference}</span></span>
+                    ))}
+                    {equivs.length > distinctEquivs(equivs, 2).length && (
+                      <button type="button" onClick={() => setShowAllEquivs(true)} className="shrink-0 text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-1">
+                        Voir tout (+{equivs.length - distinctEquivs(equivs, 2).length}) <ChevronDown size={13} />
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="flex gap-2">
