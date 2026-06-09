@@ -227,23 +227,21 @@ export default function Dashboard() {
       </div>
 
       {/* Avis clients */}
-      <div className="mt-8">
-        <h3 className="text-center font-bold text-slate-100 text-lg mb-1">Avis clients</h3>
-        <p className="text-center text-xs text-slate-500 mb-4">Ce que disent nos clients</p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="mt-6">
+        <h3 className="text-center font-semibold text-slate-200 text-sm mb-3">Avis clients</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {REVIEWS.map((r) => (
-            <div key={r.name} className="card p-5">
-              <div className="flex gap-0.5 mb-2 text-red-500">
-                {[...Array(5)].map((_, i) => <Star key={i} size={15} fill="currentColor" />)}
-              </div>
-              <p className="text-sm text-slate-300 italic">“{r.text}”</p>
-              <div className="mt-3 flex items-center gap-2.5">
-                <div className="h-8 w-8 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-xs">{r.name[0]}</div>
-                <div>
-                  <div className="text-sm font-semibold text-slate-200">{r.name}</div>
-                  <div className="text-xs text-slate-500">{r.city}</div>
+            <div key={r.name} className="card p-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className="h-6 w-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-[10px]">{r.name[0]}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-xs font-semibold text-slate-200 truncate">{r.name} <span className="text-slate-500 font-normal">· {r.city}</span></div>
+                </div>
+                <div className="flex gap-0.5 text-red-500">
+                  {[...Array(5)].map((_, i) => <Star key={i} size={10} fill="currentColor" />)}
                 </div>
               </div>
+              <p className="text-[11px] leading-snug text-slate-400 italic line-clamp-2">“{r.text}”</p>
             </div>
           ))}
         </div>
