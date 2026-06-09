@@ -33,7 +33,7 @@ export default function StatsPage() {
     async function load() {
       const [{ data: sales }, { data: items }] = await Promise.all([
         supabase.from("sales").select("date, total, client:clients(ville)"),
-        supabase.from("sale_items").select("quantite, product:products(nom_fr)"),
+        supabase.from("sale_items").select("quantite, product:products(reference)"),
       ]);
 
       if (sales) {
@@ -66,9 +66,8 @@ export default function StatsPage() {
       if (items) {
         const byProduct: Record<string, number> = {};
         for (const i of items) {
-          const nom = (i.product as { nom_fr: string } | null)?.nom_fr ?? "?";
-          const shortName = nom.replace("Filtre ", "").replace("Filtron — ", "");
-          byProduct[shortName] = (byProduct[shortName] ?? 0) + i.quantite;
+          const ref = (i.product as { reference: string } | null)?.reference ?? "?";
+          byProduct[ref] = (byProduct[ref] ?? 0) + i.quantite;
         }
         setTopProducts(
           Object.entries(byProduct)
@@ -230,7 +229,7 @@ export default function StatsPage() {
                 <span className="text-xs font-bold text-slate-400 w-5">{i + 1}</span>
                 <div className="flex-1">
                   <div className="flex justify-between text-xs text-slate-500 mb-1">
-                    <span className="truncate max-w-xs">{p.nom}</span>
+                    <span className="truncate max-w-xs font-mono">{p.nom}</span>
                     <span className="font-semibold text-slate-700 ms-2">{p.qty} pcs</span>
                   </div>
                   <div className="h-4 bg-slate-100 rounded-full overflow-hidden">
