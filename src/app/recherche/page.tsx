@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, Equivalence, Application } from "@/types/database";
-import { Car, Search, Package, Tag, Repeat, Sparkles } from "lucide-react";
+import { Car, Search, Package, Tag, Repeat, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
@@ -62,6 +62,27 @@ function decodeYear(vin: string): string {
   if (vin.length < 10) return "";
   const y = YEAR_CODES[vin[9].toUpperCase()];
   return y ? String(y) : "";
+}
+
+// Affiche une liste de "tags" repliée à `limit` éléments, avec une flèche pour
+// voir tout / réduire — évite que la liste des véhicules prenne toute la page.
+function CollapsibleTags({ items, limit = 2 }: { items: React.ReactNode[]; limit?: number }) {
+  const [open, setOpen] = useState(false);
+  const shown = open ? items : items.slice(0, limit);
+  const hidden = items.length - limit;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {shown}
+      {hidden > 0 && (
+        <button
+          onClick={() => setOpen(o => !o)}
+          className="text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-0.5 px-1.5 py-0.5"
+        >
+          {open ? <>Réduire <ChevronUp size={13} /></> : <>Voir tout (+{hidden}) <ChevronDown size={13} /></>}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function RecherchePage() {
@@ -283,27 +304,21 @@ export default function RecherchePage() {
                   {apps.length > 0 ? (
                     <div className="mt-3 pt-3 border-t border-slate-100">
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Car size={13} /> {t("vehiclesFit")} <span className="text-slate-300 font-normal">({apps.length})</span></div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {apps.slice(0, 24).map((a) => (
-                          <span key={a.id} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                            <strong>{a.marque}</strong> {a.modele}{a.moteur ? ` · ${a.moteur}` : ""}
-                            {a.annee_debut ? ` · ${a.annee_debut}${a.annee_fin ? `→${a.annee_fin}` : ""}` : ""}
-                          </span>
-                        ))}
-                        {apps.length > 24 && <span className="text-xs text-slate-400 px-1">+{apps.length - 24}</span>}
-                      </div>
+                      <CollapsibleTags items={apps.map((a) => (
+                        <span key={a.id} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                          <strong>{a.marque}</strong> {a.modele}{a.moteur ? ` · ${a.moteur}` : ""}
+                          {a.annee_debut ? ` · ${a.annee_debut}${a.annee_fin ? `→${a.annee_fin}` : ""}` : ""}
+                        </span>
+                      ))} />
                     </div>
                   ) : vehs.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-100">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Car size={13} /> {t("vehiclesFit")}</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {vehs.slice(0, 12).map((v, i) => (
-                          <span key={i} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                            {v.marque} {v.modele} · {v.motorisation}
-                          </span>
-                        ))}
-                        {vehs.length > 12 && <span className="text-xs text-slate-400 px-1">+{vehs.length - 12}</span>}
-                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Car size={13} /> {t("vehiclesFit")} <span className="text-slate-300 font-normal">({vehs.length})</span></div>
+                      <CollapsibleTags items={vehs.map((v, i) => (
+                        <span key={i} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                          {v.marque} {v.modele} · {v.motorisation}
+                        </span>
+                      ))} />
                     </div>
                   )}
 
