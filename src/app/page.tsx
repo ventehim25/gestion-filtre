@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye } from "lucide-react";
+import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import Logo from "@/components/Logo";
 import VoiceButton from "@/components/VoiceButton";
@@ -63,6 +63,7 @@ export default function Dashboard() {
   const [dbError, setDbError] = useState("");
   // Montants sensibles masqués par défaut — révélés au clic
   const [showMoney, setShowMoney] = useState<{ f: boolean; b: boolean }>({ f: false, b: false });
+  const [showReviews, setShowReviews] = useState(false);
 
   useEffect(() => {
     const tmr = setInterval(() => setIdx((i) => (i + 1) % HERO.length), 5000);
@@ -230,10 +231,12 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Avis clients */}
+      {/* Avis clients — masqués, dépliés au clic */}
       <div className="mt-6">
-        <h3 className="text-center font-semibold text-slate-200 text-sm mb-3">Avis clients</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <button onClick={() => setShowReviews(v => !v)} className="mx-auto flex items-center gap-1.5 text-sm font-semibold text-slate-300 hover:text-slate-100">
+          Avis clients {showReviews ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        </button>
+        <div className={`grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 ${showReviews ? "" : "hidden"}`}>
           {REVIEWS.map((r) => (
             <div key={r.name} className="card p-3">
               <div className="flex items-center gap-2 mb-1.5">
