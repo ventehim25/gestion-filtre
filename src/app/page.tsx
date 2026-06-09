@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, ClipboardList, MapPin, CloudOff, Banknote } from "lucide-react";
+// Truck déjà importé pour la tuile Fournisseurs
 import BrandLogo from "@/components/BrandLogo";
 import Logo from "@/components/Logo";
 import VoiceButton from "@/components/VoiceButton";
@@ -225,7 +226,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {[
           { label: t("addSale"), icon: ShoppingCart, href: "/ventes", color: "bg-blue-500/15 text-blue-400" },
-          { label: t("vehicleSearch"), icon: Car, href: "/recherche?tab=vehicule", color: "bg-violet-500/15 text-violet-400" },
+          { label: t("suppliers"), icon: Truck, href: "/fournisseurs", color: "bg-violet-500/15 text-violet-400" },
           { label: t("reorder"), icon: ClipboardList, href: "/reappro", color: "bg-amber-500/15 text-amber-400" },
           { label: t("tours"), icon: MapPin, href: "/tournees", color: "bg-emerald-500/15 text-emerald-400" },
         ].map((s) => (
