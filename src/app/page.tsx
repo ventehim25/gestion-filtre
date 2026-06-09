@@ -201,6 +201,16 @@ export default function Dashboard() {
             </div>
           </form>
 
+          {/* Accès rapides */}
+          <div className="flex flex-wrap gap-2 mt-3">
+            <button onClick={() => router.push("/recherche?tab=vehicule")} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white text-sm px-4 py-2 rounded-lg transition-colors">
+              <Car size={15} /> {t("tabByVehicle")}
+            </button>
+            <button onClick={() => router.push("/recherche?tab=vehicule")} className="flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white text-sm px-4 py-2 rounded-lg transition-colors">
+              <Tag size={15} /> {t("make")}
+            </button>
+          </div>
+
           {/* Indicateurs carrousel */}
           <div className="flex gap-1.5 mt-3">
             {HERO.map((_, i) => (
