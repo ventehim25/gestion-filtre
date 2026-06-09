@@ -491,7 +491,7 @@ export default function RecherchePage() {
           </div>
 
           {selectedVehicule !== null && (
-            <div className="card overflow-hidden">
+            <div className="card overflow-x-auto">
               <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center gap-2">
                 <Car size={16} className="text-blue-600" />
                 <span className="font-semibold text-slate-700">{t("compatibleProducts")}</span>

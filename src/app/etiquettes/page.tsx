@@ -101,7 +101,7 @@ export default function EtiquettesPage() {
         <p className="text-xs text-slate-400 mt-2">Coche les produits puis clique « Imprimer ». Le code-barres encode la référence → scannable ensuite à la douchette. {q.trim() ? "" : "(Tape une recherche pour voir plus de produits.)"}</p>
       </div>
 
-      <div className="card overflow-hidden">
+      <div className="card overflow-x-auto">
         <div className="divide-y divide-slate-100">
           {filtered.map(p => (
             <button key={p.id} onClick={() => setSel({ ...sel, [p.id]: !sel[p.id] })}
