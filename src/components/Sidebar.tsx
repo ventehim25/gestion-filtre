@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/context/LangContext";
-import { LayoutDashboard, Package, Users, ShoppingCart, MapPin, Settings, Menu, X, AlertCircle, BarChart2, Car, Boxes, FileText, ClipboardList, Barcode } from "lucide-react";
+import { LayoutDashboard, Package, Users, ShoppingCart, MapPin, Settings, Menu, X, AlertCircle, BarChart2, Car, Boxes, FileText, ClipboardList, Barcode, Truck } from "lucide-react";
 import Logo from "@/components/Logo";
 import clsx from "clsx";
 import { useState } from "react";
@@ -13,6 +13,7 @@ const navItems = [
   { href: "/produits", icon: Package, key: "products" as const },
   { href: "/stock", icon: Boxes, key: "stockEntry" as const },
   { href: "/reappro", icon: ClipboardList, key: "reorder" as const },
+  { href: "/fournisseurs", icon: Truck, key: "suppliers" as const },
   { href: "/etiquettes", icon: Barcode, key: "labels" as const },
   { href: "/catalogues", icon: FileText, key: "catalogues" as const },
   { href: "/clients", icon: Users, key: "clients" as const },

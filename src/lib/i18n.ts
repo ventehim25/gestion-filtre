@@ -119,6 +119,7 @@ export const translations = {
     download: "Télécharger",
     reorder: "Réappro",
     labels: "Étiquettes",
+    suppliers: "Fournisseurs",
   },
   ar: {
     appName: "FiltroPro",
@@ -238,6 +239,7 @@ export const translations = {
     download: "تحميل",
     reorder: "إعادة الطلب",
     labels: "ملصقات",
+    suppliers: "الموردون",
   },
 } as const;
 

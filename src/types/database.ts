@@ -36,8 +36,49 @@ export type Database = {
         Insert: Omit<Garage, "id" | "created_at">;
         Update: Partial<Omit<Garage, "id" | "created_at">>;
       };
+      fournisseurs: {
+        Row: Fournisseur;
+        Insert: Omit<Fournisseur, "id" | "created_at">;
+        Update: Partial<Omit<Fournisseur, "id" | "created_at">>;
+      };
+      receptions: {
+        Row: Reception;
+        Insert: Omit<Reception, "id" | "created_at">;
+        Update: Partial<Omit<Reception, "id" | "created_at">>;
+      };
+      avances: {
+        Row: Avance;
+        Insert: Omit<Avance, "id" | "created_at">;
+        Update: Partial<Omit<Avance, "id" | "created_at">>;
+      };
     };
   };
+};
+
+export type Fournisseur = {
+  id: string;
+  created_at: string;
+  nom: string;
+  telephone: string | null;
+  note: string | null;
+};
+
+export type Reception = {
+  id: string;
+  created_at: string;
+  fournisseur_id: string;
+  date: string;
+  montant: number;
+  details: string | null;
+};
+
+export type Avance = {
+  id: string;
+  created_at: string;
+  fournisseur_id: string;
+  date: string;
+  montant: number;
+  note: string | null;
 };
 
 export type GarageStatut = "a_livrer" | "preparee" | "livre" | "reporte";
