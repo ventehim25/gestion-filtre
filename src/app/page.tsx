@@ -12,7 +12,7 @@ import { getPending } from "@/lib/offlineSales";
 
 type Stats = {
   totalVentes: number; totalClients: number; totalProduits: number;
-  stockFaible: number; benefice: number; duFournisseur: number;
+  stockFaible: number; benefice: number; coutMarchandise: number;
   toRecommend: number; unpaid: number; encaisseJour: number; encaisseSemaine: number;
 };
 
@@ -61,7 +61,7 @@ export default function Dashboard() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
-  const [stats, setStats] = useState<Stats>({ totalVentes: 0, totalClients: 0, totalProduits: 0, stockFaible: 0, benefice: 0, duFournisseur: 0, toRecommend: 0, unpaid: 0, encaisseJour: 0, encaisseSemaine: 0 });
+  const [stats, setStats] = useState<Stats>({ totalVentes: 0, totalClients: 0, totalProduits: 0, stockFaible: 0, benefice: 0, coutMarchandise: 0, toRecommend: 0, unpaid: 0, encaisseJour: 0, encaisseSemaine: 0 });
   const [dbError, setDbError] = useState("");
   const [pendingOffline, setPendingOffline] = useState(0);
   // Montants sensibles masqués par défaut — révélés au clic
@@ -76,20 +76,27 @@ export default function Dashboard() {
   useEffect(() => {
     setPendingOffline(getPending().length);
     async function load() {
-      const [r1, r2, r3, r4, r5] = await Promise.all([
+      const [r1, r2, r3, r4] = await Promise.all([
         supabase.from("clients").select("*", { count: "exact", head: true }),
         supabase.from("products").select("*", { count: "exact", head: true }),
         supabase.from("sales").select("total, montant_paye, statut, date"),
         supabase.from("products").select("id").gt("stock", 0).lte("stock", 2),
-        supabase.from("sale_items").select("quantite, prix_unitaire, product:products(prix_achat)"),
       ]);
-      const errors = [r1.error, r2.error, r3.error, r4.error, r5.error].filter(Boolean);
+      const errors = [r1.error, r2.error, r3.error, r4.error].filter(Boolean);
       if (errors.length > 0) { setDbError(errors.map((e) => e?.message).join(" | ")); return; }
       const sales = (r3.data ?? []) as { total: number; montant_paye: number; statut: string; date: string }[];
-      const stockFaible = r4.data; const saleItems = r5.data;
+      const stockFaible = r4.data;
+      // Articles vendus paginés → coût marchandise & bénéfice exacts
+      const saleItems: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }[] = [];
+      for (let i = 0; i < 30; i++) {
+        const { data } = await supabase.from("sale_items").select("quantite, prix_unitaire, product:products(prix_achat)").range(i * 1000, i * 1000 + 999);
+        if (!data || data.length === 0) break;
+        saleItems.push(...(data as unknown as typeof saleItems));
+        if (data.length < 1000) break;
+      }
       const totalVentes = sales.reduce((s, v) => s + v.total, 0);
-      const duFournisseur = sales.reduce((s, v) => s + (v.total - v.montant_paye), 0);
-      const benefice = (saleItems ?? []).reduce((s: number, i: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }) => s + (i.prix_unitaire - (i.product?.prix_achat ?? 0)) * i.quantite, 0);
+      const coutMarchandise = saleItems.reduce((s, i) => s + i.quantite * (i.product?.prix_achat ?? 0), 0);
+      const benefice = saleItems.reduce((s, i) => s + (i.prix_unitaire - (i.product?.prix_achat ?? 0)) * i.quantite, 0);
       const unpaid = sales.filter((s) => s.statut !== "paye").length;
       const todayStr = new Date().toISOString().split("T")[0];
       const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0];
@@ -108,7 +115,7 @@ export default function Dashboard() {
 
       setStats({
         totalVentes, totalClients: r1.count ?? 0, totalProduits: r2.count ?? 0,
-        stockFaible: stockFaible?.length ?? 0, benefice, duFournisseur,
+        stockFaible: stockFaible?.length ?? 0, benefice, coutMarchandise,
         toRecommend, unpaid, encaisseJour, encaisseSemaine,
       });
     }
@@ -258,9 +265,9 @@ export default function Dashboard() {
         <button onClick={() => setShowMoney(m => ({ ...m, f: !m.f }))} className="card p-4 flex items-center gap-3 text-left hover:-translate-y-0.5">
           <div className="h-10 w-10 shrink-0 rounded-xl bg-orange-500/15 text-orange-400 flex items-center justify-center"><Wallet size={20} /></div>
           <div className="min-w-0">
-            <h3 className="text-xs font-medium text-slate-400">{t("toSupplier")}</h3>
+            <h3 className="text-xs font-medium text-slate-400">Coût marchandise</h3>
             {showMoney.f
-              ? <p className="text-lg md:text-2xl font-bold text-orange-400 mt-0.5">{stats.duFournisseur.toFixed(2)} {t("moroccanDirham")}</p>
+              ? <p className="text-lg md:text-2xl font-bold text-orange-400 mt-0.5">{stats.coutMarchandise.toFixed(2)} {t("moroccanDirham")}</p>
               : <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1"><Eye size={13} /> Afficher</p>}
           </div>
         </button>
