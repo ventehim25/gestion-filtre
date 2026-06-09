@@ -355,7 +355,7 @@ export default function RecherchePage() {
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Repeat size={13} /> {t("equivalents")} <span className="text-slate-300 font-normal">({(p.equivalences ?? []).length})</span></div>
                       <CollapsibleTags limit={1} items={(p.equivalences ?? []).map(e => (
                         <span key={e.id} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
-                          <strong>{e.marque}</strong> {e.reference}
+                          <strong>{e.marque}</strong> {e.reference}{e.prix ? <span className="text-emerald-600"> · {e.prix} MAD</span> : null}
                         </span>
                       ))} />
                     </div>

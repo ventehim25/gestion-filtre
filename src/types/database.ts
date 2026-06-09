@@ -107,6 +107,7 @@ export type Equivalence = {
   product_id: string;
   marque: string;
   reference: string;
+  prix: number | null;
 };
 
 export type Application = {
