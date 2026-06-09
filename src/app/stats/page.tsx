@@ -9,6 +9,8 @@ type MonthlyStat = { mois: string; total: number; count: number };
 type CityStat = { ville: string; total: number };
 type ProductStat = { nom: string; qty: number };
 type PnlRow = { key: string; ca: number; cost: number; benef: number };
+type SupplierRow = { id: string; nom: string; type: string; ventes: number; cost: number; benef: number };
+type CapPoint = { mois: string; capital: number };
 
 // Lundi de la semaine d'une date "YYYY-MM-DD"
 function weekStart(dateStr: string): string {
@@ -28,6 +30,10 @@ export default function StatsPage() {
   const [weekly, setWeekly] = useState<PnlRow[]>([]);
   const [monthlyPnl, setMonthlyPnl] = useState<PnlRow[]>([]);
   const [gran, setGran] = useState<"jour" | "semaine" | "mois">("jour");
+  // Multi-fournisseurs
+  const [supplierRows, setSupplierRows] = useState<SupplierRow[]>([]);
+  const [cat, setCat] = useState({ capVentes: 0, capBenef: 0, credVentes: 0, credBenef: 0, nonAttr: 0 });
+  const [capEvol, setCapEvol] = useState<CapPoint[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -103,6 +109,63 @@ export default function StatsPage() {
       setDaily(toRows(agg(d => d), 14));
       setWeekly(toRows(agg(d => weekStart(d)), 10));
       setMonthlyPnl(toRows(agg(d => d.slice(0, 7)), 12));
+
+      // ----- Multi-fournisseurs (source choisie à la vente) -----
+      const [{ data: frs }, { data: recs }] = await Promise.all([
+        supabase.from("fournisseurs").select("id, nom, type"),
+        supabase.from("receptions").select("fournisseur_id, montant, date"),
+      ]);
+      const attLines: { fournisseur_id: string; quantite: number; prix_unitaire: number; product: { prix_achat: number } | null; sale: { date: string } | null }[] = [];
+      for (let i = 0; i < 30; i++) {
+        const { data } = await supabase.from("sale_items")
+          .select("fournisseur_id, quantite, prix_unitaire, product:products(prix_achat), sale:sales(date)")
+          .not("fournisseur_id", "is", null).range(i * 1000, i * 1000 + 999);
+        if (!data || data.length === 0) break;
+        attLines.push(...(data as unknown as typeof attLines));
+        if (data.length < 1000) break;
+      }
+      // Totaux par fournisseur
+      const byF: Record<string, { ventes: number; cost: number; benef: number }> = {};
+      for (const l of attLines) {
+        const pa = l.product?.prix_achat ?? 0;
+        const cur = byF[l.fournisseur_id] ?? { ventes: 0, cost: 0, benef: 0 };
+        cur.ventes += l.quantite * l.prix_unitaire;
+        cur.cost += l.quantite * pa;
+        cur.benef += l.quantite * (l.prix_unitaire - pa);
+        byF[l.fournisseur_id] = cur;
+      }
+      const rows: SupplierRow[] = (frs ?? []).map((f: { id: string; nom: string; type: string }) => ({
+        id: f.id, nom: f.nom, type: f.type, ...(byF[f.id] ?? { ventes: 0, cost: 0, benef: 0 }),
+      })).sort((a, b) => b.ventes - a.ventes);
+      setSupplierRows(rows);
+
+      // Séparation capital / crédit
+      const typeOf: Record<string, string> = {}; (frs ?? []).forEach((f: { id: string; type: string }) => typeOf[f.id] = f.type);
+      let capVentes = 0, capBenef = 0, credVentes = 0, credBenef = 0;
+      for (const r of rows) {
+        if (r.type === "capital") { capVentes += r.ventes; capBenef += r.benef; }
+        else { credVentes += r.ventes; credBenef += r.benef; }
+      }
+      const totalVentesAll = withItems.reduce((s, x) => s + x.total, 0);
+      const nonAttr = Math.max(0, totalVentesAll - (capVentes + credVentes));
+      setCat({ capVentes, capBenef, credVentes, credBenef, nonAttr });
+
+      // Évolution du capital (mois par mois, cumulé) : ventes capital − achats capital
+      const net: Record<string, number> = {};
+      for (const l of attLines) {
+        if (typeOf[l.fournisseur_id] !== "capital") continue;
+        const m = (l.sale?.date ?? "").slice(0, 7); if (!m) continue;
+        net[m] = (net[m] ?? 0) + l.quantite * l.prix_unitaire;
+      }
+      for (const r of recs ?? []) {
+        if (typeOf[(r as { fournisseur_id: string }).fournisseur_id] !== "capital") continue;
+        const m = ((r as { date: string }).date ?? "").slice(0, 7); if (!m) continue;
+        net[m] = (net[m] ?? 0) - (r as { montant: number }).montant;
+      }
+      const sortedM = Object.keys(net).sort();
+      let cumul = 0;
+      const evol = sortedM.map(m => { cumul += net[m]; return { mois: m, capital: cumul }; }).slice(-6);
+      setCapEvol(evol);
     }
     load();
   }, []);
@@ -117,6 +180,8 @@ export default function StatsPage() {
   const maxMonthly = Math.max(...monthly.map(m => m.total), 1);
   const maxCity = Math.max(...cities.map(c => c.total), 1);
   const maxProduct = Math.max(...topProducts.map(p => p.qty), 1);
+  const maxCap = Math.max(...capEvol.map(c => Math.abs(c.capital)), 1);
+  const ml = (m: string) => `${m.slice(5, 7)}/${m.slice(0, 4)}`;
 
   return (
     <div>
@@ -214,6 +279,80 @@ export default function StatsPage() {
               </tfoot>
             </table>
             <p className="text-[11px] text-slate-500 mt-2">Montants en MAD. Coût = prix d&apos;achat des articles vendus · Bénéfice = ventes − coût.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Capital vs Crédit */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="card p-5">
+          <h3 className="font-semibold text-emerald-400 mb-1">🐷 Capital (mon argent)</h3>
+          <p className="text-xs text-slate-500 mb-3">Ventes sourcées « capital » (ex. filtropro)</p>
+          <div className="flex justify-between text-sm"><span className="text-slate-400">Ventes</span><span className="font-semibold text-slate-200">{cat.capVentes.toFixed(0)} MAD</span></div>
+          <div className="flex justify-between text-sm mt-1"><span className="text-slate-400">Bénéfice</span><span className="font-bold text-emerald-400">{cat.capBenef.toFixed(0)} MAD</span></div>
+        </div>
+        <div className="card p-5">
+          <h3 className="font-semibold text-red-400 mb-1">🚚 Crédit (fournisseurs)</h3>
+          <p className="text-xs text-slate-500 mb-3">Ventes sourcées « crédit » (ex. dinoun)</p>
+          <div className="flex justify-between text-sm"><span className="text-slate-400">Ventes</span><span className="font-semibold text-slate-200">{cat.credVentes.toFixed(0)} MAD</span></div>
+          <div className="flex justify-between text-sm mt-1"><span className="text-slate-400">Bénéfice</span><span className="font-bold text-emerald-400">{cat.credBenef.toFixed(0)} MAD</span></div>
+          {cat.nonAttr > 0 && <p className="text-[11px] text-amber-400/80 mt-2">⚠ {cat.nonAttr.toFixed(0)} MAD de ventes sans source attribuée</p>}
+        </div>
+      </div>
+
+      {/* Par fournisseur */}
+      <div className="card p-5 mb-6">
+        <h3 className="font-semibold text-slate-700 mb-4">Coûts &amp; Bénéfices par fournisseur</h3>
+        {supplierRows.length === 0 ? (
+          <p className="text-slate-400 text-sm text-center py-8">{t("noData")}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="border-b border-slate-200">
+                <tr>
+                  <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Fournisseur</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Ventes</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Coût</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Bénéfice</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {supplierRows.map(r => (
+                  <tr key={r.id}>
+                    <td className="px-3 py-2 text-slate-200">
+                      {r.nom} <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${r.type === "capital" ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}`}>{r.type === "capital" ? "capital" : "crédit"}</span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-medium text-sky-400">{r.ventes.toFixed(0)}</td>
+                    <td className="px-3 py-2 text-right text-orange-400">{r.cost.toFixed(0)}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-emerald-400">+{r.benef.toFixed(0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <p className="text-[11px] text-slate-500 mt-2">Selon la source choisie à la vente. Montants en MAD.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Évolution du capital */}
+      <div className="card p-5 mb-6">
+        <h3 className="font-semibold text-slate-700 mb-1">Évolution de mon capital (filtropro)</h3>
+        <p className="text-xs text-slate-500 mb-4">Cumulé mois par mois : ventes capital − marchandise rachetée</p>
+        {capEvol.length === 0 ? (
+          <p className="text-slate-400 text-sm text-center py-8">{t("noData")}</p>
+        ) : (
+          <div className="space-y-3">
+            {capEvol.map(c => (
+              <div key={c.mois}>
+                <div className="flex justify-between text-xs text-slate-500 mb-1">
+                  <span>{ml(c.mois)}</span>
+                  <span className="font-semibold text-emerald-400">{c.capital.toFixed(0)} MAD</span>
+                </div>
+                <div className="h-5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: `${(Math.max(0, c.capital) / maxCap) * 100}%` }} />
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
