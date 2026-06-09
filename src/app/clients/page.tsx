@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Client } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, Phone, MessageCircle } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Phone, MessageCircle, Eye } from "lucide-react";
 
 const empty = { nom: "", telephone: "", ville: "", adresse: "", notes: "", solde_du: 0 };
 
@@ -16,13 +16,40 @@ export default function ClientsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState(empty);
+  // Marges (bénéfice + coût fournisseur) cumulées par client, révélées au clic
+  const [margins, setMargins] = useState<Record<string, { benefice: number; cost: number }>>({});
+  const [reveal, setReveal] = useState<Set<string>>(new Set());
+  function toggleReveal(id: string) {
+    setReveal(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
 
   async function load() {
     const { data } = await supabase.from("clients").select("*").order("nom");
     setClients(data ?? []);
   }
 
-  useEffect(() => { load(); }, []);
+  async function loadMargins() {
+    const map: Record<string, { benefice: number; cost: number }> = {};
+    for (let i = 0; i < 30; i++) {
+      const { data } = await supabase.from("sales")
+        .select("client_id, items:sale_items(quantite, prix_unitaire, product:products(prix_achat))")
+        .range(i * 1000, i * 1000 + 999);
+      if (!data || data.length === 0) break;
+      for (const s of data as unknown as { client_id: string; items: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }[] }[]) {
+        const cur = map[s.client_id] ?? { benefice: 0, cost: 0 };
+        for (const it of s.items ?? []) {
+          const pa = it.product?.prix_achat ?? 0;
+          cur.cost += it.quantite * pa;
+          cur.benefice += it.quantite * (it.prix_unitaire - pa);
+        }
+        map[s.client_id] = cur;
+      }
+      if (data.length < 1000) break;
+    }
+    setMargins(map);
+  }
+
+  useEffect(() => { load(); loadMargins(); }, []);
 
   async function save() {
     if (editing) {
@@ -118,6 +145,20 @@ export default function ClientsPage() {
             {c.solde_du > 0 && (
               <div className="mt-2 bg-orange-50 rounded-lg px-3 py-1.5">
                 <p className="text-xs text-orange-600 font-medium">{t("pending")}: {c.solde_du} MAD</p>
+              </div>
+            )}
+            {margins[c.id] && (
+              <div className="mt-2">
+                {reveal.has(c.id) ? (
+                  <div className="flex gap-3 text-xs bg-[var(--surface-2)] rounded-lg px-3 py-1.5">
+                    <span className="text-emerald-400 font-semibold">Bénéf: {margins[c.id].benefice.toFixed(0)} MAD</span>
+                    <span className="text-orange-400">Coût: {margins[c.id].cost.toFixed(0)} MAD</span>
+                  </div>
+                ) : (
+                  <button onClick={() => toggleReveal(c.id)} className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1">
+                    <Eye size={12} /> Bénéfice / coût
+                  </button>
+                )}
               </div>
             )}
             {c.notes && <p className="text-xs text-slate-400 mt-2 line-clamp-2">{c.notes}</p>}

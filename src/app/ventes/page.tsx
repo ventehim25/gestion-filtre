@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Sale, Client, Product, SaleItem, SaleStatus } from "@/types/database";
-import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet } from "lucide-react";
+import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye } from "lucide-react";
 import ProductPicker from "@/components/ProductPicker";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { addPending, getPending, syncPending } from "@/lib/offlineSales";
@@ -47,10 +47,15 @@ export default function VentesPage() {
   const [payEdit, setPayEdit] = useState<(Sale & { client: Client }) | null>(null);
   const [payStatut, setPayStatut] = useState<SaleStatus>("paye");
   const [payMontant, setPayMontant] = useState(0);
+  // Marges révélées au clic (par vente)
+  const [revealMargin, setRevealMargin] = useState<Set<string>>(new Set());
+  function toggleMargin(id: string) {
+    setRevealMargin(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  }
 
   async function load() {
     const [{ data: s }, { data: c }] = await Promise.all([
-      supabase.from("sales").select("*, client:clients(*)").order("created_at", { ascending: false }),
+      supabase.from("sales").select("*, client:clients(*), items:sale_items(quantite, prix_unitaire, product:products(nom_fr, prix_achat))").order("created_at", { ascending: false }),
       supabase.from("clients").select("*").order("nom"),
     ]);
     setSales((s as unknown as (Sale & { client: Client })[]) ?? []);
@@ -426,19 +431,34 @@ export default function VentesPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              {[t("date"), t("clients"), t("city"), t("total"), t("status")].map(h => (
+              {[t("date"), t("clients"), t("city"), t("total"), t("status"), t("profit")].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {sales.map(s => (
+            {sales.map(s => {
+              const cost = (s.items ?? []).reduce((a, it) => a + it.quantite * ((it.product as Product | undefined)?.prix_achat ?? 0), 0);
+              const benef = s.total - cost;
+              return (
               <tr key={s.id} className="hover:bg-slate-50">
                 <td className="px-4 py-3 text-slate-600">{s.date}</td>
                 <td className="px-4 py-3 font-medium">{s.client?.nom}</td>
                 <td className="px-4 py-3 text-slate-500">{s.client?.ville}</td>
                 <td className="px-4 py-3 font-semibold">{s.total.toFixed(2)} MAD</td>
                 <td className="px-4 py-3"><span className={badgeClass(s.statut)}>{t(s.statut === "paye" ? "paid" : s.statut === "partiel" ? "partial" : "pending")}</span></td>
+                <td className="px-4 py-3">
+                  {revealMargin.has(s.id) ? (
+                    <div className="text-xs leading-tight">
+                      <div className="font-semibold text-emerald-400">+{benef.toFixed(0)} MAD</div>
+                      <div className="text-orange-400">coût {cost.toFixed(0)}</div>
+                    </div>
+                  ) : (
+                    <button onClick={() => toggleMargin(s.id)} className="text-xs text-slate-500 hover:text-slate-300 flex items-center gap-1">
+                      <Eye size={12} /> Afficher
+                    </button>
+                  )}
+                </td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
                   <button onClick={() => openPayEdit(s)} className="text-amber-500 hover:text-amber-400" title="Modifier le paiement"><Wallet size={16} /></button>
@@ -448,7 +468,8 @@ export default function VentesPage() {
                 </div>
               </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
         {sales.length === 0 && <p className="text-center text-slate-400 py-10">{t("noData")}</p>}
