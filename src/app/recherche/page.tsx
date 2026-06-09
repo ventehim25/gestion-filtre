@@ -64,25 +64,36 @@ function decodeYear(vin: string): string {
   return y ? String(y) : "";
 }
 
-// Affiche une liste de "tags" repliée à `limit` éléments, avec une flèche pour
-// voir tout / réduire — évite que la liste des véhicules prenne toute la page.
-function CollapsibleTags({ items, limit = 2 }: { items: React.ReactNode[]; limit?: number }) {
+// Affiche une liste de "tags" repliée (aperçu sur UNE ligne) avec une flèche pour
+// voir tout / réduire — évite que la liste prenne toute la page.
+// `previewItems` : ce qu'on montre replié (ex. une marque distincte par tag).
+function CollapsibleTags({ items, previewItems, limit = 2 }: { items: React.ReactNode[]; previewItems?: React.ReactNode[]; limit?: number }) {
   const [open, setOpen] = useState(false);
-  const shown = open ? items : items.slice(0, limit);
-  const hidden = items.length - limit;
+  const preview = previewItems ?? items.slice(0, limit);
+  const hidden = items.length - preview.length;
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {shown}
+    <div className={open ? "flex flex-wrap items-center gap-1.5" : "flex flex-nowrap items-center gap-1.5 overflow-hidden"}>
+      {open ? items : preview}
       {hidden > 0 && (
         <button
           onClick={() => setOpen(o => !o)}
-          className="text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-0.5 px-1.5 py-0.5"
+          className="shrink-0 text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-0.5 px-1.5 py-0.5"
         >
           {open ? <>Réduire <ChevronUp size={13} /></> : <>Voir tout (+{hidden}) <ChevronDown size={13} /></>}
         </button>
       )}
     </div>
   );
+}
+
+// Garde au plus `n` éléments, chacun d'une marque différente (pas de doublon de marque).
+function distinctByMarque<T extends { marque: string }>(list: T[], n: number): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const x of list) {
+    if (!seen.has(x.marque)) { seen.add(x.marque); out.push(x); if (out.length >= n) break; }
+  }
+  return out;
 }
 
 export default function RecherchePage() {
@@ -284,6 +295,8 @@ export default function RecherchePage() {
             {refResults.map(p => {
               const vehs = (p.compatibilites ?? []).map(c => c.vehicules).filter(Boolean) as Vehicule[];
               const apps = p.applications ?? [];
+              const appPreview = distinctByMarque(apps, 2);
+              const vehPreview = distinctByMarque(vehs, 2);
               return (
                 <div key={p.id} className="card p-4 flex gap-4">
                   <FilterImage reference={p.reference} categorie={p.categorie} imageUrl={p.image_url} wid={200} className="h-20 w-20 rounded-lg object-contain bg-white shrink-0 self-start border border-slate-700/60 p-1" />
@@ -304,21 +317,36 @@ export default function RecherchePage() {
                   {apps.length > 0 ? (
                     <div className="mt-3 pt-3 border-t border-slate-100">
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Car size={13} /> {t("vehiclesFit")} <span className="text-slate-300 font-normal">({apps.length})</span></div>
-                      <CollapsibleTags items={apps.map((a) => (
-                        <span key={a.id} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                          <strong>{a.marque}</strong> {a.modele}{a.moteur ? ` · ${a.moteur}` : ""}
-                          {a.annee_debut ? ` · ${a.annee_debut}${a.annee_fin ? `→${a.annee_fin}` : ""}` : ""}
-                        </span>
-                      ))} />
+                      <CollapsibleTags
+                        items={apps.map((a) => (
+                          <span key={a.id} className="shrink-0 whitespace-nowrap text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                            <strong>{a.marque}</strong> {a.modele}{a.moteur ? ` · ${a.moteur}` : ""}
+                            {a.annee_debut ? ` · ${a.annee_debut}${a.annee_fin ? `→${a.annee_fin}` : ""}` : ""}
+                          </span>
+                        ))}
+                        previewItems={appPreview.map((a) => (
+                          <span key={a.id} className="shrink-0 whitespace-nowrap text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                            <strong>{a.marque}</strong> {a.modele}{a.moteur ? ` · ${a.moteur}` : ""}
+                            {a.annee_debut ? ` · ${a.annee_debut}${a.annee_fin ? `→${a.annee_fin}` : ""}` : ""}
+                          </span>
+                        ))}
+                      />
                     </div>
                   ) : vehs.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-100">
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Car size={13} /> {t("vehiclesFit")} <span className="text-slate-300 font-normal">({vehs.length})</span></div>
-                      <CollapsibleTags items={vehs.map((v, i) => (
-                        <span key={i} className="text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
-                          {v.marque} {v.modele} · {v.motorisation}
-                        </span>
-                      ))} />
+                      <CollapsibleTags
+                        items={vehs.map((v, i) => (
+                          <span key={i} className="shrink-0 whitespace-nowrap text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                            {v.marque} {v.modele} · {v.motorisation}
+                          </span>
+                        ))}
+                        previewItems={vehPreview.map((v, i) => (
+                          <span key={i} className="shrink-0 whitespace-nowrap text-xs bg-slate-100 text-slate-700 px-2 py-0.5 rounded">
+                            {v.marque} {v.modele} · {v.motorisation}
+                          </span>
+                        ))}
+                      />
                     </div>
                   )}
 
