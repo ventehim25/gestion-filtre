@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Sale, Client, Product, SaleItem, SaleStatus } from "@/types/database";
-import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw } from "lucide-react";
+import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet } from "lucide-react";
 import ProductPicker from "@/components/ProductPicker";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { addPending, getPending, syncPending } from "@/lib/offlineSales";
@@ -40,6 +40,13 @@ export default function VentesPage() {
   const [pendingCount, setPendingCount] = useState(0);
   const [syncing, setSyncing] = useState(false);
   const [lastSale, setLastSale] = useState<LastSale | null>(null);
+  // Modification d'une vente existante
+  const [editingSale, setEditingSale] = useState<(Sale & { client: Client }) | null>(null);
+  const [oldLines, setOldLines] = useState<{ product_id: string; quantite: number }[]>([]);
+  // Modification rapide du paiement
+  const [payEdit, setPayEdit] = useState<(Sale & { client: Client }) | null>(null);
+  const [payStatut, setPayStatut] = useState<SaleStatus>("paye");
+  const [payMontant, setPayMontant] = useState(0);
 
   async function load() {
     const [{ data: s }, { data: c }] = await Promise.all([
@@ -144,7 +151,74 @@ export default function VentesPage() {
 
   const total = lines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
 
+  function resetForm() {
+    setShowForm(false); setEditingSale(null); setOldLines([]);
+    setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye");
+  }
+
+  function openNew() {
+    resetForm();
+    setShowForm(true);
+  }
+
+  // Ouvre le formulaire pré-rempli pour modifier une vente existante
+  async function openEditSale(s: Sale & { client: Client }) {
+    const { data } = await supabase.from("sale_items")
+      .select("product_id, quantite, prix_unitaire, product:products(nom_fr)")
+      .eq("sale_id", s.id);
+    const items = (data ?? []) as unknown as { product_id: string; quantite: number; prix_unitaire: number; product: { nom_fr: string } | null }[];
+    setLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, prix_unitaire: i.prix_unitaire, nom: i.product?.nom_fr ?? "" })));
+    setOldLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite })));
+    setClientId(s.client_id);
+    setStatut(s.statut);
+    setMontantPaye(s.montant_paye);
+    setNotes(s.notes ?? "");
+    setEditingSale(s);
+    setShowForm(true);
+  }
+
+  // Sauvegarde d'une MODIFICATION de vente (réajuste le stock : rend l'ancien, retire le nouveau)
+  async function saveEdit() {
+    if (!editingSale) return;
+    const validLines = lines.filter(l => l.product_id && l.quantite > 0);
+    if (!clientId || validLines.length === 0) { flash("Client et au moins un article requis"); return; }
+    if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Modification impossible hors-ligne."); return; }
+    const saleTotal = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
+    const montant = statut === "paye" ? saleTotal : montantPaye;
+    try {
+      // 1) Rendre le stock des anciens articles (qty négative => stock += qty)
+      for (const o of oldLines) await supabase.rpc("decrement_stock", { p_id: o.product_id, qty: -o.quantite });
+      // 2) Remplacer les lignes
+      await supabase.from("sale_items").delete().eq("sale_id", editingSale.id);
+      await supabase.from("sales").update({
+        client_id: clientId, total: saleTotal, montant_paye: montant, statut, notes: notes || null,
+      }).eq("id", editingSale.id);
+      await supabase.from("sale_items").insert(
+        validLines.map(l => ({ sale_id: editingSale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire }))
+      );
+      // 3) Retirer le stock des nouveaux articles
+      for (const l of validLines) await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
+      flash("Vente modifiée ✓");
+    } catch { alert("Erreur lors de la modification."); }
+    resetForm();
+    load();
+  }
+
+  // Modification rapide du paiement uniquement
+  function openPayEdit(s: Sale & { client: Client }) {
+    setPayEdit(s); setPayStatut(s.statut); setPayMontant(s.montant_paye);
+  }
+  async function savePayEdit() {
+    if (!payEdit) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Modification impossible hors-ligne."); return; }
+    const montant = payStatut === "paye" ? payEdit.total : payMontant;
+    await supabase.from("sales").update({ statut: payStatut, montant_paye: montant }).eq("id", payEdit.id);
+    setPayEdit(null);
+    load();
+  }
+
   async function save() {
+    if (editingSale) { saveEdit(); return; }
     const validLines = lines.filter(l => l.product_id && l.quantite > 0);
     if (!clientId || validLines.length === 0) return;
     const client = clients.find(c => c.id === clientId);
@@ -249,7 +323,7 @@ export default function VentesPage() {
   return (
     <div>
       <Header title="sales" action={
-        <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
+        <button onClick={openNew} className="btn-primary flex items-center gap-2">
           <Plus size={16} /> {t("addSale")}
         </button>
       } />
@@ -268,7 +342,7 @@ export default function VentesPage() {
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="card p-6 w-full max-w-2xl my-4">
-            <h3 className="font-semibold text-slate-800 mb-4">{t("addSale")}</h3>
+            <h3 className="font-semibold text-slate-800 mb-4">{editingSale ? "Modifier la vente" : t("addSale")}</h3>
             <div className="mb-4">
               <label className="text-xs text-slate-500 mb-1 block">{t("clients")}</label>
               <select className="input" value={clientId} onChange={e => setClientId(e.target.value)}>
@@ -336,10 +410,12 @@ export default function VentesPage() {
             </div>
 
             <div className="flex gap-2 justify-end items-center flex-wrap">
-              <button onClick={() => setShowForm(false)} className="btn-secondary">{t("cancel")}</button>
-              <button onClick={sendDevis} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600/90 hover:bg-green-500 text-white text-sm font-medium" title="Envoyer un devis au client (sans enregistrer)">
-                <MessageCircle size={15} /> Devis
-              </button>
+              <button onClick={resetForm} className="btn-secondary">{t("cancel")}</button>
+              {!editingSale && (
+                <button onClick={sendDevis} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600/90 hover:bg-green-500 text-white text-sm font-medium" title="Envoyer un devis au client (sans enregistrer)">
+                  <MessageCircle size={15} /> Devis
+                </button>
+              )}
               <button onClick={save} className="btn-primary">{t("save")}</button>
             </div>
           </div>
@@ -365,6 +441,8 @@ export default function VentesPage() {
                 <td className="px-4 py-3"><span className={badgeClass(s.statut)}>{t(s.statut === "paye" ? "paid" : s.statut === "partiel" ? "partial" : "pending")}</span></td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
+                  <button onClick={() => openPayEdit(s)} className="text-amber-500 hover:text-amber-400" title="Modifier le paiement"><Wallet size={16} /></button>
+                  <button onClick={() => openEditSale(s)} className="text-blue-400 hover:text-blue-300" title="Modifier la vente"><Pencil size={15} /></button>
                   <button onClick={() => whatsForSale(s)} className="text-green-500 hover:text-green-400" title="Envoyer la fiche sur WhatsApp"><MessageCircle size={16} /></button>
                   <button onClick={() => printReceipt(s)} className="text-slate-400 hover:text-blue-600" title={t("printReceipt")}><Printer size={15} /></button>
                 </div>
@@ -391,6 +469,41 @@ export default function VentesPage() {
             <p className="font-mono text-lg text-slate-100 bg-slate-800/60 rounded-lg px-3 py-2 mb-4">{linkCode}</p>
             <p className="text-sm text-slate-400 mb-2">Choisissez la référence correspondante :</p>
             <ProductPicker products={products} value="" onSelect={(p) => linkAndAdd(p)} />
+          </div>
+        </div>
+      )}
+
+      {/* Modification rapide du paiement */}
+      {payEdit && (
+        <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-[60] p-4">
+          <div className="card p-6 w-full max-w-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-100 flex items-center gap-2"><Wallet size={18} className="text-amber-400" /> Paiement</h3>
+              <button onClick={() => setPayEdit(null)} className="text-slate-400 hover:text-white"><X size={18} /></button>
+            </div>
+            <p className="text-sm text-slate-400 mb-1">{payEdit.client?.nom} · {payEdit.date}</p>
+            <p className="text-lg font-bold text-blue-400 mb-4">Total : {payEdit.total.toFixed(2)} MAD</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">{t("status")}</label>
+                <select className="input" value={payStatut} onChange={e => setPayStatut(e.target.value as SaleStatus)}>
+                  <option value="paye">{t("paid")}</option>
+                  <option value="en_attente">{t("pending")}</option>
+                  <option value="partiel">{t("partial")}</option>
+                </select>
+              </div>
+              {payStatut !== "paye" && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block">Montant payé (MAD)</label>
+                  <input type="number" className="input" value={payMontant} onChange={e => setPayMontant(+e.target.value)} />
+                  <p className="text-xs text-orange-400 mt-1">Reste : {(payEdit.total - (payStatut === "paye" ? payEdit.total : payMontant)).toFixed(2)} MAD</p>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2 justify-end mt-5">
+              <button onClick={() => setPayEdit(null)} className="btn-secondary">{t("cancel")}</button>
+              <button onClick={savePayEdit} className="btn-primary">{t("save")}</button>
+            </div>
           </div>
         </div>
       )}
