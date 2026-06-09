@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
@@ -47,6 +47,7 @@ export default function ProduitsPage() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(empty);
   const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string }[]>([]);
+  const [showAllEquivs, setShowAllEquivs] = useState(false);
   const [newEquiv, setNewEquiv] = useState({ marque: "Mann", reference: "" });
   const [vehMap, setVehMap] = useState<Record<string, { makes: string[]; nb: number }>>({});
 
@@ -116,11 +117,12 @@ export default function ProduitsPage() {
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
     setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference })) ?? []);
     setNewEquiv({ marque: "Mann", reference: "" });
+    setShowAllEquivs(false);
     setShowForm(true);
   }
 
   function openNew() {
-    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Mann", reference: "" });
+    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Mann", reference: "" }); setShowAllEquivs(false);
   }
 
   // Diffuse les produits en promo (prix_promo > 0) par WhatsApp
@@ -233,13 +235,18 @@ export default function ProduitsPage() {
               <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><Repeat size={15} /> {t("equivalents")}</label>
               {equivs.length === 0 && <p className="text-xs text-slate-400 mb-2">{t("noEquiv")}</p>}
               <div className="space-y-1.5 mb-2">
-                {equivs.map((e, i) => (
+                {(showAllEquivs ? equivs : equivs.slice(0, 4)).map((e, i) => (
                   <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-md px-2 py-1">
                     <span className="text-xs font-semibold text-indigo-700 w-20 shrink-0">{e.marque}</span>
                     <span className="text-sm font-mono flex-1">{e.reference}</span>
                     <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600"><X size={15} /></button>
                   </div>
                 ))}
+                {equivs.length > 4 && (
+                  <button type="button" onClick={() => setShowAllEquivs(v => !v)} className="text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-1 px-1 py-0.5">
+                    {showAllEquivs ? <>Réduire <ChevronUp size={13} /></> : <>Voir tout (+{equivs.length - 4}) <ChevronDown size={13} /></>}
+                  </button>
+                )}
               </div>
               <div className="flex gap-2">
                 <select className="input w-32" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
