@@ -17,7 +17,7 @@ type LastSale = {
   total: number; statut: SaleStatus; montant_paye: number; offline: boolean;
 };
 
-type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string };
+type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string; variant?: string };
 
 export default function VentesPage() {
   const { t } = useLang();
@@ -26,6 +26,8 @@ export default function VentesPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [crossSell, setCrossSell] = useState<Product[]>([]);
+  // Variantes de marque par produit (Filtron + équivalences avec prix) → prix auto à la vente
+  const [variants, setVariants] = useState<Record<string, { marque: string; reference: string; prix: number }[]>>({});
   const [showForm, setShowForm] = useState(false);
   const [clientId, setClientId] = useState("");
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -110,9 +112,29 @@ export default function VentesPage() {
 
   function setLineProduct(i: number, p: Product) {
     const updated = [...lines];
-    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.nom_fr };
+    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.nom_fr, variant: "Filtron" };
     setLines(updated);
     fetchCrossSell(p);
+    loadVariants(p);
+  }
+
+  // Charge les variantes de marque d'un produit (Filtron + équivalences ayant un prix)
+  async function loadVariants(p: Product) {
+    if (variants[p.id]) return;
+    const { data } = await supabase.from("equivalences").select("marque, reference, prix").eq("product_id", p.id);
+    const list = [
+      { marque: "Filtron", reference: p.reference, prix: p.prix_vente },
+      ...((data ?? []) as { marque: string; reference: string; prix: number | null }[]).map(e => ({ marque: e.marque, reference: e.reference, prix: e.prix ?? p.prix_vente })),
+    ];
+    setVariants(prev => ({ ...prev, [p.id]: list }));
+  }
+
+  // Applique une marque à une ligne : prix auto + libellé "réf (marque)"
+  function applyVariant(i: number, marque: string) {
+    const l = lines[i];
+    const v = (variants[l.product_id] || []).find(x => x.marque === marque);
+    if (!v) return;
+    setLines(lines.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: v.prix, nom: `${v.reference} (${v.marque})` } : x));
   }
 
   // Vente croisée : autres filtres (catégories différentes) compatibles avec le même véhicule
@@ -153,6 +175,7 @@ export default function VentesPage() {
     flash(`${p.reference} ajouté ✓`);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
     fetchCrossSell(p);
+    loadVariants(p);
   }
 
   // Traite un code scanné (caméra ou douchette)
@@ -415,6 +438,13 @@ export default function VentesPage() {
                     <button onClick={() => setLines(lines.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-600 flex items-center justify-center"><Trash2 size={15} /></button>
                     <div className="col-span-1 flex items-center text-sm font-medium text-slate-600">{(l.quantite * l.prix_unitaire).toFixed(0)}</div>
                   </div>
+                  {variants[l.product_id] && variants[l.product_id].length > 1 && (
+                    <select className="input mt-1 py-1 text-xs" value={l.variant ?? "Filtron"} onChange={e => applyVariant(i, e.target.value)}>
+                      {variants[l.product_id].map(v => (
+                        <option key={v.marque + v.reference} value={v.marque}>{v.marque} · {v.reference} · {v.prix} MAD</option>
+                      ))}
+                    </select>
+                  )}
                   {fournisseurs.length > 0 && (
                     <select className="input mt-1 py-1 text-xs" value={l.fournisseur_id ?? ""} onChange={e => updateLine(i, "fournisseur_id", e.target.value)}>
                       <option value="">Source : — (non attribué)</option>
