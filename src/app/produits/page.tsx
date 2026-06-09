@@ -5,7 +5,8 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone } from "lucide-react";
+import { sendWhatsApp } from "@/lib/whatsapp";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
@@ -26,7 +27,7 @@ const categoryKeys: Record<ProductCategory, keyof ReturnType<typeof useLang>["t"
   autre: "other",
 };
 
-const empty = { nom_fr: "", nom_ar: "", reference: "", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "" };
+const empty = { nom_fr: "", nom_ar: "", reference: "", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0 };
 
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe
 function refCompare(a: string, b: string) {
@@ -84,10 +85,11 @@ export default function ProduitsPage() {
 
   async function save() {
     let productId = editing?.id;
+    const payload = { ...form, prix_promo: form.prix_promo > 0 ? form.prix_promo : null };
     if (editing) {
-      await supabase.from("products").update(form).eq("id", editing.id);
+      await supabase.from("products").update(payload).eq("id", editing.id);
     } else {
-      const { data: inserted } = await supabase.from("products").insert(form).select().single();
+      const { data: inserted } = await supabase.from("products").insert(payload).select().single();
       productId = (inserted as Product | null)?.id;
     }
     // Synchronise les équivalences (supprime puis réinsère)
@@ -110,7 +112,7 @@ export default function ProduitsPage() {
 
   async function startEdit(p: Product) {
     setEditing(p);
-    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "" });
+    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0 });
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
     setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference })) ?? []);
     setNewEquiv({ marque: "Mann", reference: "" });
@@ -119,6 +121,15 @@ export default function ProduitsPage() {
 
   function openNew() {
     setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Mann", reference: "" });
+  }
+
+  // Diffuse les produits en promo (prix_promo > 0) par WhatsApp
+  function promoWhatsApp() {
+    const promos = products.filter(p => (p.prix_promo ?? 0) > 0);
+    if (promos.length === 0) { alert("Aucun produit en promo. Mets un « prix promo » sur des produits d'abord (Modifier)."); return; }
+    const lignes = promos.map(p => `• ${p.reference} — ${p.nom_fr}\n   ${p.prix_vente} ➜ *${p.prix_promo} MAD*`).join("\n");
+    const text = ["🔥 *PROMOS FiltroPro* 🔥", "", lignes, "", "Dispo jusqu'à épuisement du stock.", "📞 06 02 35 02 90"].join("\n");
+    sendWhatsApp(null, text);
   }
 
   function addEquivRow() {
@@ -147,9 +158,14 @@ export default function ProduitsPage() {
   return (
     <div>
       <Header title="products" action={
-        <button onClick={openNew} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> {t("addProduct")}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={promoWhatsApp} className="btn-secondary flex items-center gap-2" title="Diffuser les promos sur WhatsApp">
+            <Megaphone size={15} /> <span className="hidden sm:inline">Promo WhatsApp</span>
+          </button>
+          <button onClick={openNew} className="btn-primary flex items-center gap-2">
+            <Plus size={16} /> <span className="hidden sm:inline">{t("addProduct")}</span>
+          </button>
+        </div>
       } />
 
       {/* Sélecteur type véhicule : sépare voitures et bus/camions */}
@@ -207,6 +223,7 @@ export default function ProduitsPage() {
               </div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("buyPrice")} (MAD)</label><input type="number" className="input" value={form.prix_achat} onChange={e => setForm({ ...form, prix_achat: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("sellPrice")} (MAD)</label><input type="number" className="input" value={form.prix_vente} onChange={e => setForm({ ...form, prix_vente: +e.target.value })} /></div>
+              <div><label className="text-xs text-rose-400 mb-1 block">Prix promo (MAD) — 0 = pas de promo</label><input type="number" className="input" value={form.prix_promo} onChange={e => setForm({ ...form, prix_promo: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("stock")}</label><input type="number" className="input" value={form.stock} onChange={e => setForm({ ...form, stock: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">Stock min</label><input type="number" className="input" value={form.stock_min} onChange={e => setForm({ ...form, stock_min: +e.target.value })} /></div>
             </div>
@@ -269,7 +286,15 @@ export default function ProduitsPage() {
                   <span className="inline-flex items-center gap-1.5"><CategoryIcon categorie={p.categorie} size={15} className="text-red-400" /> {t(categoryKeys[p.categorie])}</span>
                 </td>
                 {showCost && <td className="px-4 py-3 text-slate-400">{p.prix_achat} MAD</td>}
-                <td className="px-4 py-3 font-medium text-blue-600">{p.prix_vente} MAD</td>
+                <td className="px-4 py-3 font-medium text-blue-600">
+                  {(p.prix_promo ?? 0) > 0 ? (
+                    <span className="flex items-center gap-1.5">
+                      <span className="line-through text-slate-500 text-xs">{p.prix_vente}</span>
+                      <span className="text-rose-400 font-bold">{p.prix_promo} MAD</span>
+                      <span className="text-[9px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded-full font-semibold">PROMO</span>
+                    </span>
+                  ) : `${p.prix_vente} MAD`}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <StockBadge stock={p.stock} stockMin={p.stock_min} />

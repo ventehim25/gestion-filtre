@@ -11,13 +11,14 @@ export type LatLng = { lat: number; lng: number };
 
 // Couleurs des statuts (pins + badges). Rouge = à livrer, vert = livré, etc.
 export const STATUT_INFO: Record<GarageStatut, { label: string; color: string; bg: string }> = {
+  prospect: { label: "Prospect (à démarcher)", color: "#a855f7", bg: "rgba(168,85,247,0.15)" },
   a_livrer: { label: "À livrer", color: "#ef4444", bg: "rgba(239,68,68,0.15)" },
   preparee: { label: "Commande préparée", color: "#3b82f6", bg: "rgba(59,130,246,0.15)" },
   livre: { label: "Livré", color: "#22c55e", bg: "rgba(34,197,94,0.15)" },
   reporte: { label: "Pas de réponse / reporté", color: "#94a3b8", bg: "rgba(148,163,184,0.18)" },
 };
 
-export const STATUT_ORDER: GarageStatut[] = ["a_livrer", "preparee", "livre", "reporte"];
+export const STATUT_ORDER: GarageStatut[] = ["prospect", "a_livrer", "preparee", "livre", "reporte"];
 
 // Distance à vol d'oiseau (km) entre deux points GPS.
 export function haversineKm(a: LatLng, b: LatLng): number {

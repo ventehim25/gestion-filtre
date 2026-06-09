@@ -65,6 +65,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({ totalVentes: 0, totalClients: 0, totalProduits: 0, stockFaible: 0, benefice: 0, coutMarchandise: 0, toRecommend: 0, unpaid: 0, encaisseJour: 0, encaisseSemaine: 0 });
   const [dbError, setDbError] = useState("");
   const [pendingOffline, setPendingOffline] = useState(0);
+  const [relances, setRelances] = useState<{ id: string; nom: string; days: number; freq: number }[]>([]);
   // Montants sensibles masqués par défaut — révélés au clic
   const [showMoney, setShowMoney] = useState<{ f: boolean; b: boolean; e: boolean }>({ f: false, b: false, e: false });
   const [showVitrine, setShowVitrine] = useState(false);
@@ -80,12 +81,12 @@ export default function Dashboard() {
       const [r1, r2, r3, r4] = await Promise.all([
         supabase.from("clients").select("*", { count: "exact", head: true }),
         supabase.from("products").select("*", { count: "exact", head: true }),
-        supabase.from("sales").select("total, montant_paye, statut, date"),
+        supabase.from("sales").select("total, montant_paye, statut, date, client_id"),
         supabase.from("products").select("id").gt("stock", 0).lte("stock", 2),
       ]);
       const errors = [r1.error, r2.error, r3.error, r4.error].filter(Boolean);
       if (errors.length > 0) { setDbError(errors.map((e) => e?.message).join(" | ")); return; }
-      const sales = (r3.data ?? []) as { total: number; montant_paye: number; statut: string; date: string }[];
+      const sales = (r3.data ?? []) as { total: number; montant_paye: number; statut: string; date: string; client_id: string }[];
       const stockFaible = r4.data;
       // Articles vendus paginés → coût marchandise & bénéfice exacts
       const saleItems: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }[] = [];
@@ -113,6 +114,27 @@ export default function Dashboard() {
         if (data.length < 1000) break;
       }
       const toRecommend = lowList.filter((p) => p.stock <= p.stock_min).length;
+
+      // Clients/garages à relancer : intervalle d'achat dépassé
+      const { data: cl } = await supabase.from("clients").select("id, nom");
+      const names: Record<string, string> = {};
+      (cl ?? []).forEach((c: { id: string; nom: string }) => { names[c.id] = c.nom; });
+      const byClient: Record<string, string[]> = {};
+      for (const s of sales) { if (s.client_id && s.date) (byClient[s.client_id] ??= []).push(s.date); }
+      const todayMs = Date.now();
+      const rel: { id: string; nom: string; days: number; freq: number }[] = [];
+      for (const [cid, dates] of Object.entries(byClient)) {
+        if (dates.length < 2) continue;
+        const sorted = [...dates].sort();
+        const first = new Date(sorted[0]).getTime();
+        const last = new Date(sorted[sorted.length - 1]).getTime();
+        const freq = (last - first) / (86400000 * (sorted.length - 1));
+        if (!(freq > 0)) continue;
+        const daysSince = Math.round((todayMs - last) / 86400000);
+        if (daysSince > freq * 1.2 && daysSince >= 7) rel.push({ id: cid, nom: names[cid] ?? "Client", days: daysSince, freq: Math.round(freq) });
+      }
+      rel.sort((a, b) => (b.days / b.freq) - (a.days / a.freq));
+      setRelances(rel.slice(0, 6));
 
       setStats({
         totalVentes, totalClients: r1.count ?? 0, totalProduits: r2.count ?? 0,
@@ -282,6 +304,22 @@ export default function Dashboard() {
           </div>
         </button>
       </div>
+
+      {/* Garages à relancer (réassort) */}
+      {relances.length > 0 && (
+        <div className="card p-5 mt-6">
+          <h3 className="font-semibold text-slate-200 mb-1 flex items-center gap-2"><AlertTriangle size={16} className="text-amber-400" /> À relancer (réassort)</h3>
+          <p className="text-xs text-slate-500 mb-3">Garages qui n'ont pas commandé depuis plus longtemps que d'habitude.</p>
+          <div className="space-y-2">
+            {relances.map(r => (
+              <button key={r.id} onClick={() => router.push("/clients")} className="w-full flex items-center justify-between gap-2 text-sm bg-[var(--surface-2)] rounded-lg px-3 py-2 hover:bg-slate-800 text-left">
+                <span className="text-slate-200 font-medium truncate">{r.nom}</span>
+                <span className="text-xs text-slate-400 shrink-0">il y a {r.days} j · ~tous les {r.freq} j</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Vitrine (marques + atouts + avis) — repliée par défaut */}
       <div className="mt-6">

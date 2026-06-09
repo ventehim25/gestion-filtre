@@ -84,7 +84,7 @@ export type Avance = {
   note: string | null;
 };
 
-export type GarageStatut = "a_livrer" | "preparee" | "livre" | "reporte";
+export type GarageStatut = "prospect" | "a_livrer" | "preparee" | "livre" | "reporte";
 
 export type Garage = {
   id: string;
@@ -144,6 +144,7 @@ export type Product = {
   dimensions?: string | null;
   image_url?: string | null;
   code_barre?: string | null;
+  prix_promo?: number | null;
 };
 
 export type Client = {

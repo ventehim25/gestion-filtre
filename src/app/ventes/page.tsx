@@ -25,6 +25,7 @@ export default function VentesPage() {
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
+  const [crossSell, setCrossSell] = useState<Product[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [clientId, setClientId] = useState("");
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -111,6 +112,25 @@ export default function VentesPage() {
     const updated = [...lines];
     updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.nom_fr };
     setLines(updated);
+    fetchCrossSell(p);
+  }
+
+  // Vente croisée : autres filtres (catégories différentes) compatibles avec le même véhicule
+  async function fetchCrossSell(p: Product) {
+    try {
+      const { data: apps } = await supabase.from("applications").select("marque, modele").eq("product_id", p.id).limit(1);
+      if (!apps || apps.length === 0) return;
+      const { marque, modele } = apps[0] as { marque: string; modele: string };
+      const { data: matches } = await supabase.from("applications").select("product_id, products(*)").eq("marque", marque).eq("modele", modele).limit(60);
+      const seen = new Set<string>();
+      const out: Product[] = [];
+      for (const m of (matches ?? []) as unknown as { product_id: string; products: Product | null }[]) {
+        const prod = m.products;
+        if (!prod || prod.id === p.id || prod.categorie === p.categorie || seen.has(prod.id)) continue;
+        seen.add(prod.id); out.push(prod);
+      }
+      setCrossSell(out.slice(0, 6));
+    } catch { /* silencieux */ }
   }
 
   function flash(msg: string) {
@@ -132,6 +152,7 @@ export default function VentesPage() {
     });
     flash(`${p.reference} ajouté ✓`);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
+    fetchCrossSell(p);
   }
 
   // Traite un code scanné (caméra ou douchette)
@@ -162,6 +183,7 @@ export default function VentesPage() {
   function resetForm() {
     setShowForm(false); setEditingSale(null); setOldLines([]);
     setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye");
+    setCrossSell([]);
   }
 
   function openNew() {
@@ -402,6 +424,19 @@ export default function VentesPage() {
                 </div>
               ))}
             </div>
+
+            {crossSell.filter(p => !lines.some(l => l.product_id === p.id)).length > 0 && (
+              <div className="mb-3">
+                <p className="text-xs text-slate-500 mb-1.5">💡 Filtres pour le même véhicule (clique pour ajouter) :</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {crossSell.filter(p => !lines.some(l => l.product_id === p.id)).map(p => (
+                    <button key={p.id} type="button" onClick={() => addProductToCart(p)} className="flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 px-2 py-1 rounded-lg hover:bg-blue-500/25">
+                      <Plus size={11} /> <span className="font-mono">{p.reference}</span> <span className="text-slate-400">· {p.prix_vente} MAD</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="bg-slate-50 rounded-lg p-3 mb-4 flex items-center justify-between">
               <span className="font-semibold">{t("total")}</span>
