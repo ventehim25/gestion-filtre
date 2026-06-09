@@ -128,10 +128,10 @@ export default function Dashboard() {
   }
 
   const cards = [
-    { label: t("totalSales"), value: `${stats.totalVentes.toFixed(0)} ${t("moroccanDirham")}`, icon: TrendingUp, color: "bg-sky-500/15 text-sky-400" },
-    { label: t("totalClients"), value: stats.totalClients, icon: Users, color: "bg-violet-500/15 text-violet-400" },
-    { label: t("totalProducts"), value: stats.totalProduits, icon: Package, color: "bg-teal-500/15 text-teal-400" },
-    { label: t("lowStock"), value: stats.stockFaible, icon: AlertTriangle, color: "bg-amber-500/15 text-amber-400" },
+    { label: t("totalSales"), value: `${stats.totalVentes.toFixed(0)} ${t("moroccanDirham")}`, icon: TrendingUp, color: "bg-sky-500/15 text-sky-400", href: "/ventes" },
+    { label: t("totalClients"), value: stats.totalClients, icon: Users, color: "bg-violet-500/15 text-violet-400", href: "/clients" },
+    { label: t("totalProducts"), value: stats.totalProduits, icon: Package, color: "bg-teal-500/15 text-teal-400", href: "/produits" },
+    { label: t("lowStock"), value: stats.stockFaible, icon: AlertTriangle, color: "bg-amber-500/15 text-amber-400", href: "/reappro" },
   ];
 
   return (
@@ -239,7 +239,7 @@ export default function Dashboard() {
       {/* Cartes stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {cards.map((c) => (
-          <div key={c.label} className="card p-5 hover:-translate-y-0.5 flex items-center gap-4">
+          <button key={c.label} onClick={() => router.push(c.href)} className="card p-5 hover:-translate-y-0.5 flex items-center gap-4 text-left w-full">
             <div className={`h-12 w-12 shrink-0 rounded-xl flex items-center justify-center ${c.color}`}>
               <c.icon size={22} />
             </div>
@@ -247,7 +247,7 @@ export default function Dashboard() {
               <p className="text-xs text-slate-500 font-medium truncate">{c.label}</p>
               <p className="text-xl font-bold text-slate-100 mt-0.5">{c.value}</p>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
