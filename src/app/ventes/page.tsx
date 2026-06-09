@@ -124,7 +124,10 @@ export default function VentesPage() {
     const { data } = await supabase.from("equivalences").select("marque, reference, prix").eq("product_id", p.id);
     const list = [
       { marque: "Filtron", reference: p.reference, prix: p.prix_vente },
-      ...((data ?? []) as { marque: string; reference: string; prix: number | null }[]).map(e => ({ marque: e.marque, reference: e.reference, prix: e.prix ?? p.prix_vente })),
+      // Seulement les équivalences que TU as enregistrées (avec un prix), pas les OE auto
+      ...((data ?? []) as { marque: string; reference: string; prix: number | null }[])
+        .filter(e => e.prix != null)
+        .map(e => ({ marque: e.marque, reference: e.reference, prix: e.prix as number })),
     ];
     setVariants(prev => ({ ...prev, [p.id]: list }));
   }

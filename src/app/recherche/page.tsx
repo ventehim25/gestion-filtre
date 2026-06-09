@@ -299,6 +299,8 @@ export default function RecherchePage() {
               const apps = p.applications ?? [];
               const appPreview = distinctByMarque(apps, 2);
               const vehPreview = distinctByMarque(vehs, 2);
+              // Références que TU as enregistrées (avec un prix), pas les OE auto
+              const regEquivs = (p.equivalences ?? []).filter(e => (e.prix ?? null) !== null);
               return (
                 <div key={p.id} className="card p-4 flex gap-4">
                   <FilterImage reference={p.reference} categorie={p.categorie} imageUrl={p.image_url} wid={200} className="h-20 w-20 rounded-lg object-contain bg-white shrink-0 self-start border border-slate-700/60 p-1" />
@@ -308,10 +310,10 @@ export default function RecherchePage() {
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>
                       <button onClick={() => toggleRef(p.id)} className="text-xl font-bold font-mono text-slate-800 mt-1 flex items-center gap-1.5 hover:text-blue-500">
                         {p.reference}
-                        {(p.equivalences ?? []).length > 0 && (openRefs.has(p.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
+                        {regEquivs.length > 0 && (openRefs.has(p.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
                       </button>
-                      {(p.equivalences ?? []).length > 0 && !openRefs.has(p.id) && (
-                        <span className="block text-[11px] text-blue-400">↳ {(p.equivalences ?? []).length} autre(s) référence(s) — cliquer</span>
+                      {regEquivs.length > 0 && !openRefs.has(p.id) && (
+                        <span className="block text-[11px] text-blue-400">↳ {regEquivs.length} autre(s) référence(s) — cliquer</span>
                       )}
                       <div className="text-sm text-slate-500">{p.nom_fr}</div>
                       {p.dimensions && <div className="text-xs text-slate-500 mt-1">📐 {p.dimensions}</div>}
@@ -358,11 +360,11 @@ export default function RecherchePage() {
                     </div>
                   )}
 
-                  {(p.equivalences ?? []).length > 0 && openRefs.has(p.id) && (
+                  {regEquivs.length > 0 && openRefs.has(p.id) && (
                     <div className="mt-3 pt-3 border-t border-slate-100">
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-2"><Repeat size={13} /> {t("equivalents")}</div>
                       <div className="space-y-1.5">
-                        {(p.equivalences ?? []).map(e => (
+                        {regEquivs.map(e => (
                           <div key={e.id} className="flex items-baseline gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
                             <span className="font-mono text-base font-bold text-slate-100">{e.reference}</span>
                             <span className="text-xs text-indigo-300">{e.marque}</span>
