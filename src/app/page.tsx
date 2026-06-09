@@ -4,14 +4,16 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, ClipboardList, MapPin } from "lucide-react";
+import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, ClipboardList, MapPin, CloudOff, Banknote } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import Logo from "@/components/Logo";
 import VoiceButton from "@/components/VoiceButton";
+import { getPending } from "@/lib/offlineSales";
 
 type Stats = {
   totalVentes: number; totalClients: number; totalProduits: number;
   stockFaible: number; benefice: number; duFournisseur: number;
+  toRecommend: number; unpaid: number; encaisseJour: number; encaisseSemaine: number;
 };
 
 const BRANDS = [
@@ -59,10 +61,11 @@ export default function Dashboard() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
-  const [stats, setStats] = useState<Stats>({ totalVentes: 0, totalClients: 0, totalProduits: 0, stockFaible: 0, benefice: 0, duFournisseur: 0 });
+  const [stats, setStats] = useState<Stats>({ totalVentes: 0, totalClients: 0, totalProduits: 0, stockFaible: 0, benefice: 0, duFournisseur: 0, toRecommend: 0, unpaid: 0, encaisseJour: 0, encaisseSemaine: 0 });
   const [dbError, setDbError] = useState("");
+  const [pendingOffline, setPendingOffline] = useState(0);
   // Montants sensibles masqués par défaut — révélés au clic
-  const [showMoney, setShowMoney] = useState<{ f: boolean; b: boolean }>({ f: false, b: false });
+  const [showMoney, setShowMoney] = useState<{ f: boolean; b: boolean; e: boolean }>({ f: false, b: false, e: false });
   const [showVitrine, setShowVitrine] = useState(false);
 
   useEffect(() => {
@@ -71,21 +74,43 @@ export default function Dashboard() {
   }, []);
 
   useEffect(() => {
+    setPendingOffline(getPending().length);
     async function load() {
       const [r1, r2, r3, r4, r5] = await Promise.all([
         supabase.from("clients").select("*", { count: "exact", head: true }),
         supabase.from("products").select("*", { count: "exact", head: true }),
-        supabase.from("sales").select("total, montant_paye"),
+        supabase.from("sales").select("total, montant_paye, statut, date"),
         supabase.from("products").select("id").gt("stock", 0).lte("stock", 2),
         supabase.from("sale_items").select("quantite, prix_unitaire, product:products(prix_achat)"),
       ]);
       const errors = [r1.error, r2.error, r3.error, r4.error, r5.error].filter(Boolean);
       if (errors.length > 0) { setDbError(errors.map((e) => e?.message).join(" | ")); return; }
-      const sales = r3.data; const stockFaible = r4.data; const saleItems = r5.data;
-      const totalVentes = sales?.reduce((s, v) => s + v.total, 0) ?? 0;
-      const duFournisseur = sales?.reduce((s, v) => s + (v.total - v.montant_paye), 0) ?? 0;
+      const sales = (r3.data ?? []) as { total: number; montant_paye: number; statut: string; date: string }[];
+      const stockFaible = r4.data; const saleItems = r5.data;
+      const totalVentes = sales.reduce((s, v) => s + v.total, 0);
+      const duFournisseur = sales.reduce((s, v) => s + (v.total - v.montant_paye), 0);
       const benefice = (saleItems ?? []).reduce((s: number, i: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }) => s + (i.prix_unitaire - (i.product?.prix_achat ?? 0)) * i.quantite, 0);
-      setStats({ totalVentes, totalClients: r1.count ?? 0, totalProduits: r2.count ?? 0, stockFaible: stockFaible?.length ?? 0, benefice, duFournisseur });
+      const unpaid = sales.filter((s) => s.statut !== "paye").length;
+      const todayStr = new Date().toISOString().split("T")[0];
+      const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0];
+      const encaisseJour = sales.filter((s) => s.date === todayStr).reduce((a, s) => a + s.montant_paye, 0);
+      const encaisseSemaine = sales.filter((s) => s.date >= weekAgo).reduce((a, s) => a + s.montant_paye, 0);
+
+      // Produits à recommander (stock <= seuil) — pagination
+      const lowList: { stock: number; stock_min: number }[] = [];
+      for (let i = 0; i < 20; i++) {
+        const { data } = await supabase.from("products").select("stock, stock_min").range(i * 1000, i * 1000 + 999);
+        if (!data || data.length === 0) break;
+        lowList.push(...(data as { stock: number; stock_min: number }[]));
+        if (data.length < 1000) break;
+      }
+      const toRecommend = lowList.filter((p) => p.stock <= p.stock_min).length;
+
+      setStats({
+        totalVentes, totalClients: r1.count ?? 0, totalProduits: r2.count ?? 0,
+        stockFaible: stockFaible?.length ?? 0, benefice, duFournisseur,
+        toRecommend, unpaid, encaisseJour, encaisseSemaine,
+      });
     }
     load();
   }, []);
@@ -96,14 +121,35 @@ export default function Dashboard() {
   }
 
   const cards = [
-    { label: t("totalSales"), value: `${stats.totalVentes.toFixed(0)} ${t("moroccanDirham")}`, icon: TrendingUp, grad: "from-red-500 to-red-600" },
-    { label: t("totalClients"), value: stats.totalClients, icon: Users, grad: "from-red-600 to-rose-700" },
-    { label: t("totalProducts"), value: stats.totalProduits, icon: Package, grad: "from-rose-500 to-red-600" },
-    { label: t("lowStock"), value: stats.stockFaible, icon: AlertTriangle, grad: "from-red-700 to-rose-900" },
+    { label: t("totalSales"), value: `${stats.totalVentes.toFixed(0)} ${t("moroccanDirham")}`, icon: TrendingUp, color: "bg-sky-500/15 text-sky-400" },
+    { label: t("totalClients"), value: stats.totalClients, icon: Users, color: "bg-violet-500/15 text-violet-400" },
+    { label: t("totalProducts"), value: stats.totalProduits, icon: Package, color: "bg-teal-500/15 text-teal-400" },
+    { label: t("lowStock"), value: stats.stockFaible, icon: AlertTriangle, color: "bg-amber-500/15 text-amber-400" },
   ];
 
   return (
     <div>
+      {/* Alertes utiles (cliquables) */}
+      {(stats.toRecommend > 0 || stats.unpaid > 0 || pendingOffline > 0) && (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {stats.toRecommend > 0 && (
+            <button onClick={() => router.push("/reappro")} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-colors">
+              <ClipboardList size={15} /> {stats.toRecommend} à recommander
+            </button>
+          )}
+          {stats.unpaid > 0 && (
+            <button onClick={() => router.push("/rappels")} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-orange-500/15 text-orange-300 border border-orange-500/30 hover:bg-orange-500/25 transition-colors">
+              <AlertTriangle size={15} /> {stats.unpaid} vente(s) impayée(s)
+            </button>
+          )}
+          {pendingOffline > 0 && (
+            <button onClick={() => router.push("/ventes")} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-yellow-500/15 text-yellow-300 border border-yellow-500/30 hover:bg-yellow-500/25 transition-colors">
+              <CloudOff size={15} /> {pendingOffline} à synchroniser
+            </button>
+          )}
+        </div>
+      )}
+
       {/* HERO : carrousel + recherche */}
       <div className="relative rounded-2xl overflow-hidden mb-6 min-h-[190px] md:min-h-[240px] flex items-center">
         {HERO.map((id, i) => (
@@ -171,13 +217,13 @@ export default function Dashboard() {
       {/* Raccourcis rapides */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {[
-          { label: t("addSale"), icon: ShoppingCart, href: "/ventes", grad: "from-red-500 to-red-600" },
-          { label: t("vehicleSearch"), icon: Car, href: "/recherche?tab=vehicule", grad: "from-rose-500 to-red-600" },
-          { label: t("reorder"), icon: ClipboardList, href: "/reappro", grad: "from-orange-500 to-red-600" },
-          { label: t("tours"), icon: MapPin, href: "/tournees", grad: "from-red-600 to-rose-800" },
+          { label: t("addSale"), icon: ShoppingCart, href: "/ventes", color: "bg-blue-500/15 text-blue-400" },
+          { label: t("vehicleSearch"), icon: Car, href: "/recherche?tab=vehicule", color: "bg-violet-500/15 text-violet-400" },
+          { label: t("reorder"), icon: ClipboardList, href: "/reappro", color: "bg-amber-500/15 text-amber-400" },
+          { label: t("tours"), icon: MapPin, href: "/tournees", color: "bg-emerald-500/15 text-emerald-400" },
         ].map((s) => (
           <button key={s.href} onClick={() => router.push(s.href)} className="card p-4 flex items-center gap-3 text-left hover:-translate-y-0.5">
-            <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${s.grad} shadow-lg`}><s.icon size={20} /></div>
+            <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center ${s.color}`}><s.icon size={20} /></div>
             <span className="font-semibold text-slate-100 text-sm">{s.label}</span>
           </button>
         ))}
@@ -187,7 +233,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {cards.map((c) => (
           <div key={c.label} className="card p-5 hover:-translate-y-0.5 flex items-center gap-4">
-            <div className={`h-12 w-12 shrink-0 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${c.grad} shadow-lg`}>
+            <div className={`h-12 w-12 shrink-0 rounded-xl flex items-center justify-center ${c.color}`}>
               <c.icon size={22} />
             </div>
             <div className="min-w-0">
@@ -198,8 +244,17 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Dû fournisseur / Bénéfice — masqués, révélés au clic */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Encaissé / Dû fournisseur / Bénéfice — masqués, révélés au clic */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        <button onClick={() => setShowMoney(m => ({ ...m, e: !m.e }))} className="card p-4 flex items-center gap-3 text-left hover:-translate-y-0.5">
+          <div className="h-10 w-10 shrink-0 rounded-xl bg-sky-500/15 text-sky-400 flex items-center justify-center"><Banknote size={20} /></div>
+          <div className="min-w-0">
+            <h3 className="text-xs font-medium text-slate-400">Encaissé</h3>
+            {showMoney.e
+              ? <p className="text-base md:text-xl font-bold text-sky-400 mt-0.5 leading-tight">{stats.encaisseJour.toFixed(0)} <span className="text-xs font-normal text-slate-500">aujourd&apos;hui</span><br /><span className="text-xs text-slate-400">{stats.encaisseSemaine.toFixed(0)} MAD / 7j</span></p>
+              : <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1"><Eye size={13} /> Afficher</p>}
+          </div>
+        </button>
         <button onClick={() => setShowMoney(m => ({ ...m, f: !m.f }))} className="card p-4 flex items-center gap-3 text-left hover:-translate-y-0.5">
           <div className="h-10 w-10 shrink-0 rounded-xl bg-orange-500/15 text-orange-400 flex items-center justify-center"><Wallet size={20} /></div>
           <div className="min-w-0">
