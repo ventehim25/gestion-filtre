@@ -55,12 +55,15 @@ export type Database = {
   };
 };
 
+export type FournisseurType = "capital" | "credit";
+
 export type Fournisseur = {
   id: string;
   created_at: string;
   nom: string;
   telephone: string | null;
   note: string | null;
+  type: FournisseurType;
 };
 
 export type Reception = {
@@ -175,5 +178,6 @@ export type SaleItem = {
   product_id: string;
   quantite: number;
   prix_unitaire: number;
+  fournisseur_id: string | null;
   product?: Product;
 };

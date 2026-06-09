@@ -3,11 +3,11 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
-import type { Fournisseur, Reception, Avance, Product } from "@/types/database";
+import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
 import {
   Plus, Truck, Phone, MessageCircle, Pencil, Trash2, X, PackagePlus, HandCoins,
-  ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff,
+  ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank,
 } from "lucide-react";
 
 type RecLine = { product_id: string; quantite: number; prix_achat: number; reference: string };
@@ -25,10 +25,13 @@ export default function FournisseursPage() {
   const [showAmounts, setShowAmounts] = useState(false);   // montants masqués par défaut
   const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
+  // Ventes attribuées par fournisseur (source choisie à la vente)
+  const [attByF, setAttByF] = useState<Record<string, { ventes: number; benef: number }>>({});
+
   // Formulaire fournisseur
   const [showSupplier, setShowSupplier] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Fournisseur | null>(null);
-  const [sForm, setSForm] = useState({ nom: "", telephone: "", note: "" });
+  const [sForm, setSForm] = useState<{ nom: string; telephone: string; note: string; type: FournisseurType }>({ nom: "", telephone: "", note: "", type: "credit" });
 
   // Formulaire réception (marchandise prise)
   const [recFor, setRecFor] = useState<Fournisseur | null>(null);
@@ -81,6 +84,24 @@ export default function FournisseursPage() {
       agg.push({ date: s.date ?? "", cout: c, benef: b });
     }
     setSalesAgg(agg);
+
+    // Ventes attribuées à un fournisseur (source choisie à la vente)
+    const attLines: { fournisseur_id: string; quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }[] = [];
+    for (let i = 0; i < 30; i++) {
+      const { data } = await supabase.from("sale_items").select("fournisseur_id, quantite, prix_unitaire, product:products(prix_achat)").not("fournisseur_id", "is", null).range(i * 1000, i * 1000 + 999);
+      if (!data || data.length === 0) break;
+      attLines.push(...(data as unknown as typeof attLines));
+      if (data.length < 1000) break;
+    }
+    const att: Record<string, { ventes: number; benef: number }> = {};
+    for (const l of attLines) {
+      const pa = l.product?.prix_achat ?? 0;
+      const cur = att[l.fournisseur_id] ?? { ventes: 0, benef: 0 };
+      cur.ventes += l.quantite * l.prix_unitaire;
+      cur.benef += l.quantite * (l.prix_unitaire - pa);
+      att[l.fournisseur_id] = cur;
+    }
+    setAttByF(att);
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -96,7 +117,11 @@ export default function FournisseursPage() {
     return m;
   }, [avances]);
   const soldeOf = (id: string) => (recByF[id] ?? 0) - (avByF[id] ?? 0);
-  const soldeTotal = fournisseurs.reduce((s, f) => s + soldeOf(f.id), 0);
+  const isCapital = (f: Fournisseur) => (f.type ?? "credit") === "capital";
+  // Capital dispo (type capital) = ventes attribuées − marchandise achetée
+  const capitalOf = (id: string) => (attByF[id]?.ventes ?? 0) - (recByF[id] ?? 0);
+  const capitalTotal = fournisseurs.filter(isCapital).reduce((s, f) => s + capitalOf(f.id), 0);
+  const duTotal = fournisseurs.filter(f => !isCapital(f)).reduce((s, f) => s + soldeOf(f.id), 0);
 
   // Mois disponibles + filtre
   const months = useMemo(() => {
@@ -133,11 +158,11 @@ export default function FournisseursPage() {
   const periodTxt = selectedMonth === "all" ? "cumul" : monthLabel(selectedMonth);
 
   // ---- Fournisseur CRUD ----
-  function openNewSupplier() { setEditingSupplier(null); setSForm({ nom: "", telephone: "", note: "" }); setShowSupplier(true); }
-  function openEditSupplier(f: Fournisseur) { setEditingSupplier(f); setSForm({ nom: f.nom, telephone: f.telephone ?? "", note: f.note ?? "" }); setShowSupplier(true); }
+  function openNewSupplier() { setEditingSupplier(null); setSForm({ nom: "", telephone: "", note: "", type: "credit" }); setShowSupplier(true); }
+  function openEditSupplier(f: Fournisseur) { setEditingSupplier(f); setSForm({ nom: f.nom, telephone: f.telephone ?? "", note: f.note ?? "", type: f.type ?? "credit" }); setShowSupplier(true); }
   async function saveSupplier() {
     if (!sForm.nom.trim()) { alert("Nom requis"); return; }
-    const payload = { nom: sForm.nom.trim(), telephone: sForm.telephone || null, note: sForm.note || null };
+    const payload = { nom: sForm.nom.trim(), telephone: sForm.telephone || null, note: sForm.note || null, type: sForm.type };
     if (editingSupplier) await supabase.from("fournisseurs").update(payload).eq("id", editingSupplier.id);
     else await supabase.from("fournisseurs").insert(payload);
     setShowSupplier(false); load();
@@ -200,22 +225,22 @@ export default function FournisseursPage() {
         </div>
       } />
 
-      {/* Portefeuille + solde global */}
+      {/* Capital / Dette / Bénéfice */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="card p-4">
-          <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Wallet size={14} className="text-orange-400" /> À reverser (coût des ventes)</h3>
-          <p className="text-2xl font-bold text-orange-400 mt-1">{money(porte.cout)}</p>
-          <p className="text-xs text-slate-500 mt-0.5">{periodTxt}</p>
+          <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><PiggyBank size={14} className="text-emerald-400" /> Capital disponible (mon argent)</h3>
+          <p className="text-2xl font-bold text-emerald-400 mt-1">{money(capitalTotal)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">cumulé · grandit avec les ventes</p>
         </div>
         <div className="card p-4">
-          <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><TrendingUp size={14} className="text-emerald-400" /> Ton bénéfice</h3>
-          <p className="text-2xl font-bold text-emerald-400 mt-1">{money(porte.benefice)}</p>
-          <p className="text-xs text-slate-500 mt-0.5">{periodTxt}</p>
+          <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Truck size={14} className="text-red-400" /> Total dû (fournisseurs crédit)</h3>
+          <p className={`text-2xl font-bold mt-1 ${duTotal > 0 ? "text-red-400" : "text-emerald-400"}`}>{money(duTotal)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">cumulé</p>
         </div>
         <div className="card p-4">
-          <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Truck size={14} className="text-red-400" /> Total dû aux fournisseurs</h3>
-          <p className={`text-2xl font-bold mt-1 ${soldeTotal > 0 ? "text-red-400" : "text-emerald-400"}`}>{money(soldeTotal)}</p>
-          <p className="text-xs text-slate-500 mt-0.5">{fournisseurs.length} fournisseur(s) · total (toujours cumulé)</p>
+          <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><TrendingUp size={14} className="text-sky-400" /> Bénéfice (toutes ventes)</h3>
+          <p className="text-2xl font-bold text-sky-400 mt-1">{money(porte.benefice)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{periodTxt}</p>
         </div>
       </div>
 
@@ -229,13 +254,20 @@ export default function FournisseursPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {fournisseurs.map(f => {
+            const cap = isCapital(f);
             const solde = soldeOf(f.id);
+            const capital = capitalOf(f.id);
+            const att = attByF[f.id] ?? { ventes: 0, benef: 0 };
             const open = expanded === f.id;
             return (
               <div key={f.id} className="card p-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-100 flex items-center gap-2"><Truck size={16} className="text-red-400" /> {f.nom}</p>
+                    <p className="font-semibold text-slate-100 flex items-center gap-2 flex-wrap">
+                      {cap ? <PiggyBank size={16} className="text-emerald-400" /> : <Truck size={16} className="text-red-400" />}
+                      {f.nom}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${cap ? "bg-emerald-500/15 text-emerald-300" : "bg-red-500/15 text-red-300"}`}>{cap ? "capital" : "crédit"}</span>
+                    </p>
                     {f.telephone && (
                       <div className="flex items-center gap-2 mt-1">
                         <a href={`tel:${f.telephone}`} className="flex items-center gap-1 text-xs text-blue-400 hover:underline"><Phone size={12} /> {f.telephone}</a>
@@ -245,8 +277,10 @@ export default function FournisseursPage() {
                     {f.note && <p className="text-xs text-slate-500 mt-1">{f.note}</p>}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[11px] text-slate-500">Reste à payer</p>
-                    <p className={`text-xl font-bold ${solde > 0 ? "text-red-400" : "text-emerald-400"}`}>{money(solde)}</p>
+                    <p className="text-[11px] text-slate-500">{cap ? "Capital disponible" : "Reste à payer"}</p>
+                    {cap
+                      ? <p className="text-xl font-bold text-emerald-400">{money(capital)}</p>
+                      : <p className={`text-xl font-bold ${solde > 0 ? "text-red-400" : "text-emerald-400"}`}>{money(solde)}</p>}
                     <div className="flex gap-2 justify-end mt-1">
                       <button onClick={() => openEditSupplier(f)} className="text-blue-400 hover:text-blue-300"><Pencil size={14} /></button>
                       <button onClick={() => removeSupplier(f)} className="text-red-400 hover:text-red-300"><Trash2 size={14} /></button>
@@ -254,14 +288,24 @@ export default function FournisseursPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
-                  <span>Pris ({periodTxt}) : <b className="text-slate-200">{money(recByFPeriod[f.id] ?? 0)}</b></span>
-                  <span>Versé ({periodTxt}) : <b className="text-slate-200">{money(avByFPeriod[f.id] ?? 0)}</b></span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 text-xs text-slate-400">
+                  {cap ? (
+                    <>
+                      <span>Vendu : <b className="text-slate-200">{money(att.ventes)}</b></span>
+                      <span>Acheté : <b className="text-slate-200">{money(recByF[f.id] ?? 0)}</b></span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Pris ({periodTxt}) : <b className="text-slate-200">{money(recByFPeriod[f.id] ?? 0)}</b></span>
+                      <span>Versé ({periodTxt}) : <b className="text-slate-200">{money(avByFPeriod[f.id] ?? 0)}</b></span>
+                      <span>Bénéfice : <b className="text-emerald-300">{money(att.benef)}</b></span>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button onClick={() => openReception(f)} className="flex items-center gap-1.5 text-xs bg-orange-500/15 text-orange-300 px-3 py-1.5 rounded-lg hover:bg-orange-500/25"><PackagePlus size={14} /> Marchandise prise</button>
-                  <button onClick={() => openAvance(f)} className="flex items-center gap-1.5 text-xs bg-emerald-500/15 text-emerald-300 px-3 py-1.5 rounded-lg hover:bg-emerald-500/25"><HandCoins size={14} /> Avance / paiement</button>
+                  {!cap && <button onClick={() => openAvance(f)} className="flex items-center gap-1.5 text-xs bg-emerald-500/15 text-emerald-300 px-3 py-1.5 rounded-lg hover:bg-emerald-500/25"><HandCoins size={14} /> Avance / paiement</button>}
                   <button onClick={() => setExpanded(open ? null : f.id)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 ms-auto">
                     Historique {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                   </button>
@@ -297,6 +341,14 @@ export default function FournisseursPage() {
             </div>
             <div className="space-y-3">
               <div><label className="text-xs text-slate-400 mb-1 block">Nom *</label><input className="input" value={sForm.nom} onChange={e => setSForm({ ...sForm, nom: e.target.value })} /></div>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Type</label>
+                <select className="input" value={sForm.type} onChange={e => setSForm({ ...sForm, type: e.target.value as FournisseurType })}>
+                  <option value="credit">Crédit — fournisseur à rembourser (ex. dinoun)</option>
+                  <option value="capital">Capital — mon propre argent (ex. filtropro)</option>
+                </select>
+                <p className="text-[11px] text-slate-500 mt-1">Capital : ton argent qui tourne et grandit. Crédit : tu rembourses le coût, tu gardes le bénéfice.</p>
+              </div>
               <div><label className="text-xs text-slate-400 mb-1 block">Téléphone</label><input className="input" value={sForm.telephone} onChange={e => setSForm({ ...sForm, telephone: e.target.value })} /></div>
               <div><label className="text-xs text-slate-400 mb-1 block">Note</label><textarea className="input" rows={2} value={sForm.note} onChange={e => setSForm({ ...sForm, note: e.target.value })} /></div>
             </div>

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { Sale, Client, Product, SaleItem, SaleStatus } from "@/types/database";
+import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/types/database";
 import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye } from "lucide-react";
 import ProductPicker from "@/components/ProductPicker";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -17,13 +17,14 @@ type LastSale = {
   total: number; statut: SaleStatus; montant_paye: number; offline: boolean;
 };
 
-type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string };
+type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string };
 
 export default function VentesPage() {
   const { t } = useLang();
   const [sales, setSales] = useState<(Sale & { client: Client })[]>([]);
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [clientId, setClientId] = useState("");
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -54,12 +55,14 @@ export default function VentesPage() {
   }
 
   async function load() {
-    const [{ data: s }, { data: c }] = await Promise.all([
-      supabase.from("sales").select("*, client:clients(*), items:sale_items(quantite, prix_unitaire, product:products(nom_fr, prix_achat))").order("created_at", { ascending: false }),
+    const [{ data: s }, { data: c }, { data: fr }] = await Promise.all([
+      supabase.from("sales").select("*, client:clients(*), items:sale_items(quantite, prix_unitaire, fournisseur_id, product:products(nom_fr, prix_achat))").order("created_at", { ascending: false }),
       supabase.from("clients").select("*").order("nom"),
+      supabase.from("fournisseurs").select("*").order("nom"),
     ]);
     setSales((s as unknown as (Sale & { client: Client })[]) ?? []);
     setClients(c ?? []);
+    setFournisseurs((fr as Fournisseur[]) ?? []);
 
     // Tous les produits (Supabase limite à 1000/requête → pagination)
     const all: Product[] = [];
@@ -169,10 +172,10 @@ export default function VentesPage() {
   // Ouvre le formulaire pré-rempli pour modifier une vente existante
   async function openEditSale(s: Sale & { client: Client }) {
     const { data } = await supabase.from("sale_items")
-      .select("product_id, quantite, prix_unitaire, product:products(nom_fr)")
+      .select("product_id, quantite, prix_unitaire, fournisseur_id, product:products(nom_fr)")
       .eq("sale_id", s.id);
-    const items = (data ?? []) as unknown as { product_id: string; quantite: number; prix_unitaire: number; product: { nom_fr: string } | null }[];
-    setLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, prix_unitaire: i.prix_unitaire, nom: i.product?.nom_fr ?? "" })));
+    const items = (data ?? []) as unknown as { product_id: string; quantite: number; prix_unitaire: number; fournisseur_id: string | null; product: { nom_fr: string } | null }[];
+    setLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, prix_unitaire: i.prix_unitaire, nom: i.product?.nom_fr ?? "", fournisseur_id: i.fournisseur_id ?? undefined })));
     setOldLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite })));
     setClientId(s.client_id);
     setStatut(s.statut);
@@ -199,7 +202,7 @@ export default function VentesPage() {
         client_id: clientId, total: saleTotal, montant_paye: montant, statut, notes: notes || null,
       }).eq("id", editingSale.id);
       await supabase.from("sale_items").insert(
-        validLines.map(l => ({ sale_id: editingSale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire }))
+        validLines.map(l => ({ sale_id: editingSale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id || null }))
       );
       // 3) Retirer le stock des nouveaux articles
       for (const l of validLines) await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
@@ -239,7 +242,7 @@ export default function VentesPage() {
         }).select().single();
         if (error || !sale) throw error || new Error("insert");
         const { error: e2 } = await supabase.from("sale_items").insert(
-          validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire }))
+          validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id || null }))
         );
         if (e2) throw e2;
         for (const l of validLines) await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
@@ -251,7 +254,7 @@ export default function VentesPage() {
       addPending({
         localId: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
         client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
-        lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom })),
+        lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: l.fournisseur_id || null })),
         total: saleTotal, statut, montant_paye: montant, notes: notes || null, createdAt: Date.now(),
       });
       setPendingCount(getPending().length);
@@ -380,14 +383,22 @@ export default function VentesPage() {
                 </div>
               )}
               {lines.map((l, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2 mb-2">
-                  <div className="col-span-5">
-                    <ProductPicker products={products} value={l.product_id} onSelect={(p) => setLineProduct(i, p)} />
+                <div key={i} className="mb-2">
+                  <div className="grid grid-cols-12 gap-2">
+                    <div className="col-span-5">
+                      <ProductPicker products={products} value={l.product_id} onSelect={(p) => setLineProduct(i, p)} />
+                    </div>
+                    <input type="number" className="input col-span-2" value={l.quantite} onChange={e => updateLine(i, "quantite", +e.target.value)} min={1} />
+                    <input type="number" className="input col-span-3" value={l.prix_unitaire} onChange={e => updateLine(i, "prix_unitaire", +e.target.value)} />
+                    <button onClick={() => setLines(lines.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-600 flex items-center justify-center"><Trash2 size={15} /></button>
+                    <div className="col-span-1 flex items-center text-sm font-medium text-slate-600">{(l.quantite * l.prix_unitaire).toFixed(0)}</div>
                   </div>
-                  <input type="number" className="input col-span-2" value={l.quantite} onChange={e => updateLine(i, "quantite", +e.target.value)} min={1} />
-                  <input type="number" className="input col-span-3" value={l.prix_unitaire} onChange={e => updateLine(i, "prix_unitaire", +e.target.value)} />
-                  <button onClick={() => setLines(lines.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-600 flex items-center justify-center"><Trash2 size={15} /></button>
-                  <div className="col-span-1 flex items-center text-sm font-medium text-slate-600">{(l.quantite * l.prix_unitaire).toFixed(0)}</div>
+                  {fournisseurs.length > 0 && (
+                    <select className="input mt-1 py-1 text-xs" value={l.fournisseur_id ?? ""} onChange={e => updateLine(i, "fournisseur_id", e.target.value)}>
+                      <option value="">Source : — (non attribué)</option>
+                      {fournisseurs.map(f => <option key={f.id} value={f.id}>Source : {f.nom}{f.type === "capital" ? " (capital)" : ""}</option>)}
+                    </select>
+                  )}
                 </div>
               ))}
             </div>
