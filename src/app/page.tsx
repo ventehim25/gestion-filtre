@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, ClipboardList, MapPin } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import Logo from "@/components/Logo";
 import VoiceButton from "@/components/VoiceButton";
@@ -63,7 +63,7 @@ export default function Dashboard() {
   const [dbError, setDbError] = useState("");
   // Montants sensibles masqués par défaut — révélés au clic
   const [showMoney, setShowMoney] = useState<{ f: boolean; b: boolean }>({ f: false, b: false });
-  const [showReviews, setShowReviews] = useState(false);
+  const [showVitrine, setShowVitrine] = useState(false);
 
   useEffect(() => {
     const tmr = setInterval(() => setIdx((i) => (i + 1) % HERO.length), 5000);
@@ -168,17 +168,19 @@ export default function Dashboard() {
 
       {dbError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm font-mono">{dbError}</div>}
 
-      {/* Bandeau grandes marques */}
-      <div className="card p-3 mb-4 overflow-hidden">
-        <div className="relative overflow-hidden">
-          <div className="absolute left-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-r from-[var(--surface)] to-transparent pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-l from-[var(--surface)] to-transparent pointer-events-none" />
-          <div className="flex gap-4 animate-marquee w-max">
-            {[...BRANDS, ...BRANDS].map((b, i) => (
-              <BrandLogo key={i} name={b.name} slug={b.slug} color={b.color} />
-            ))}
-          </div>
-        </div>
+      {/* Raccourcis rapides */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+        {[
+          { label: t("addSale"), icon: ShoppingCart, href: "/ventes", grad: "from-red-500 to-red-600" },
+          { label: t("vehicleSearch"), icon: Car, href: "/recherche?tab=vehicule", grad: "from-rose-500 to-red-600" },
+          { label: t("reorder"), icon: ClipboardList, href: "/reappro", grad: "from-orange-500 to-red-600" },
+          { label: t("tours"), icon: MapPin, href: "/tournees", grad: "from-red-600 to-rose-800" },
+        ].map((s) => (
+          <button key={s.href} onClick={() => router.push(s.href)} className="card p-4 flex items-center gap-3 text-left hover:-translate-y-0.5">
+            <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center text-white bg-gradient-to-br ${s.grad} shadow-lg`}><s.icon size={20} /></div>
+            <span className="font-semibold text-slate-100 text-sm">{s.label}</span>
+          </button>
+        ))}
       </div>
 
       {/* Cartes stats */}
@@ -218,40 +220,65 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Bande atouts / garanties */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
-        {FEATURES.map((f) => (
-          <div key={f.title} className="card p-3 flex items-center gap-2.5">
-            <div className="h-8 w-8 shrink-0 rounded-lg bg-red-500/15 text-red-400 flex items-center justify-center"><f.icon size={16} /></div>
-            <div className="min-w-0">
-              <h4 className="font-semibold text-slate-100 text-xs tracking-wide truncate">{f.title}</h4>
-              <p className="text-[10px] text-slate-500 truncate">{f.sub}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Avis clients — masqués, dépliés au clic */}
+      {/* Vitrine (marques + atouts + avis) — repliée par défaut */}
       <div className="mt-6">
-        <button onClick={() => setShowReviews(v => !v)} className="mx-auto flex items-center gap-1.5 text-sm font-semibold text-slate-300 hover:text-slate-100">
-          Avis clients {showReviews ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        <button onClick={() => setShowVitrine(v => !v)} className="w-full card p-3 flex items-center justify-center gap-1.5 text-sm font-semibold text-slate-300 hover:text-slate-100">
+          Découvrir FiltroPro {showVitrine ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
         </button>
-        <div className={`grid grid-cols-1 md:grid-cols-3 gap-3 mt-3 ${showReviews ? "" : "hidden"}`}>
-          {REVIEWS.map((r) => (
-            <div key={r.name} className="card p-3">
-              <div className="flex items-center gap-2 mb-1.5">
-                <div className="h-6 w-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-[10px]">{r.name[0]}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-semibold text-slate-200 truncate">{r.name} <span className="text-slate-500 font-normal">· {r.city}</span></div>
-                </div>
-                <div className="flex gap-0.5 text-red-500">
-                  {[...Array(5)].map((_, i) => <Star key={i} size={10} fill="currentColor" />)}
+
+        {showVitrine && (
+          <div className="mt-4 space-y-4">
+            {/* Bandeau grandes marques */}
+            <div className="card p-3 overflow-hidden">
+              <p className="text-[11px] text-slate-500 font-semibold tracking-[0.2em] uppercase mb-2 flex items-center gap-2">
+                <span className="h-1 w-1 rounded-full bg-red-500" /> Grandes marques compatibles
+              </p>
+              <div className="relative overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-r from-[var(--surface)] to-transparent pointer-events-none" />
+                <div className="absolute right-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-l from-[var(--surface)] to-transparent pointer-events-none" />
+                <div className="flex gap-4 animate-marquee w-max">
+                  {[...BRANDS, ...BRANDS].map((b, i) => (
+                    <BrandLogo key={i} name={b.name} slug={b.slug} color={b.color} />
+                  ))}
                 </div>
               </div>
-              <p className="text-[11px] leading-snug text-slate-400 italic line-clamp-2">“{r.text}”</p>
             </div>
-          ))}
-        </div>
+
+            {/* Atouts / garanties */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              {FEATURES.map((f) => (
+                <div key={f.title} className="card p-3 flex items-center gap-2.5">
+                  <div className="h-8 w-8 shrink-0 rounded-lg bg-red-500/15 text-red-400 flex items-center justify-center"><f.icon size={16} /></div>
+                  <div className="min-w-0">
+                    <h4 className="font-semibold text-slate-100 text-xs tracking-wide truncate">{f.title}</h4>
+                    <p className="text-[10px] text-slate-500 truncate">{f.sub}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Avis clients */}
+            <div>
+              <h3 className="text-center font-semibold text-slate-300 text-sm mb-3">Avis clients</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {REVIEWS.map((r) => (
+                  <div key={r.name} className="card p-3">
+                    <div className="flex items-center gap-2 mb-1.5">
+                      <div className="h-6 w-6 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center font-bold text-[10px]">{r.name[0]}</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-slate-200 truncate">{r.name} <span className="text-slate-500 font-normal">· {r.city}</span></div>
+                      </div>
+                      <div className="flex gap-0.5 text-red-500">
+                        {[...Array(5)].map((_, i) => <Star key={i} size={10} fill="currentColor" />)}
+                      </div>
+                    </div>
+                    <p className="text-[11px] leading-snug text-slate-400 italic line-clamp-2">“{r.text}”</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
