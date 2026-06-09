@@ -7,7 +7,7 @@ import type { Fournisseur, Reception, Avance, Product } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
 import {
   Plus, Truck, Phone, MessageCircle, Pencil, Trash2, X, PackagePlus, HandCoins,
-  ChevronDown, ChevronUp, Wallet, TrendingUp,
+  ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff,
 } from "lucide-react";
 
 type RecLine = { product_id: string; quantite: number; prix_achat: number; reference: string };
@@ -19,9 +19,11 @@ export default function FournisseursPage() {
   const [receptions, setReceptions] = useState<Reception[]>([]);
   const [avances, setAvances] = useState<Avance[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [porte, setPorte] = useState({ cout: 0, benefice: 0, coutMois: 0, beneficeMois: 0 });
+  const [salesAgg, setSalesAgg] = useState<{ date: string; cout: number; benef: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showAmounts, setShowAmounts] = useState(false);   // montants masqués par défaut
+  const [selectedMonth, setSelectedMonth] = useState<string>("all");
 
   // Formulaire fournisseur
   const [showSupplier, setShowSupplier] = useState(false);
@@ -68,18 +70,17 @@ export default function FournisseursPage() {
       items.push(...(data as unknown as typeof items));
       if (data.length < 1000) break;
     }
-    const mois = todayStr().slice(0, 7);
-    let cout = 0, benefice = 0, coutMois = 0, beneficeMois = 0;
+    const agg: { date: string; cout: number; benef: number }[] = [];
     for (const s of items) {
+      let c = 0, b = 0;
       for (const it of s.items ?? []) {
         const pa = it.product?.prix_achat ?? 0;
-        const c = it.quantite * pa;
-        const b = it.quantite * (it.prix_unitaire - pa);
-        cout += c; benefice += b;
-        if ((s.date ?? "").slice(0, 7) === mois) { coutMois += c; beneficeMois += b; }
+        c += it.quantite * pa;
+        b += it.quantite * (it.prix_unitaire - pa);
       }
+      agg.push({ date: s.date ?? "", cout: c, benef: b });
     }
-    setPorte({ cout, benefice, coutMois, beneficeMois });
+    setSalesAgg(agg);
     setLoading(false);
   }
   useEffect(() => { load(); }, []);
@@ -96,6 +97,40 @@ export default function FournisseursPage() {
   }, [avances]);
   const soldeOf = (id: string) => (recByF[id] ?? 0) - (avByF[id] ?? 0);
   const soldeTotal = fournisseurs.reduce((s, f) => s + soldeOf(f.id), 0);
+
+  // Mois disponibles + filtre
+  const months = useMemo(() => {
+    const set = new Set<string>();
+    receptions.forEach(r => r.date && set.add(r.date.slice(0, 7)));
+    avances.forEach(a => a.date && set.add(a.date.slice(0, 7)));
+    salesAgg.forEach(s => s.date && set.add(s.date.slice(0, 7)));
+    return [...set].sort().reverse();
+  }, [receptions, avances, salesAgg]);
+  const inMonth = (d: string) => selectedMonth === "all" || (d ?? "").slice(0, 7) === selectedMonth;
+  const monthLabel = (m: string) => `${m.slice(5, 7)}/${m.slice(0, 4)}`;
+
+  // Portefeuille (selon le mois sélectionné)
+  const porte = useMemo(() => {
+    let cout = 0, benefice = 0;
+    for (const s of salesAgg) if (inMonth(s.date)) { cout += s.cout; benefice += s.benef; }
+    return { cout, benefice };
+  }, [salesAgg, selectedMonth]);
+
+  // Pris / versé sur la période (pour affichage), le solde reste cumulé
+  const recByFPeriod = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const r of receptions) if (inMonth(r.date)) m[r.fournisseur_id] = (m[r.fournisseur_id] ?? 0) + r.montant;
+    return m;
+  }, [receptions, selectedMonth]);
+  const avByFPeriod = useMemo(() => {
+    const m: Record<string, number> = {};
+    for (const a of avances) if (inMonth(a.date)) m[a.fournisseur_id] = (m[a.fournisseur_id] ?? 0) + a.montant;
+    return m;
+  }, [avances, selectedMonth]);
+
+  // Masquage des montants
+  const money = (n: number) => showAmounts ? `${n.toFixed(0)} MAD` : "••• MAD";
+  const periodTxt = selectedMonth === "all" ? "cumul" : monthLabel(selectedMonth);
 
   // ---- Fournisseur CRUD ----
   function openNewSupplier() { setEditingSupplier(null); setSForm({ nom: "", telephone: "", note: "" }); setShowSupplier(true); }
@@ -141,35 +176,46 @@ export default function FournisseursPage() {
   }
 
   function histOf(id: string) {
-    const r = receptions.filter(x => x.fournisseur_id === id).map(x => ({ type: "rec" as const, date: x.date, montant: x.montant, text: x.details ?? "Marchandise" }));
-    const a = avances.filter(x => x.fournisseur_id === id).map(x => ({ type: "av" as const, date: x.date, montant: x.montant, text: x.note ?? "Avance" }));
+    const r = receptions.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "rec" as const, date: x.date, montant: x.montant, text: x.details ?? "Marchandise" }));
+    const a = avances.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "av" as const, date: x.date, montant: x.montant, text: x.note ?? "Avance" }));
     return [...r, ...a].sort((p, q) => q.date.localeCompare(p.date));
   }
 
   return (
     <div>
       <Header title="suppliers" action={
-        <button onClick={openNewSupplier} className="btn-primary flex items-center gap-2">
-          <Plus size={16} /> Ajouter fournisseur
-        </button>
+        <div className="flex items-center gap-2">
+          <select className="input w-auto py-1.5 text-sm" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}>
+            <option value="all">Tous les mois</option>
+            {months.map(m => <option key={m} value={m}>{monthLabel(m)}</option>)}
+          </select>
+          <button onClick={() => setShowAmounts(v => !v)} title={showAmounts ? "Masquer les montants" : "Afficher les montants"}
+            className="btn-secondary flex items-center gap-1.5">
+            {showAmounts ? <EyeOff size={15} /> : <Eye size={15} />}
+            <span className="hidden sm:inline">{showAmounts ? "Masquer" : "Afficher"}</span>
+          </button>
+          <button onClick={openNewSupplier} className="btn-primary flex items-center gap-2">
+            <Plus size={16} /> <span className="hidden sm:inline">Fournisseur</span>
+          </button>
+        </div>
       } />
 
       {/* Portefeuille + solde global */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="card p-4">
           <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Wallet size={14} className="text-orange-400" /> À reverser (coût des ventes)</h3>
-          <p className="text-2xl font-bold text-orange-400 mt-1">{porte.cout.toFixed(0)} <span className="text-sm font-normal text-slate-500">MAD</span></p>
-          <p className="text-xs text-slate-500 mt-0.5">Ce mois : {porte.coutMois.toFixed(0)} MAD</p>
+          <p className="text-2xl font-bold text-orange-400 mt-1">{money(porte.cout)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{periodTxt}</p>
         </div>
         <div className="card p-4">
-          <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><TrendingUp size={14} className="text-emerald-400" /> Ton bénéfice (cumul)</h3>
-          <p className="text-2xl font-bold text-emerald-400 mt-1">{porte.benefice.toFixed(0)} <span className="text-sm font-normal text-slate-500">MAD</span></p>
-          <p className="text-xs text-slate-500 mt-0.5">Ce mois : {porte.beneficeMois.toFixed(0)} MAD</p>
+          <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><TrendingUp size={14} className="text-emerald-400" /> Ton bénéfice</h3>
+          <p className="text-2xl font-bold text-emerald-400 mt-1">{money(porte.benefice)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{periodTxt}</p>
         </div>
         <div className="card p-4">
           <h3 className="text-xs font-medium text-slate-400 flex items-center gap-1.5"><Truck size={14} className="text-red-400" /> Total dû aux fournisseurs</h3>
-          <p className={`text-2xl font-bold mt-1 ${soldeTotal > 0 ? "text-red-400" : "text-emerald-400"}`}>{soldeTotal.toFixed(0)} <span className="text-sm font-normal text-slate-500">MAD</span></p>
-          <p className="text-xs text-slate-500 mt-0.5">{fournisseurs.length} fournisseur(s)</p>
+          <p className={`text-2xl font-bold mt-1 ${soldeTotal > 0 ? "text-red-400" : "text-emerald-400"}`}>{money(soldeTotal)}</p>
+          <p className="text-xs text-slate-500 mt-0.5">{fournisseurs.length} fournisseur(s) · total (toujours cumulé)</p>
         </div>
       </div>
 
@@ -200,7 +246,7 @@ export default function FournisseursPage() {
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-[11px] text-slate-500">Reste à payer</p>
-                    <p className={`text-xl font-bold ${solde > 0 ? "text-red-400" : "text-emerald-400"}`}>{solde.toFixed(0)} <span className="text-xs font-normal">MAD</span></p>
+                    <p className={`text-xl font-bold ${solde > 0 ? "text-red-400" : "text-emerald-400"}`}>{money(solde)}</p>
                     <div className="flex gap-2 justify-end mt-1">
                       <button onClick={() => openEditSupplier(f)} className="text-blue-400 hover:text-blue-300"><Pencil size={14} /></button>
                       <button onClick={() => removeSupplier(f)} className="text-red-400 hover:text-red-300"><Trash2 size={14} /></button>
@@ -209,8 +255,8 @@ export default function FournisseursPage() {
                 </div>
 
                 <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
-                  <span>Pris : <b className="text-slate-200">{(recByF[f.id] ?? 0).toFixed(0)}</b></span>
-                  <span>Versé : <b className="text-slate-200">{(avByF[f.id] ?? 0).toFixed(0)}</b></span>
+                  <span>Pris ({periodTxt}) : <b className="text-slate-200">{money(recByFPeriod[f.id] ?? 0)}</b></span>
+                  <span>Versé ({periodTxt}) : <b className="text-slate-200">{money(avByFPeriod[f.id] ?? 0)}</b></span>
                 </div>
 
                 <div className="flex flex-wrap gap-2 mt-3">
@@ -229,7 +275,7 @@ export default function FournisseursPage() {
                       <div key={i} className="flex items-center justify-between text-xs py-1">
                         <span className="text-slate-400">{h.date} · <span className="text-slate-300">{h.text}</span></span>
                         <span className={h.type === "rec" ? "text-orange-300 font-medium" : "text-emerald-300 font-medium"}>
-                          {h.type === "rec" ? "+" : "−"}{h.montant.toFixed(0)} MAD
+                          {h.type === "rec" ? "+" : "−"}{money(h.montant)}
                         </span>
                       </div>
                     ))}
