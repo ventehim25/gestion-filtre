@@ -249,16 +249,16 @@ export default function ProduitsPage() {
                 {showAllEquivs ? (
                   <div className="space-y-2">
                     {equivs.map((e, i) => (
-                      <div key={i} className="bg-slate-50 rounded-lg p-2 space-y-1.5">
+                      <div key={i} className="bg-slate-50 rounded-lg p-2.5 space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-indigo-700 w-14 shrink-0">{e.marque}</span>
+                          <span className="text-xs font-semibold text-indigo-700 shrink-0">{e.marque}</span>
                           <span className="text-sm font-mono flex-1 truncate">{e.reference}</span>
                           <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0"><X size={15} /></button>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                          <span>Achat</span><input type="number" className="input w-16 py-0.5 text-xs text-center" value={e.prix_achat ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix_achat: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
-                          <span>Vente</span><input type="number" className="input w-16 py-0.5 text-xs text-center" value={e.prix ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
-                          <span>Qté</span><input type="number" className="input w-14 py-0.5 text-xs text-center" value={e.stock ?? 0} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, stock: +ev.target.value } : x))} />
+                        <div className="grid grid-cols-3 gap-2">
+                          <div><label className="text-[10px] text-slate-500 block mb-0.5">Prix achat</label><input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix_achat ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix_achat: ev.target.value === "" ? undefined : +ev.target.value } : x))} /></div>
+                          <div><label className="text-[10px] text-slate-500 block mb-0.5">Prix vente</label><input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix: ev.target.value === "" ? undefined : +ev.target.value } : x))} /></div>
+                          <div><label className="text-[10px] text-slate-500 block mb-0.5">Quantité</label><input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.stock ?? 0} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, stock: +ev.target.value } : x))} /></div>
                         </div>
                       </div>
                     ))}
@@ -277,22 +277,28 @@ export default function ProduitsPage() {
                   </div>
                 )}
               </div>
-              <div className="bg-slate-50/60 rounded-lg p-2 space-y-2">
-                <div className="flex gap-2">
-                  <select className="input w-28 shrink-0" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
-                    {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
-                    <option value="OE">OE (origine)</option>
-                  </select>
-                  <input className="input flex-1 min-w-0 font-mono" placeholder={t("equivRef")} value={newEquiv.reference}
-                    onChange={e => setNewEquiv({ ...newEquiv, reference: e.target.value })}
-                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEquivRow(); } }} />
+              <div className="bg-slate-50/60 rounded-lg p-3 space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <div>
+                    <label className="text-[11px] text-slate-500 block mb-0.5">Marque</label>
+                    <select className="input" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
+                      {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
+                      <option value="OE">OE (origine)</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-[11px] text-slate-500 block mb-0.5">Référence {newEquiv.marque}</label>
+                    <input className="input font-mono" placeholder="ex : Z555" value={newEquiv.reference}
+                      onChange={e => setNewEquiv({ ...newEquiv, reference: e.target.value })}
+                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEquivRow(); } }} />
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                  <span>Achat</span><input type="number" className="input w-16 py-1 text-xs text-center" placeholder="0" value={newEquiv.prix_achat || ""} onChange={e => setNewEquiv({ ...newEquiv, prix_achat: +e.target.value })} />
-                  <span>Vente</span><input type="number" className="input w-16 py-1 text-xs text-center" placeholder="0" value={newEquiv.prix || ""} onChange={e => setNewEquiv({ ...newEquiv, prix: +e.target.value })} />
-                  <span>Qté</span><input type="number" className="input w-14 py-1 text-xs text-center" placeholder="0" value={newEquiv.stock || ""} onChange={e => setNewEquiv({ ...newEquiv, stock: +e.target.value })} />
-                  <button onClick={addEquivRow} className="btn-secondary flex items-center gap-1 shrink-0 ms-auto"><Plus size={14} /> Ajouter</button>
+                <div className="grid grid-cols-3 gap-2">
+                  <div><label className="text-[11px] text-slate-500 block mb-0.5">Prix achat</label><input type="number" className="input text-center" placeholder="0" value={newEquiv.prix_achat || ""} onChange={e => setNewEquiv({ ...newEquiv, prix_achat: +e.target.value })} /></div>
+                  <div><label className="text-[11px] text-slate-500 block mb-0.5">Prix vente</label><input type="number" className="input text-center" placeholder="0" value={newEquiv.prix || ""} onChange={e => setNewEquiv({ ...newEquiv, prix: +e.target.value })} /></div>
+                  <div><label className="text-[11px] text-slate-500 block mb-0.5">Quantité</label><input type="number" className="input text-center" placeholder="0" value={newEquiv.stock || ""} onChange={e => setNewEquiv({ ...newEquiv, stock: +e.target.value })} /></div>
                 </div>
+                <button onClick={addEquivRow} className="btn-primary w-full flex items-center justify-center gap-1.5"><Plus size={15} /> Ajouter cette marque</button>
               </div>
             </div>
 
