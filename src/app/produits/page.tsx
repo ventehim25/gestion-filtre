@@ -272,15 +272,15 @@ export default function ProduitsPage() {
                   </div>
                 )}
               </div>
-              <div className="flex gap-2">
-                <select className="input w-32" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
+              <div className="flex flex-wrap gap-2 items-center">
+                <select className="input w-28 shrink-0" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
                   {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
                   <option value="OE">OE (origine)</option>
                 </select>
-                <input className="input flex-1 font-mono" placeholder={t("equivRef")} value={newEquiv.reference}
+                <input className="input flex-1 min-w-[8rem] font-mono" placeholder={t("equivRef")} value={newEquiv.reference}
                   onChange={e => setNewEquiv({ ...newEquiv, reference: e.target.value })}
                   onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEquivRow(); } }} />
-                <input type="number" className="input w-20 shrink-0" placeholder="prix" value={newEquiv.prix || ""}
+                <input type="number" className="input w-16 shrink-0" placeholder="prix" value={newEquiv.prix || ""}
                   onChange={e => setNewEquiv({ ...newEquiv, prix: +e.target.value })}
                   onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEquivRow(); } }} />
                 <button onClick={addEquivRow} className="btn-secondary flex items-center gap-1 shrink-0"><Plus size={14} /></button>
