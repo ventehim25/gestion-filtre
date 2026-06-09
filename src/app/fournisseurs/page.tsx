@@ -320,16 +320,23 @@ export default function FournisseursPage() {
               <label className="text-xs text-slate-400 mb-1 block">Date</label>
               <input type="date" className="input w-44" value={recDate} onChange={e => setRecDate(e.target.value)} />
             </div>
-            <div className="space-y-2 mb-3">
+            <div className="space-y-2 mb-2">
+              <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-slate-500">
+                <span className="col-span-6">Produit</span>
+                <span className="col-span-2 text-center">Qté</span>
+                <span className="col-span-3 text-center">Prix achat (u.)</span>
+                <span className="col-span-1"></span>
+              </div>
               {recLines.map((l, i) => (
                 <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-7"><ProductPicker products={products} value={l.product_id} onSelect={(p) => setRecProduct(i, p)} /></div>
+                  <div className="col-span-6"><ProductPicker products={products} value={l.product_id} onSelect={(p) => setRecProduct(i, p)} /></div>
                   <input type="number" min={1} className="input col-span-2 text-center" value={l.quantite} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, quantite: Math.max(1, +e.target.value) } : x))} />
-                  <div className="col-span-2 text-xs text-slate-400 text-right">{(l.quantite * l.prix_achat).toFixed(0)}</div>
+                  <input type="number" min={0} step="0.01" className="input col-span-3 text-center" placeholder="prix" value={l.prix_achat || ""} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, prix_achat: Math.max(0, +e.target.value) } : x))} />
                   <button onClick={() => setRecLines(prev => prev.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center"><Trash2 size={14} /></button>
                 </div>
               ))}
               <button onClick={() => setRecLines([...recLines, { product_id: "", quantite: 1, prix_achat: 0, reference: "" }])} className="btn-secondary text-xs flex items-center gap-1"><Plus size={12} /> Ajouter une ligne</button>
+              <p className="text-[11px] text-slate-500">Le prix d&apos;achat se remplit auto, mais tu peux le corriger selon le prix de ce fournisseur.</p>
             </div>
             <div className="bg-[var(--surface-2)] rounded-lg p-3 mb-4 flex items-center justify-between">
               <span className="text-sm text-slate-300">Coût total (ajouté à la dette)</span>
