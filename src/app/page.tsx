@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star } from "lucide-react";
+import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye } from "lucide-react";
 import BrandLogo from "@/components/BrandLogo";
 import Logo from "@/components/Logo";
 import VoiceButton from "@/components/VoiceButton";
@@ -61,6 +61,8 @@ export default function Dashboard() {
   const [idx, setIdx] = useState(0);
   const [stats, setStats] = useState<Stats>({ totalVentes: 0, totalClients: 0, totalProduits: 0, stockFaible: 0, benefice: 0, duFournisseur: 0 });
   const [dbError, setDbError] = useState("");
+  // Montants sensibles masqués par défaut — révélés au clic
+  const [showMoney, setShowMoney] = useState<{ f: boolean; b: boolean }>({ f: false, b: false });
 
   useEffect(() => {
     const tmr = setInterval(() => setIdx((i) => (i + 1) % HERO.length), 5000);
@@ -102,7 +104,7 @@ export default function Dashboard() {
   return (
     <div>
       {/* HERO : carrousel + recherche */}
-      <div className="relative rounded-2xl overflow-hidden mb-6 min-h-[300px] md:min-h-[360px] flex items-center">
+      <div className="relative rounded-2xl overflow-hidden mb-6 min-h-[190px] md:min-h-[240px] flex items-center">
         {HERO.map((id, i) => (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -114,15 +116,16 @@ export default function Dashboard() {
         ))}
         <div className="absolute inset-0 bg-gradient-to-r from-black via-black/85 to-black/40" />
 
-        <div className="relative w-full px-6 md:px-10 py-8">
-          <div className="flex items-center gap-2 mb-3">
+        <div className="relative w-full px-6 md:px-10 py-5">
+          <div className="flex items-center gap-2 mb-2">
             <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse" />
-            <span className="text-red-500 text-[11px] font-semibold tracking-[0.25em] uppercase">Pièces &amp; Filtres Auto · Maroc</span>
+            <span className="text-red-500 text-[10px] font-semibold tracking-[0.25em] uppercase">Pièces &amp; Filtres Auto · Maroc</span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold text-white tracking-tight">{t("appName")}</h1>
-          <p className="text-slate-300 text-sm md:text-base mt-2 mb-5 max-w-lg">
+          <h1 className="text-2xl md:text-4xl font-bold text-white tracking-tight">{t("appName")}</h1>
+          <p className="hidden md:block text-slate-300 text-sm mt-1.5 mb-4 max-w-lg">
             Trouvez le bon filtre en quelques secondes — par référence, véhicule ou marque.
           </p>
+          <div className="md:hidden mb-3" />
 
           {/* Barre de recherche */}
           <form onSubmit={go} className="flex flex-col sm:flex-row gap-2 max-w-xl">
@@ -154,7 +157,7 @@ export default function Dashboard() {
           </div>
 
           {/* Indicateurs carrousel */}
-          <div className="flex gap-1.5 mt-5">
+          <div className="flex gap-1.5 mt-3">
             {HERO.map((_, i) => (
               <button key={i} onClick={() => setIdx(i)} className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-red-500" : "w-1.5 bg-white/40"}`} aria-label={`image ${i + 1}`} />
             ))}
@@ -165,14 +168,11 @@ export default function Dashboard() {
       {dbError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm font-mono">{dbError}</div>}
 
       {/* Bandeau grandes marques */}
-      <div className="card p-5 mb-6 overflow-hidden">
-        <p className="text-[11px] text-slate-500 font-semibold tracking-[0.2em] uppercase mb-3 flex items-center gap-2">
-          <span className="h-1 w-1 rounded-full bg-red-500" /> Grandes marques compatibles
-        </p>
+      <div className="card p-3 mb-4 overflow-hidden">
         <div className="relative overflow-hidden">
-          <div className="absolute left-0 top-0 bottom-0 w-16 z-10 bg-gradient-to-r from-[var(--surface)] to-transparent pointer-events-none" />
-          <div className="absolute right-0 top-0 bottom-0 w-16 z-10 bg-gradient-to-l from-[var(--surface)] to-transparent pointer-events-none" />
-          <div className="flex gap-4 animate-marquee w-max py-1">
+          <div className="absolute left-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-r from-[var(--surface)] to-transparent pointer-events-none" />
+          <div className="absolute right-0 top-0 bottom-0 w-12 z-10 bg-gradient-to-l from-[var(--surface)] to-transparent pointer-events-none" />
+          <div className="flex gap-4 animate-marquee w-max">
             {[...BRANDS, ...BRANDS].map((b, i) => (
               <BrandLogo key={i} name={b.name} slug={b.slug} color={b.color} />
             ))}
@@ -195,33 +195,37 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Dû fournisseur / Bénéfice */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card p-6 flex items-start gap-4">
-          <div className="h-11 w-11 shrink-0 rounded-xl bg-orange-500/15 text-orange-400 flex items-center justify-center"><Wallet size={20} /></div>
-          <div>
-            <h3 className="font-semibold text-slate-300">{t("toSupplier")}</h3>
-            <p className="text-3xl font-bold text-orange-400 mt-1">{stats.duFournisseur.toFixed(2)} {t("moroccanDirham")}</p>
-            <p className="text-xs text-slate-500 mt-1">Montant dû à votre fournisseur</p>
+      {/* Dû fournisseur / Bénéfice — masqués, révélés au clic */}
+      <div className="grid grid-cols-2 gap-4">
+        <button onClick={() => setShowMoney(m => ({ ...m, f: !m.f }))} className="card p-4 flex items-center gap-3 text-left hover:-translate-y-0.5">
+          <div className="h-10 w-10 shrink-0 rounded-xl bg-orange-500/15 text-orange-400 flex items-center justify-center"><Wallet size={20} /></div>
+          <div className="min-w-0">
+            <h3 className="text-xs font-medium text-slate-400">{t("toSupplier")}</h3>
+            {showMoney.f
+              ? <p className="text-lg md:text-2xl font-bold text-orange-400 mt-0.5">{stats.duFournisseur.toFixed(2)} {t("moroccanDirham")}</p>
+              : <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1"><Eye size={13} /> Afficher</p>}
           </div>
-        </div>
-        <div className="card p-6 flex items-start gap-4">
-          <div className="h-11 w-11 shrink-0 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center"><TrendingUp size={20} /></div>
-          <div>
-            <h3 className="font-semibold text-slate-300">{t("profit")}</h3>
-            <p className="text-3xl font-bold text-emerald-400 mt-1">{stats.benefice.toFixed(2)} {t("moroccanDirham")}</p>
-            <p className="text-xs text-slate-500 mt-1">Bénéfice net estimé</p>
+        </button>
+        <button onClick={() => setShowMoney(m => ({ ...m, b: !m.b }))} className="card p-4 flex items-center gap-3 text-left hover:-translate-y-0.5">
+          <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-500/15 text-emerald-400 flex items-center justify-center"><TrendingUp size={20} /></div>
+          <div className="min-w-0">
+            <h3 className="text-xs font-medium text-slate-400">{t("profit")}</h3>
+            {showMoney.b
+              ? <p className="text-lg md:text-2xl font-bold text-emerald-400 mt-0.5">{stats.benefice.toFixed(2)} {t("moroccanDirham")}</p>
+              : <p className="text-sm text-slate-500 mt-0.5 flex items-center gap-1"><Eye size={13} /> Afficher</p>}
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Bande atouts / garanties */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
         {FEATURES.map((f) => (
-          <div key={f.title} className="card p-5 text-center">
-            <div className="h-11 w-11 mx-auto rounded-xl bg-red-500/15 text-red-400 flex items-center justify-center mb-3"><f.icon size={22} /></div>
-            <h4 className="font-bold text-slate-100 text-sm tracking-wide">{f.title}</h4>
-            <p className="text-xs text-slate-500 mt-1">{f.sub}</p>
+          <div key={f.title} className="card p-3 flex items-center gap-2.5">
+            <div className="h-8 w-8 shrink-0 rounded-lg bg-red-500/15 text-red-400 flex items-center justify-center"><f.icon size={16} /></div>
+            <div className="min-w-0">
+              <h4 className="font-semibold text-slate-100 text-xs tracking-wide truncate">{f.title}</h4>
+              <p className="text-[10px] text-slate-500 truncate">{f.sub}</p>
+            </div>
           </div>
         ))}
       </div>
