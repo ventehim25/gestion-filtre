@@ -66,9 +66,9 @@ export default function FournisseursPage() {
     setProducts(all);
 
     // Portefeuille (depuis les ventes)
-    const items: { date: string; items: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }[] }[] = [];
+    const items: { date: string; items: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] }[] = [];
     for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("sales").select("date, items:sale_items(quantite, prix_unitaire, product:products(prix_achat))").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("sales").select("date, items:sale_items(quantite, prix_unitaire, cout_unitaire, product:products(prix_achat))").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       items.push(...(data as unknown as typeof items));
       if (data.length < 1000) break;
@@ -77,7 +77,7 @@ export default function FournisseursPage() {
     for (const s of items) {
       let c = 0, b = 0;
       for (const it of s.items ?? []) {
-        const pa = it.product?.prix_achat ?? 0;
+        const pa = it.cout_unitaire ?? it.product?.prix_achat ?? 0;
         c += it.quantite * pa;
         b += it.quantite * (it.prix_unitaire - pa);
       }
@@ -86,16 +86,16 @@ export default function FournisseursPage() {
     setSalesAgg(agg);
 
     // Ventes attribuées à un fournisseur (source choisie à la vente)
-    const attLines: { fournisseur_id: string; quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }[] = [];
+    const attLines: { fournisseur_id: string; quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] = [];
     for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("sale_items").select("fournisseur_id, quantite, prix_unitaire, product:products(prix_achat)").not("fournisseur_id", "is", null).range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("sale_items").select("fournisseur_id, quantite, prix_unitaire, cout_unitaire, product:products(prix_achat)").not("fournisseur_id", "is", null).range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       attLines.push(...(data as unknown as typeof attLines));
       if (data.length < 1000) break;
     }
     const att: Record<string, { ventes: number; benef: number }> = {};
     for (const l of attLines) {
-      const pa = l.product?.prix_achat ?? 0;
+      const pa = l.cout_unitaire ?? l.product?.prix_achat ?? 0;
       const cur = att[l.fournisseur_id] ?? { ventes: 0, benef: 0 };
       cur.ventes += l.quantite * l.prix_unitaire;
       cur.benef += l.quantite * (l.prix_unitaire - pa);

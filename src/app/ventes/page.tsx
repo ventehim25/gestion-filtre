@@ -17,7 +17,7 @@ type LastSale = {
   total: number; statut: SaleStatus; montant_paye: number; offline: boolean;
 };
 
-type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string; variant?: string };
+type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string; variant?: string; equivalence_id?: string | null; cout_unitaire?: number };
 
 export default function VentesPage() {
   const { t } = useLang();
@@ -27,7 +27,7 @@ export default function VentesPage() {
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [crossSell, setCrossSell] = useState<Product[]>([]);
   // Variantes de marque par produit (Filtron + équivalences avec prix) → prix auto à la vente
-  const [variants, setVariants] = useState<Record<string, { marque: string; reference: string; prix: number }[]>>({});
+  const [variants, setVariants] = useState<Record<string, { marque: string; reference: string; prix: number; prix_achat: number; stock: number; equivalence_id: string | null }[]>>({});
   const [showForm, setShowForm] = useState(false);
   const [clientId, setClientId] = useState("");
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -46,7 +46,7 @@ export default function VentesPage() {
   const [lastSale, setLastSale] = useState<LastSale | null>(null);
   // Modification d'une vente existante
   const [editingSale, setEditingSale] = useState<(Sale & { client: Client }) | null>(null);
-  const [oldLines, setOldLines] = useState<{ product_id: string; quantite: number }[]>([]);
+  const [oldLines, setOldLines] = useState<{ product_id: string; quantite: number; equivalence_id: string | null }[]>([]);
   // Modification rapide du paiement
   const [payEdit, setPayEdit] = useState<(Sale & { client: Client }) | null>(null);
   const [payStatut, setPayStatut] = useState<SaleStatus>("paye");
@@ -59,7 +59,7 @@ export default function VentesPage() {
 
   async function load() {
     const [{ data: s }, { data: c }, { data: fr }] = await Promise.all([
-      supabase.from("sales").select("*, client:clients(*), items:sale_items(quantite, prix_unitaire, fournisseur_id, product:products(nom_fr, prix_achat))").order("created_at", { ascending: false }),
+      supabase.from("sales").select("*, client:clients(*), items:sale_items(quantite, prix_unitaire, cout_unitaire, fournisseur_id, product:products(nom_fr, prix_achat))").order("created_at", { ascending: false }),
       supabase.from("clients").select("*").order("nom"),
       supabase.from("fournisseurs").select("*").order("nom"),
     ]);
@@ -112,32 +112,31 @@ export default function VentesPage() {
 
   function setLineProduct(i: number, p: Product) {
     const updated = [...lines];
-    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.nom_fr, variant: "Filtron" };
+    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.nom_fr, variant: "Filtron", equivalence_id: null, cout_unitaire: p.prix_achat };
     setLines(updated);
     fetchCrossSell(p);
     loadVariants(p);
   }
 
-  // Charge les variantes de marque d'un produit (Filtron + équivalences ayant un prix)
+  // Charge les variantes d'un produit (Filtron + équivalences enregistrées avec un prix)
   async function loadVariants(p: Product) {
     if (variants[p.id]) return;
-    const { data } = await supabase.from("equivalences").select("marque, reference, prix").eq("product_id", p.id);
+    const { data } = await supabase.from("equivalences").select("id, marque, reference, prix, prix_achat, stock").eq("product_id", p.id);
     const list = [
-      { marque: "Filtron", reference: p.reference, prix: p.prix_vente },
-      // Seulement les équivalences que TU as enregistrées (avec un prix), pas les OE auto
-      ...((data ?? []) as { marque: string; reference: string; prix: number | null }[])
+      { marque: "Filtron", reference: p.reference, prix: p.prix_vente, prix_achat: p.prix_achat, stock: p.stock, equivalence_id: null as string | null },
+      ...((data ?? []) as { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null }[])
         .filter(e => e.prix != null)
-        .map(e => ({ marque: e.marque, reference: e.reference, prix: e.prix as number })),
+        .map(e => ({ marque: e.marque, reference: e.reference, prix: e.prix as number, prix_achat: e.prix_achat ?? 0, stock: e.stock ?? 0, equivalence_id: e.id })),
     ];
     setVariants(prev => ({ ...prev, [p.id]: list }));
   }
 
-  // Applique une marque à une ligne : prix auto + libellé "réf (marque)"
+  // Applique une marque à une ligne : prix de vente auto + coût figé + libellé "réf (marque)"
   function applyVariant(i: number, marque: string) {
     const l = lines[i];
     const v = (variants[l.product_id] || []).find(x => x.marque === marque);
     if (!v) return;
-    setLines(lines.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: v.prix, nom: `${v.reference} (${v.marque})` } : x));
+    setLines(lines.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: v.prix, cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
   }
 
   // Vente croisée : autres filtres (catégories différentes) compatibles avec le même véhicule
@@ -220,11 +219,11 @@ export default function VentesPage() {
   // Ouvre le formulaire pré-rempli pour modifier une vente existante
   async function openEditSale(s: Sale & { client: Client }) {
     const { data } = await supabase.from("sale_items")
-      .select("product_id, quantite, prix_unitaire, fournisseur_id, product:products(nom_fr)")
+      .select("product_id, quantite, prix_unitaire, fournisseur_id, equivalence_id, cout_unitaire, product:products(nom_fr)")
       .eq("sale_id", s.id);
-    const items = (data ?? []) as unknown as { product_id: string; quantite: number; prix_unitaire: number; fournisseur_id: string | null; product: { nom_fr: string } | null }[];
-    setLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, prix_unitaire: i.prix_unitaire, nom: i.product?.nom_fr ?? "", fournisseur_id: i.fournisseur_id ?? undefined })));
-    setOldLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite })));
+    const items = (data ?? []) as unknown as { product_id: string; quantite: number; prix_unitaire: number; fournisseur_id: string | null; equivalence_id: string | null; cout_unitaire: number | null; product: { nom_fr: string } | null }[];
+    setLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, prix_unitaire: i.prix_unitaire, nom: i.product?.nom_fr ?? "", fournisseur_id: i.fournisseur_id ?? undefined, equivalence_id: i.equivalence_id, cout_unitaire: i.cout_unitaire ?? undefined })));
+    setOldLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, equivalence_id: i.equivalence_id })));
     setClientId(s.client_id);
     setStatut(s.statut);
     setMontantPaye(s.montant_paye);
@@ -243,17 +242,23 @@ export default function VentesPage() {
     const montant = statut === "paye" ? saleTotal : montantPaye;
     try {
       // 1) Rendre le stock des anciens articles (qty négative => stock += qty)
-      for (const o of oldLines) await supabase.rpc("decrement_stock", { p_id: o.product_id, qty: -o.quantite });
+      for (const o of oldLines) {
+        if (o.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: o.equivalence_id, qty: -o.quantite });
+        else await supabase.rpc("decrement_stock", { p_id: o.product_id, qty: -o.quantite });
+      }
       // 2) Remplacer les lignes
       await supabase.from("sale_items").delete().eq("sale_id", editingSale.id);
       await supabase.from("sales").update({
         client_id: clientId, total: saleTotal, montant_paye: montant, statut, notes: notes || null,
       }).eq("id", editingSale.id);
       await supabase.from("sale_items").insert(
-        validLines.map(l => ({ sale_id: editingSale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id || null }))
+        validLines.map(l => ({ sale_id: editingSale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id || null, equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null }))
       );
       // 3) Retirer le stock des nouveaux articles
-      for (const l of validLines) await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
+      for (const l of validLines) {
+        if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: l.quantite });
+        else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
+      }
       flash("Vente modifiée ✓");
     } catch { alert("Erreur lors de la modification."); }
     resetForm();
@@ -290,10 +295,13 @@ export default function VentesPage() {
         }).select().single();
         if (error || !sale) throw error || new Error("insert");
         const { error: e2 } = await supabase.from("sale_items").insert(
-          validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id || null }))
+          validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id || null, equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null }))
         );
         if (e2) throw e2;
-        for (const l of validLines) await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
+        for (const l of validLines) {
+          if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: l.quantite });
+          else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
+        }
         savedOnline = true;
       } catch { savedOnline = false; }
     }
@@ -302,7 +310,7 @@ export default function VentesPage() {
       addPending({
         localId: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
         client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
-        lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: l.fournisseur_id || null })),
+        lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: l.fournisseur_id || null, equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
         total: saleTotal, statut, montant_paye: montant, notes: notes || null, createdAt: Date.now(),
       });
       setPendingCount(getPending().length);
@@ -444,7 +452,7 @@ export default function VentesPage() {
                   {variants[l.product_id] && variants[l.product_id].length > 1 && (
                     <select className="input mt-1 py-1 text-xs" value={l.variant ?? "Filtron"} onChange={e => applyVariant(i, e.target.value)}>
                       {variants[l.product_id].map(v => (
-                        <option key={v.marque + v.reference} value={v.marque}>{v.marque} · {v.reference} · {v.prix} MAD</option>
+                        <option key={v.marque + v.reference} value={v.marque}>{v.marque} · {v.reference} · {v.prix} MAD (stock {v.stock})</option>
                       ))}
                     </select>
                   )}
@@ -517,7 +525,7 @@ export default function VentesPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {sales.map(s => {
-              const cost = (s.items ?? []).reduce((a, it) => a + it.quantite * ((it.product as Product | undefined)?.prix_achat ?? 0), 0);
+              const cost = (s.items ?? []).reduce((a, it) => a + it.quantite * (it.cout_unitaire ?? (it.product as Product | undefined)?.prix_achat ?? 0), 0);
               const benef = s.total - cost;
               return (
               <tr key={s.id} className="hover:bg-slate-50">

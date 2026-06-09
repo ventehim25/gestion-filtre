@@ -89,16 +89,16 @@ export default function Dashboard() {
       const sales = (r3.data ?? []) as { total: number; montant_paye: number; statut: string; date: string; client_id: string }[];
       const stockFaible = r4.data;
       // Articles vendus paginés → coût marchandise & bénéfice exacts
-      const saleItems: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }[] = [];
+      const saleItems: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] = [];
       for (let i = 0; i < 30; i++) {
-        const { data } = await supabase.from("sale_items").select("quantite, prix_unitaire, product:products(prix_achat)").range(i * 1000, i * 1000 + 999);
+        const { data } = await supabase.from("sale_items").select("quantite, prix_unitaire, cout_unitaire, product:products(prix_achat)").range(i * 1000, i * 1000 + 999);
         if (!data || data.length === 0) break;
         saleItems.push(...(data as unknown as typeof saleItems));
         if (data.length < 1000) break;
       }
       const totalVentes = sales.reduce((s, v) => s + v.total, 0);
-      const coutMarchandise = saleItems.reduce((s, i) => s + i.quantite * (i.product?.prix_achat ?? 0), 0);
-      const benefice = saleItems.reduce((s, i) => s + (i.prix_unitaire - (i.product?.prix_achat ?? 0)) * i.quantite, 0);
+      const coutMarchandise = saleItems.reduce((s, i) => s + i.quantite * (i.cout_unitaire ?? i.product?.prix_achat ?? 0), 0);
+      const benefice = saleItems.reduce((s, i) => s + (i.prix_unitaire - (i.cout_unitaire ?? i.product?.prix_achat ?? 0)) * i.quantite, 0);
       const unpaid = sales.filter((s) => s.statut !== "paye").length;
       const todayStr = new Date().toISOString().split("T")[0];
       const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0];

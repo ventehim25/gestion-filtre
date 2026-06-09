@@ -3,7 +3,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SaleStatus } from "@/types/database";
 
-export type PendingLine = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string | null };
+export type PendingLine = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string | null; equivalence_id?: string | null; cout_unitaire?: number | null };
 export type PendingSale = {
   localId: string;
   client_id: string;
@@ -46,11 +46,12 @@ export async function syncPending(supabase: SupabaseClient<any>): Promise<{ done
       }).select().single();
       if (error || !sale) throw error || new Error("insert sale");
       const { error: e2 } = await supabase.from("sale_items").insert(
-        s.lines.map((l) => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id ?? null }))
+        s.lines.map((l) => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id ?? null, equivalence_id: l.equivalence_id ?? null, cout_unitaire: l.cout_unitaire ?? null }))
       );
       if (e2) throw e2;
       for (const l of s.lines) {
-        await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
+        if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: l.quantite });
+        else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
       }
       removePending(s.localId);
       done++;

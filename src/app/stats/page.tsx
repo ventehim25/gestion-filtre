@@ -84,10 +84,10 @@ export default function StatsPage() {
       }
 
       // ----- Coûts & bénéfices par jour / semaine / mois -----
-      const withItems: { date: string; total: number; items: { quantite: number; product: { prix_achat: number } | null }[] }[] = [];
+      const withItems: { date: string; total: number; items: { quantite: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] }[] = [];
       for (let i = 0; i < 30; i++) {
         const { data } = await supabase.from("sales")
-          .select("date, total, items:sale_items(quantite, product:products(prix_achat))")
+          .select("date, total, items:sale_items(quantite, cout_unitaire, product:products(prix_achat))")
           .range(i * 1000, i * 1000 + 999);
         if (!data || data.length === 0) break;
         withItems.push(...(data as unknown as typeof withItems));
@@ -98,7 +98,7 @@ export default function StatsPage() {
         for (const s of withItems) {
           if (!s.date) continue;
           const k = keyFn(s.date);
-          const cost = (s.items ?? []).reduce((a, it) => a + it.quantite * (it.product?.prix_achat ?? 0), 0);
+          const cost = (s.items ?? []).reduce((a, it) => a + it.quantite * (it.cout_unitaire ?? it.product?.prix_achat ?? 0), 0);
           if (!m[k]) m[k] = { key: k, ca: 0, cost: 0, benef: 0 };
           m[k].ca += s.total; m[k].cost += cost; m[k].benef += s.total - cost;
         }
@@ -115,10 +115,10 @@ export default function StatsPage() {
         supabase.from("fournisseurs").select("id, nom, type"),
         supabase.from("receptions").select("fournisseur_id, montant, date"),
       ]);
-      const attLines: { fournisseur_id: string; quantite: number; prix_unitaire: number; product: { prix_achat: number } | null; sale: { date: string } | null }[] = [];
+      const attLines: { fournisseur_id: string; quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null; sale: { date: string } | null }[] = [];
       for (let i = 0; i < 30; i++) {
         const { data } = await supabase.from("sale_items")
-          .select("fournisseur_id, quantite, prix_unitaire, product:products(prix_achat), sale:sales(date)")
+          .select("fournisseur_id, quantite, prix_unitaire, cout_unitaire, product:products(prix_achat), sale:sales(date)")
           .not("fournisseur_id", "is", null).range(i * 1000, i * 1000 + 999);
         if (!data || data.length === 0) break;
         attLines.push(...(data as unknown as typeof attLines));
@@ -127,7 +127,7 @@ export default function StatsPage() {
       // Totaux par fournisseur
       const byF: Record<string, { ventes: number; cost: number; benef: number }> = {};
       for (const l of attLines) {
-        const pa = l.product?.prix_achat ?? 0;
+        const pa = l.cout_unitaire ?? l.product?.prix_achat ?? 0;
         const cur = byF[l.fournisseur_id] ?? { ventes: 0, cost: 0, benef: 0 };
         cur.ventes += l.quantite * l.prix_unitaire;
         cur.cost += l.quantite * pa;

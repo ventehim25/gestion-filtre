@@ -57,9 +57,9 @@ export default function ProduitsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(empty);
-  const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number }[]>([]);
+  const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number }[]>([]);
   const [showAllEquivs, setShowAllEquivs] = useState(false);
-  const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0 });
+  const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
   const [vehMap, setVehMap] = useState<Record<string, { makes: string[]; nb: number }>>({});
 
   async function load() {
@@ -108,10 +108,10 @@ export default function ProduitsPage() {
     if (productId) {
       await supabase.from("equivalences").delete().eq("product_id", productId);
       const rows = equivs.filter(e => e.marque.trim() && e.reference.trim())
-        .map(e => ({ product_id: productId!, marque: e.marque.trim(), reference: e.reference.trim(), prix: e.prix && e.prix > 0 ? e.prix : null }));
+        .map(e => ({ product_id: productId!, marque: e.marque.trim(), reference: e.reference.trim(), prix: e.prix && e.prix > 0 ? e.prix : null, prix_achat: e.prix_achat && e.prix_achat > 0 ? e.prix_achat : null, stock: e.stock ?? 0 }));
       if (rows.length) await supabase.from("equivalences").insert(rows);
     }
-    setShowForm(false); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0 });
+    setShowForm(false); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
     load();
   }
 
@@ -126,14 +126,14 @@ export default function ProduitsPage() {
     setEditing(p);
     setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0 });
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
-    setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined })) ?? []);
-    setNewEquiv({ marque: "Flag", reference: "", prix: 0 });
+    setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined, prix_achat: e.prix_achat ?? undefined, stock: e.stock ?? 0 })) ?? []);
+    setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
     setShowAllEquivs(false);
     setShowForm(true);
   }
 
   function openNew() {
-    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0 }); setShowAllEquivs(false);
+    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 }); setShowAllEquivs(false);
   }
 
   // Diffuse les produits en promo (prix_promo > 0) par WhatsApp
@@ -147,8 +147,8 @@ export default function ProduitsPage() {
 
   function addEquivRow() {
     if (!newEquiv.reference.trim()) return;
-    setEquivs([...equivs, { marque: newEquiv.marque, reference: newEquiv.reference.trim(), prix: newEquiv.prix || undefined }]);
-    setNewEquiv({ marque: newEquiv.marque, reference: "", prix: 0 });
+    setEquivs([...equivs, { marque: newEquiv.marque, reference: newEquiv.reference.trim(), prix: newEquiv.prix || undefined, prix_achat: newEquiv.prix_achat || undefined, stock: newEquiv.stock || 0 }]);
+    setNewEquiv({ marque: newEquiv.marque, reference: "", prix: 0, prix_achat: 0, stock: 0 });
   }
 
   const BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram"];
@@ -247,14 +247,19 @@ export default function ProduitsPage() {
               {equivs.length === 0 && <p className="text-xs text-slate-400 mb-2">{t("noEquiv")}</p>}
               <div className="mb-2">
                 {showAllEquivs ? (
-                  <div className="space-y-1.5">
+                  <div className="space-y-2">
                     {equivs.map((e, i) => (
-                      <div key={i} className="flex items-center gap-2 bg-slate-50 rounded-md px-2 py-1">
-                        <span className="text-xs font-semibold text-indigo-700 w-16 shrink-0">{e.marque}</span>
-                        <span className="text-sm font-mono flex-1 truncate">{e.reference}</span>
-                        <input type="number" className="input w-20 py-1 text-xs text-center shrink-0" placeholder="prix" value={e.prix ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
-                        <span className="text-[10px] text-slate-400 shrink-0">MAD</span>
-                        <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0"><X size={15} /></button>
+                      <div key={i} className="bg-slate-50 rounded-lg p-2 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-indigo-700 w-14 shrink-0">{e.marque}</span>
+                          <span className="text-sm font-mono flex-1 truncate">{e.reference}</span>
+                          <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0"><X size={15} /></button>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                          <span>Achat</span><input type="number" className="input w-16 py-0.5 text-xs text-center" value={e.prix_achat ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix_achat: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
+                          <span>Vente</span><input type="number" className="input w-16 py-0.5 text-xs text-center" value={e.prix ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
+                          <span>Qté</span><input type="number" className="input w-14 py-0.5 text-xs text-center" value={e.stock ?? 0} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, stock: +ev.target.value } : x))} />
+                        </div>
                       </div>
                     ))}
                     <button type="button" onClick={() => setShowAllEquivs(false)} className="text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-1">Réduire <ChevronUp size={13} /></button>
@@ -262,7 +267,7 @@ export default function ProduitsPage() {
                 ) : equivs.length === 0 ? null : (
                   <div className="flex flex-nowrap items-center gap-1.5 overflow-hidden">
                     {distinctEquivs(equivs, 2).map((e, i) => (
-                      <span key={i} className="shrink-0 whitespace-nowrap text-xs bg-slate-50 rounded px-2 py-1"><b className="text-indigo-700">{e.marque}</b> <span className="font-mono">{e.reference}</span>{e.prix ? <span className="text-emerald-400"> · {e.prix} MAD</span> : null}</span>
+                      <span key={i} className="shrink-0 whitespace-nowrap text-xs bg-slate-50 rounded px-2 py-1"><b className="text-indigo-700">{e.marque}</b> <span className="font-mono">{e.reference}</span>{e.prix ? <span className="text-emerald-400"> · {e.prix}</span> : null}{(e.stock ?? 0) > 0 ? <span className="text-slate-400"> · stk {e.stock}</span> : null}</span>
                     ))}
                     {equivs.length > distinctEquivs(equivs, 2).length && (
                       <button type="button" onClick={() => setShowAllEquivs(true)} className="shrink-0 text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-1">
@@ -272,18 +277,22 @@ export default function ProduitsPage() {
                   </div>
                 )}
               </div>
-              <div className="flex flex-wrap gap-2 items-center">
-                <select className="input w-28 shrink-0" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
-                  {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
-                  <option value="OE">OE (origine)</option>
-                </select>
-                <input className="input flex-1 min-w-[8rem] font-mono" placeholder={t("equivRef")} value={newEquiv.reference}
-                  onChange={e => setNewEquiv({ ...newEquiv, reference: e.target.value })}
-                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEquivRow(); } }} />
-                <input type="number" className="input w-16 shrink-0" placeholder="prix" value={newEquiv.prix || ""}
-                  onChange={e => setNewEquiv({ ...newEquiv, prix: +e.target.value })}
-                  onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEquivRow(); } }} />
-                <button onClick={addEquivRow} className="btn-secondary flex items-center gap-1 shrink-0"><Plus size={14} /></button>
+              <div className="bg-slate-50/60 rounded-lg p-2 space-y-2">
+                <div className="flex gap-2">
+                  <select className="input w-28 shrink-0" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
+                    {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
+                    <option value="OE">OE (origine)</option>
+                  </select>
+                  <input className="input flex-1 min-w-0 font-mono" placeholder={t("equivRef")} value={newEquiv.reference}
+                    onChange={e => setNewEquiv({ ...newEquiv, reference: e.target.value })}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEquivRow(); } }} />
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                  <span>Achat</span><input type="number" className="input w-16 py-1 text-xs text-center" placeholder="0" value={newEquiv.prix_achat || ""} onChange={e => setNewEquiv({ ...newEquiv, prix_achat: +e.target.value })} />
+                  <span>Vente</span><input type="number" className="input w-16 py-1 text-xs text-center" placeholder="0" value={newEquiv.prix || ""} onChange={e => setNewEquiv({ ...newEquiv, prix: +e.target.value })} />
+                  <span>Qté</span><input type="number" className="input w-14 py-1 text-xs text-center" placeholder="0" value={newEquiv.stock || ""} onChange={e => setNewEquiv({ ...newEquiv, stock: +e.target.value })} />
+                  <button onClick={addEquivRow} className="btn-secondary flex items-center gap-1 shrink-0 ms-auto"><Plus size={14} /> Ajouter</button>
+                </div>
               </div>
             </div>
 

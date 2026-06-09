@@ -107,7 +107,9 @@ export type Equivalence = {
   product_id: string;
   marque: string;
   reference: string;
-  prix: number | null;
+  prix: number | null;        // prix de vente de la variante
+  prix_achat: number | null;  // prix d'achat de la variante
+  stock: number;              // stock de cette marque
 };
 
 export type Application = {
@@ -181,5 +183,7 @@ export type SaleItem = {
   quantite: number;
   prix_unitaire: number;
   fournisseur_id: string | null;
+  equivalence_id: string | null;
+  cout_unitaire: number | null;
   product?: Product;
 };

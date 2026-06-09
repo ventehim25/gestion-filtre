@@ -32,13 +32,13 @@ export default function ClientsPage() {
     const map: Record<string, { benefice: number; cost: number }> = {};
     for (let i = 0; i < 30; i++) {
       const { data } = await supabase.from("sales")
-        .select("client_id, items:sale_items(quantite, prix_unitaire, product:products(prix_achat))")
+        .select("client_id, items:sale_items(quantite, prix_unitaire, cout_unitaire, product:products(prix_achat))")
         .range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
-      for (const s of data as unknown as { client_id: string; items: { quantite: number; prix_unitaire: number; product: { prix_achat: number } | null }[] }[]) {
+      for (const s of data as unknown as { client_id: string; items: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] }[]) {
         const cur = map[s.client_id] ?? { benefice: 0, cost: 0 };
         for (const it of s.items ?? []) {
-          const pa = it.product?.prix_achat ?? 0;
+          const pa = it.cout_unitaire ?? it.product?.prix_achat ?? 0;
           cur.cost += it.quantite * pa;
           cur.benefice += it.quantite * (it.prix_unitaire - pa);
         }
