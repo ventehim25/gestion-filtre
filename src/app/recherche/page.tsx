@@ -324,14 +324,12 @@ export default function RecherchePage() {
 
                   {(p.equivalences ?? []).length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-100">
-                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Repeat size={13} /> {t("equivalents")}</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {(p.equivalences ?? []).map(e => (
-                          <span key={e.id} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
-                            <strong>{e.marque}</strong> {e.reference}
-                          </span>
-                        ))}
-                      </div>
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Repeat size={13} /> {t("equivalents")} <span className="text-slate-300 font-normal">({(p.equivalences ?? []).length})</span></div>
+                      <CollapsibleTags limit={1} items={(p.equivalences ?? []).map(e => (
+                        <span key={e.id} className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded border border-indigo-100">
+                          <strong>{e.marque}</strong> {e.reference}
+                        </span>
+                      ))} />
                     </div>
                   )}
                   </div>
