@@ -49,6 +49,7 @@ export default function ProduitsPage() {
   const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number }[]>([]);
   const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
   const [vehMap, setVehMap] = useState<Record<string, { makes: string[]; nb: number }>>({});
+  const [equivMap, setEquivMap] = useState<Record<string, { marque: string; reference: string; prix: number | null; stock: number }[]>>({});
 
   async function load() {
     // Pagination : récupère toutes les lignes (Supabase limite à 1000/requête)
@@ -60,6 +61,18 @@ export default function ProduitsPage() {
       if (data.length < 1000) break;
     }
     setProducts(all);
+
+    // Variantes de marque (équivalences) par produit
+    const eqMap: Record<string, { marque: string; reference: string; prix: number | null; stock: number }[]> = {};
+    for (let i = 0; i < 30; i++) {
+      const { data } = await supabase.from("equivalences").select("product_id, marque, reference, prix, stock").range(i * 1000, i * 1000 + 999);
+      if (!data || data.length === 0) break;
+      data.forEach((e: { product_id: string; marque: string; reference: string; prix: number | null; stock: number | null }) => {
+        (eqMap[e.product_id] ??= []).push({ marque: e.marque, reference: e.reference, prix: e.prix, stock: e.stock ?? 0 });
+      });
+      if (data.length < 1000) break;
+    }
+    setEquivMap(eqMap);
 
     // Résumé véhicules (marques compatibles) par produit
     const map: Record<string, { makes: string[]; nb: number }> = {};
@@ -147,8 +160,10 @@ export default function ProduitsPage() {
 
   const filtered = products.filter(p => {
     const q = search.toLowerCase();
-    const matchSearch = !q || p.nom_fr.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q) || p.nom_ar.includes(search);
-    const matchRef = !refSearch || p.reference.toUpperCase().startsWith(refSearch);
+    const eqs = equivMap[p.id] ?? [];
+    const matchSearch = !q || p.nom_fr.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q) || p.nom_ar.includes(search)
+      || eqs.some(e => e.reference.toLowerCase().includes(q) || e.marque.toLowerCase().includes(q));
+    const matchRef = !refSearch || p.reference.toUpperCase().startsWith(refSearch) || eqs.some(e => e.reference.toUpperCase().startsWith(refSearch));
     const matchBrand = !brandFilter || p.nom_fr.includes(brandFilter);
     const matchCat = !catFilter || p.categorie === catFilter;
     const matchKind = !kindFilter || classifyKind(p.reference, vehMap[p.id]?.makes) === kindFilter;
@@ -306,7 +321,18 @@ export default function ProduitsPage() {
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <FilterImage reference={p.reference} categorie={p.categorie} imageUrl={p.image_url} wid={80} className="h-9 w-9 rounded object-contain bg-white shrink-0 border border-slate-700/50 p-0.5" />
-                    <span className="font-mono text-xs text-slate-300">{p.reference}</span>
+                    <div className="min-w-0">
+                      <span className="font-mono text-xs text-slate-300">{p.reference}</span>
+                      {(equivMap[p.id] ?? []).filter(e => e.prix != null).length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(equivMap[p.id] ?? []).filter(e => e.prix != null).map((e, i) => (
+                            <span key={i} className="text-[10px] bg-slate-800/60 rounded px-1.5 py-0.5 whitespace-nowrap">
+                              <b className="text-indigo-300">{e.marque}</b> <span className="font-mono text-slate-400">{e.reference}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td className="px-4 py-3 text-slate-700 max-w-xs">
