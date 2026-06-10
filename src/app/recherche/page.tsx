@@ -163,6 +163,8 @@ export default function RecherchePage() {
   const [refResults, setRefResults] = useState<RefResult[]>([]);
   const [refLoading, setRefLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  const [openDetails, setOpenDetails] = useState<Set<string>>(new Set());
+  function toggleDetails(id: string) { setOpenDetails(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
 
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
   const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
@@ -336,7 +338,6 @@ export default function RecherchePage() {
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>
                       <div className="text-xl font-bold font-mono text-slate-800 mt-1">{p.reference}</div>
                       <div className="text-sm text-slate-500">{p.nom_fr}</div>
-                      {p.dimensions && <div className="text-xs text-slate-500 mt-1">📐 {p.dimensions}</div>}
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-blue-600">{p.prix_vente} MAD</div>
@@ -344,7 +345,17 @@ export default function RecherchePage() {
                     </div>
                   </div>
 
-                  {apps.length > 0 ? (
+                  {(p.dimensions || apps.length > 0 || vehs.length > 0) && (
+                    <button onClick={() => toggleDetails(p.id)} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-blue-500 hover:text-blue-400">
+                      {openDetails.has(p.id)
+                        ? <>Masquer les détails <ChevronUp size={14} /></>
+                        : <>Dimensions & véhicules{apps.length > 0 ? ` (${apps.length})` : vehs.length > 0 ? ` (${vehs.length})` : ""} <ChevronDown size={14} /></>}
+                    </button>
+                  )}
+
+                  {openDetails.has(p.id) && p.dimensions && <div className="text-xs text-slate-500 mt-2">📐 {p.dimensions}</div>}
+
+                  {openDetails.has(p.id) && (apps.length > 0 ? (
                     <div className="mt-3 pt-3 border-t border-slate-100">
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-1.5"><Car size={13} /> {t("vehiclesFit")} <span className="text-slate-300 font-normal">({apps.length})</span></div>
                       <CollapsibleTags
@@ -378,7 +389,7 @@ export default function RecherchePage() {
                         ))}
                       />
                     </div>
-                  )}
+                  ))}
 
                   {regEquivs.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-100">
