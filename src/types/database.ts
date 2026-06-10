@@ -138,6 +138,7 @@ export type Product = {
   nom_fr: string;
   nom_ar: string;
   reference: string;
+  marque?: string;
   categorie: ProductCategory;
   prix_achat: number;
   prix_vente: number;

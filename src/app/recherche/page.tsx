@@ -166,7 +166,8 @@ export default function RecherchePage() {
 
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
   const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
-  const emptyAdd = { reference: "", nom_fr: "", categorie: "filtre_huile", prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2 };
+  const ADD_BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram", "OE"];
+  const emptyAdd = { reference: "", marque: "Filtron", categorie: "filtre_huile", prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2 };
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState(emptyAdd);
   const [addSaving, setAddSaving] = useState(false);
@@ -175,7 +176,7 @@ export default function RecherchePage() {
     const ref = addForm.reference.trim();
     if (!ref) { alert("Référence obligatoire."); return; }
     setAddSaving(true);
-    const payload = { ...addForm, reference: ref, nom_ar: "", notes: "", prix_promo: null };
+    const payload = { ...addForm, reference: ref, nom_fr: "", nom_ar: "", notes: "", prix_promo: null };
     const { error } = await supabase.from("products").insert(payload);
     setAddSaving(false);
     if (error) { alert("Erreur : " + error.message); return; }
@@ -573,8 +574,10 @@ export default function RecherchePage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">{t("reference")} *</label>
                 <input autoFocus className="input font-mono uppercase" value={addForm.reference} onChange={e => setAddForm({ ...addForm, reference: e.target.value.toUpperCase() })} /></div>
-              <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">Nom (FR)</label>
-                <input className="input" placeholder="ex : Filtre à huile…" value={addForm.nom_fr} onChange={e => setAddForm({ ...addForm, nom_fr: e.target.value })} /></div>
+              <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">Marque</label>
+                <select className="input" value={addForm.marque} onChange={e => setAddForm({ ...addForm, marque: e.target.value })}>
+                  {ADD_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select></div>
               <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
                 <select className="input" value={addForm.categorie} onChange={e => setAddForm({ ...addForm, categorie: e.target.value })}>
                   {ADD_CATS.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}

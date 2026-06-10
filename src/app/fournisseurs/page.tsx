@@ -58,7 +58,7 @@ export default function FournisseursPage() {
     // Produits (pour le sélecteur)
     const all: Product[] = [];
     for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("products").select("id, reference, nom_fr, prix_achat, prix_vente").order("reference").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("products").select("*").order("reference").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       all.push(...(data as unknown as Product[]));
       if (data.length < 1000) break;

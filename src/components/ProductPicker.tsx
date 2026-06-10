@@ -24,12 +24,12 @@ export default function ProductPicker({
   const matches = useMemo(() => {
     const s = q.trim().toUpperCase();
     const base = s
-      ? products.filter((p) => p.reference.toUpperCase().includes(s) || p.nom_fr.toUpperCase().includes(s))
+      ? products.filter((p) => p.reference.toUpperCase().includes(s))
       : products;
     return base.slice(0, 30);
   }, [q, products]);
 
-  const label = selected ? `${selected.reference} — ${selected.nom_fr}` : "";
+  const label = selected ? selected.reference : "";
 
   function pick(p: Product) {
     onSelect(p);
@@ -63,7 +63,7 @@ export default function ProductPicker({
               className={`w-full text-left px-2 py-1.5 rounded-md flex items-center gap-2 ${idx === hi ? "bg-slate-700/50" : "hover:bg-slate-800/60"}`}
             >
               <span className="font-mono text-xs text-slate-100 shrink-0">{p.reference}</span>
-              <span className="text-xs text-slate-400 truncate">{p.nom_fr}</span>
+              {p.marque && p.marque !== "Filtron" && <span className="text-xs text-indigo-300 truncate">{p.marque}</span>}
             </button>
           ))}
         </div>

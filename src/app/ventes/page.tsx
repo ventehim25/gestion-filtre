@@ -59,7 +59,7 @@ export default function VentesPage() {
 
   async function load() {
     const [{ data: s }, { data: c }, { data: fr }] = await Promise.all([
-      supabase.from("sales").select("*, client:clients(*), items:sale_items(quantite, prix_unitaire, cout_unitaire, fournisseur_id, product:products(nom_fr, prix_achat))").order("created_at", { ascending: false }),
+      supabase.from("sales").select("*, client:clients(*), items:sale_items(quantite, prix_unitaire, cout_unitaire, fournisseur_id, product:products(reference, prix_achat))").order("created_at", { ascending: false }),
       supabase.from("clients").select("*").order("nom"),
       supabase.from("fournisseurs").select("*").order("nom"),
     ]);
@@ -112,7 +112,7 @@ export default function VentesPage() {
 
   function setLineProduct(i: number, p: Product) {
     const updated = [...lines];
-    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.nom_fr, variant: "Filtron", equivalence_id: null, cout_unitaire: p.prix_achat };
+    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.reference, variant: "Filtron", equivalence_id: null, cout_unitaire: p.prix_achat };
     setLines(updated);
     fetchCrossSell(p);
     loadVariants(p);
@@ -172,7 +172,7 @@ export default function VentesPage() {
         u[idx] = { ...u[idx], quantite: u[idx].quantite + 1 };
         return u;
       }
-      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: p.prix_vente, nom: p.nom_fr }];
+      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: p.prix_vente, nom: p.reference }];
     });
     flash(`${p.reference} ajouté ✓`);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
@@ -219,10 +219,10 @@ export default function VentesPage() {
   // Ouvre le formulaire pré-rempli pour modifier une vente existante
   async function openEditSale(s: Sale & { client: Client }) {
     const { data } = await supabase.from("sale_items")
-      .select("product_id, quantite, prix_unitaire, fournisseur_id, equivalence_id, cout_unitaire, product:products(nom_fr)")
+      .select("product_id, quantite, prix_unitaire, fournisseur_id, equivalence_id, cout_unitaire, product:products(reference)")
       .eq("sale_id", s.id);
-    const items = (data ?? []) as unknown as { product_id: string; quantite: number; prix_unitaire: number; fournisseur_id: string | null; equivalence_id: string | null; cout_unitaire: number | null; product: { nom_fr: string } | null }[];
-    setLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, prix_unitaire: i.prix_unitaire, nom: i.product?.nom_fr ?? "", fournisseur_id: i.fournisseur_id ?? undefined, equivalence_id: i.equivalence_id, cout_unitaire: i.cout_unitaire ?? undefined })));
+    const items = (data ?? []) as unknown as { product_id: string; quantite: number; prix_unitaire: number; fournisseur_id: string | null; equivalence_id: string | null; cout_unitaire: number | null; product: { reference: string } | null }[];
+    setLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, prix_unitaire: i.prix_unitaire, nom: i.product?.reference ?? "", fournisseur_id: i.fournisseur_id ?? undefined, equivalence_id: i.equivalence_id, cout_unitaire: i.cout_unitaire ?? undefined })));
     setOldLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, equivalence_id: i.equivalence_id })));
     setClientId(s.client_id);
     setStatut(s.statut);
@@ -348,9 +348,9 @@ export default function VentesPage() {
   // Envoie la fiche d'une vente déjà enregistrée (récupère ses articles)
   async function whatsForSale(s: Sale & { client: Client }) {
     const { data } = await supabase.from("sale_items")
-      .select("quantite, prix_unitaire, product:products(nom_fr)").eq("sale_id", s.id);
-    const lns = (data ?? []).map((i: { quantite: number; prix_unitaire: number; product: { nom_fr: string } | null }) =>
-      ({ nom: i.product?.nom_fr ?? "Produit", quantite: i.quantite, prix_unitaire: i.prix_unitaire }));
+      .select("quantite, prix_unitaire, product:products(reference)").eq("sale_id", s.id);
+    const lns = (data ?? []).map((i: { quantite: number; prix_unitaire: number; product: { reference: string } | null }) =>
+      ({ nom: i.product?.reference ?? "Produit", quantite: i.quantite, prix_unitaire: i.prix_unitaire }));
     sendWhatsApp(s.client?.telephone, buildReceipt({
       clientNom: s.client?.nom, date: s.date, lines: lns, total: s.total, statut: s.statut, montant_paye: s.montant_paye,
     }));
@@ -358,7 +358,7 @@ export default function VentesPage() {
 
   function printReceipt(s: Sale & { client: Client }) {
     const items = (s.items ?? []).map(i =>
-      `<tr><td>${(i.product as Product | undefined)?.nom_fr ?? ""}</td><td style="text-align:center">${i.quantite}</td><td style="text-align:right">${i.prix_unitaire} MAD</td><td style="text-align:right">${(i.quantite * i.prix_unitaire).toFixed(2)} MAD</td></tr>`
+      `<tr><td>${(i.product as Product | undefined)?.reference ?? ""}</td><td style="text-align:center">${i.quantite}</td><td style="text-align:right">${i.prix_unitaire} MAD</td><td style="text-align:right">${(i.quantite * i.prix_unitaire).toFixed(2)} MAD</td></tr>`
     ).join("");
     const w = window.open("", "_blank");
     if (!w) return;
