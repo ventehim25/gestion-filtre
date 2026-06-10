@@ -169,7 +169,7 @@ export default function RecherchePage() {
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
   const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
   const ADD_BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram", "OE"];
-  const emptyAdd = { reference: "", marque: "Filtron", categorie: "filtre_huile", prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2 };
+  const emptyAdd = { reference: "", marque: "Filtron", filtronRef: "", categorie: "filtre_huile", prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2 };
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState(emptyAdd);
   const [addSaving, setAddSaving] = useState(false);
@@ -177,8 +177,32 @@ export default function RecherchePage() {
   async function saveNew() {
     const ref = addForm.reference.trim();
     if (!ref) { alert("Référence obligatoire."); return; }
+    const { filtronRef, ...prod } = addForm;
+    const fref = (filtronRef || "").trim();
     setAddSaving(true);
-    const payload = { ...addForm, reference: ref, nom_fr: "", nom_ar: "", notes: "", prix_promo: null };
+
+    // Marque ≠ Filtron + réf Filtron renseignée → rattacher comme variante sous le Filtron existant
+    if (prod.marque !== "Filtron" && fref) {
+      const { data: parents } = await supabase.from("products").select("id, reference").ilike("reference", fref).limit(1);
+      const parent = parents?.[0];
+      if (parent) {
+        const { error } = await supabase.from("equivalences").insert({
+          product_id: parent.id, marque: prod.marque, reference: ref,
+          prix: prod.prix_vente > 0 ? prod.prix_vente : null,
+          prix_achat: prod.prix_achat > 0 ? prod.prix_achat : null,
+          stock: prod.stock || 0,
+        });
+        setAddSaving(false);
+        if (error) { alert("Erreur : " + error.message); return; }
+        setShowAdd(false);
+        setRefQuery(parent.reference); searchRef(parent.reference);
+        return;
+      }
+      alert(`Filtron « ${fref} » introuvable — la référence est créée comme fiche indépendante.`);
+    }
+
+    // Sinon : créer un produit (Filtron, ou marque sans réf Filtron connue)
+    const payload = { ...prod, reference: ref, nom_fr: "", nom_ar: "", notes: "", prix_promo: null };
     const { error } = await supabase.from("products").insert(payload);
     setAddSaving(false);
     if (error) { alert("Erreur : " + error.message); return; }
@@ -589,6 +613,10 @@ export default function RecherchePage() {
                 <select className="input" value={addForm.marque} onChange={e => setAddForm({ ...addForm, marque: e.target.value })}>
                   {ADD_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
                 </select></div>
+              {addForm.marque !== "Filtron" && (
+                <div className="col-span-2"><label className="text-xs text-amber-400 mb-1 block">Référence Filtron équivalente <span className="text-slate-500 font-normal">(pour rattacher sous le Filtron)</span></label>
+                  <input className="input font-mono uppercase" placeholder="ex : OE667/6 — laisse vide si aucune" value={addForm.filtronRef} onChange={e => setAddForm({ ...addForm, filtronRef: e.target.value.toUpperCase() })} /></div>
+              )}
               <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
                 <select className="input" value={addForm.categorie} onChange={e => setAddForm({ ...addForm, categorie: e.target.value })}>
                   {ADD_CATS.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
