@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
@@ -29,17 +29,6 @@ const categoryKeys: Record<ProductCategory, keyof ReturnType<typeof useLang>["t"
 
 const empty = { nom_fr: "", nom_ar: "", reference: "", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0 };
 
-// Garde au plus n équivalences de références différentes (pas de doublon de réf)
-function distinctEquivs<T extends { reference: string }>(list: T[], n: number): T[] {
-  const seen = new Set<string>();
-  const out: T[] = [];
-  for (const e of list) {
-    const k = e.reference.trim().toUpperCase();
-    if (k && !seen.has(k)) { seen.add(k); out.push(e); if (out.length >= n) break; }
-  }
-  return out;
-}
-
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe
 function refCompare(a: string, b: string) {
   const parse = (r: string): [string, number, number, string] => {
@@ -58,7 +47,6 @@ export default function ProduitsPage() {
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(empty);
   const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number }[]>([]);
-  const [showAllEquivs, setShowAllEquivs] = useState(false);
   const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
   const [vehMap, setVehMap] = useState<Record<string, { makes: string[]; nb: number }>>({});
 
@@ -128,12 +116,11 @@ export default function ProduitsPage() {
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
     setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined, prix_achat: e.prix_achat ?? undefined, stock: e.stock ?? 0 })) ?? []);
     setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
-    setShowAllEquivs(false);
     setShowForm(true);
   }
 
   function openNew() {
-    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 }); setShowAllEquivs(false);
+    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
   }
 
   // Diffuse les produits en promo (prix_promo > 0) par WhatsApp
@@ -241,64 +228,58 @@ export default function ProduitsPage() {
               <div><label className="text-xs text-slate-500 mb-1 block">Stock min</label><input type="number" className="input" value={form.stock_min} onChange={e => setForm({ ...form, stock_min: +e.target.value })} /></div>
             </div>
 
-            {/* Équivalences autres marques */}
+            {/* Variantes de marque — Filtron + équivalents sur une seule grille */}
             <div className="mt-5 pt-4 border-t border-slate-200">
-              <label className="text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2"><Repeat size={15} /> {t("equivalents")}</label>
-              {equivs.length === 0 && <p className="text-xs text-slate-400 mb-2">{t("noEquiv")}</p>}
-              <div className="mb-2">
-                {showAllEquivs ? (
-                  <div className="space-y-2">
-                    {equivs.map((e, i) => (
-                      <div key={i} className="bg-slate-50 rounded-lg p-2.5 space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-indigo-700 shrink-0">{e.marque}</span>
-                          <span className="text-sm font-mono flex-1 truncate">{e.reference}</span>
-                          <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 shrink-0"><X size={15} /></button>
-                        </div>
-                        <div className="grid grid-cols-3 gap-2">
-                          <div><label className="text-[10px] text-slate-500 block mb-0.5">Prix achat</label><input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix_achat ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix_achat: ev.target.value === "" ? undefined : +ev.target.value } : x))} /></div>
-                          <div><label className="text-[10px] text-slate-500 block mb-0.5">Prix vente</label><input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix: ev.target.value === "" ? undefined : +ev.target.value } : x))} /></div>
-                          <div><label className="text-[10px] text-slate-500 block mb-0.5">Quantité</label><input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.stock ?? 0} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, stock: +ev.target.value } : x))} /></div>
-                        </div>
-                      </div>
-                    ))}
-                    <button type="button" onClick={() => setShowAllEquivs(false)} className="text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-1">Réduire <ChevronUp size={13} /></button>
-                  </div>
-                ) : equivs.length === 0 ? null : (
-                  <div className="flex flex-nowrap items-center gap-1.5 overflow-hidden">
-                    {distinctEquivs(equivs, 2).map((e, i) => (
-                      <span key={i} className="shrink-0 whitespace-nowrap text-xs bg-slate-50 rounded px-2 py-1"><b className="text-indigo-700">{e.marque}</b> <span className="font-mono">{e.reference}</span>{e.prix ? <span className="text-emerald-400"> · {e.prix}</span> : null}{(e.stock ?? 0) > 0 ? <span className="text-slate-400"> · stk {e.stock}</span> : null}</span>
-                    ))}
-                    {equivs.length > distinctEquivs(equivs, 2).length && (
-                      <button type="button" onClick={() => setShowAllEquivs(true)} className="shrink-0 text-xs font-medium text-blue-500 hover:text-blue-400 inline-flex items-center gap-1">
-                        Voir tout (+{equivs.length - distinctEquivs(equivs, 2).length}) <ChevronDown size={13} />
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-              <div className="bg-slate-50/60 rounded-lg p-3 space-y-2">
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-[11px] text-slate-500 block mb-0.5">Marque</label>
-                    <select className="input" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
-                      {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
-                      <option value="OE">OE (origine)</option>
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="text-[11px] text-slate-500 block mb-0.5">Référence {newEquiv.marque}</label>
-                    <input className="input font-mono" placeholder="ex : Z555" value={newEquiv.reference}
-                      onChange={e => setNewEquiv({ ...newEquiv, reference: e.target.value })}
-                      onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEquivRow(); } }} />
-                  </div>
+              <label className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2"><Repeat size={15} /> Variantes de marque</label>
+              <p className="text-xs text-slate-400 mb-2">La ligne Filtron reprend les infos du produit ci-dessus. Ajoute les marques équivalentes avec leur référence, prix et quantité.</p>
+
+              <div className="rounded-lg border border-slate-200 overflow-x-auto">
+                {/* En-tête */}
+                <div className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-1.5 bg-slate-100 text-[10px] font-semibold uppercase text-slate-500 min-w-[330px]">
+                  <span>Marque</span>
+                  <span>Référence</span>
+                  <span className="text-center">Achat</span>
+                  <span className="text-center">Vente</span>
+                  <span className="text-center">Qté</span>
+                  <span></span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div><label className="text-[11px] text-slate-500 block mb-0.5">Prix achat</label><input type="number" className="input text-center" placeholder="0" value={newEquiv.prix_achat || ""} onChange={e => setNewEquiv({ ...newEquiv, prix_achat: +e.target.value })} /></div>
-                  <div><label className="text-[11px] text-slate-500 block mb-0.5">Prix vente</label><input type="number" className="input text-center" placeholder="0" value={newEquiv.prix || ""} onChange={e => setNewEquiv({ ...newEquiv, prix: +e.target.value })} /></div>
-                  <div><label className="text-[11px] text-slate-500 block mb-0.5">Quantité</label><input type="number" className="input text-center" placeholder="0" value={newEquiv.stock || ""} onChange={e => setNewEquiv({ ...newEquiv, stock: +e.target.value })} /></div>
+
+                {/* Ligne Filtron (le produit lui-même, lecture seule) */}
+                <div className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-2 bg-amber-50 border-t border-slate-200 min-w-[330px]">
+                  <span className="text-xs font-bold text-amber-700">Filtron</span>
+                  <span className="text-sm font-mono truncate text-slate-700">{form.reference || <span className="text-slate-300">— réf. —</span>}</span>
+                  <span className="text-xs text-center text-slate-600">{form.prix_achat || "—"}</span>
+                  <span className="text-xs text-center text-slate-600">{form.prix_vente || "—"}</span>
+                  <span className="text-xs text-center text-slate-600">{form.stock || "—"}</span>
+                  <span></span>
                 </div>
-                <button onClick={addEquivRow} className="btn-primary w-full flex items-center justify-center gap-1.5"><Plus size={15} /> Ajouter cette marque</button>
+
+                {/* Marques équivalentes éditables */}
+                {equivs.map((e, i) => (
+                  <div key={i} className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-1.5 border-t border-slate-100 min-w-[330px]">
+                    <span className="text-xs font-semibold text-indigo-700 truncate" title={e.marque}>{e.marque}</span>
+                    <input className="input font-mono py-1 text-xs" value={e.reference} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, reference: ev.target.value } : x))} />
+                    <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix_achat ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix_achat: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
+                    <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
+                    <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.stock ?? 0} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, stock: +ev.target.value } : x))} />
+                    <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex justify-center" title="Retirer"><X size={14} /></button>
+                  </div>
+                ))}
+
+                {/* Ligne d'ajout */}
+                <div className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-2 border-t border-slate-200 bg-slate-50/70 min-w-[330px]">
+                  <select className="input py-1 text-xs px-1" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
+                    {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
+                    <option value="OE">OE</option>
+                  </select>
+                  <input className="input font-mono py-1 text-xs" placeholder="réf (ex Z555)" value={newEquiv.reference}
+                    onChange={e => setNewEquiv({ ...newEquiv, reference: e.target.value })}
+                    onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addEquivRow(); } }} />
+                  <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={newEquiv.prix_achat || ""} onChange={e => setNewEquiv({ ...newEquiv, prix_achat: +e.target.value })} />
+                  <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={newEquiv.prix || ""} onChange={e => setNewEquiv({ ...newEquiv, prix: +e.target.value })} />
+                  <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={newEquiv.stock || ""} onChange={e => setNewEquiv({ ...newEquiv, stock: +e.target.value })} />
+                  <button onClick={addEquivRow} className="text-emerald-500 hover:text-emerald-600 flex justify-center" title="Ajouter cette marque"><Plus size={16} /></button>
+                </div>
               </div>
             </div>
 
