@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
@@ -27,7 +27,7 @@ const categoryKeys: Record<ProductCategory, keyof ReturnType<typeof useLang>["t"
   autre: "other",
 };
 
-const empty = { nom_fr: "", nom_ar: "", reference: "", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0 };
+const empty = { nom_fr: "", nom_ar: "", reference: "", marque: "Filtron", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0 };
 
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe
 function refCompare(a: string, b: string) {
@@ -48,6 +48,7 @@ export default function ProduitsPage() {
   const [form, setForm] = useState(empty);
   const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number }[]>([]);
   const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
+  const [showAutoEquivs, setShowAutoEquivs] = useState(false);
   const [vehMap, setVehMap] = useState<Record<string, { makes: string[]; nb: number }>>({});
   const [equivMap, setEquivMap] = useState<Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]>>({});
 
@@ -132,15 +133,16 @@ export default function ProduitsPage() {
 
   async function startEdit(p: Product) {
     setEditing(p);
-    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0 });
+    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, marque: p.marque ?? "Filtron", categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0 });
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
     setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined, prix_achat: e.prix_achat ?? undefined, stock: e.stock ?? 0 })) ?? []);
     setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
+    setShowAutoEquivs(false);
     setShowForm(true);
   }
 
   function openNew() {
-    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
+    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 }); setShowAutoEquivs(false);
   }
 
   // Diffuse les produits en promo (prix_promo > 0) par WhatsApp
@@ -235,9 +237,12 @@ export default function ProduitsPage() {
           <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="font-semibold text-slate-800 mb-4">{editing ? t("edit") : t("addProduct")}</h3>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-xs text-slate-500 mb-1 block">Nom (FR)</label><input className="input" value={form.nom_fr} onChange={e => setForm({ ...form, nom_fr: e.target.value })} /></div>
-              <div><label className="text-xs text-slate-500 mb-1 block">الاسم (AR)</label><input className="input" dir="rtl" value={form.nom_ar} onChange={e => setForm({ ...form, nom_ar: e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("reference")}</label><input className="input" value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} /></div>
+              <div><label className="text-xs text-slate-500 mb-1 block">Marque</label>
+                <select className="input" value={form.marque} onChange={e => setForm({ ...form, marque: e.target.value })}>
+                  {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
                 <select className="input" value={form.categorie} onChange={e => setForm({ ...form, categorie: e.target.value as ProductCategory })}>
                   {CATEGORIES.map(c => <option key={c} value={c}>{t(categoryKeys[c])}</option>)}
@@ -276,8 +281,11 @@ export default function ProduitsPage() {
                   <span></span>
                 </div>
 
-                {/* Marques équivalentes éditables */}
-                {equivs.map((e, i) => (
+                {/* Marques équivalentes éditables — les OE auto (sans prix) sont masquées par défaut */}
+                {equivs.map((e, i) => {
+                  const isAuto = (e.prix == null && e.prix_achat == null);
+                  if (isAuto && !showAutoEquivs) return null;
+                  return (
                   <div key={i} className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-1.5 border-t border-slate-100 min-w-[330px]">
                     <span className="text-xs font-semibold text-indigo-700 truncate" title={e.marque}>{e.marque}</span>
                     <input className="input font-mono py-1 text-xs" value={e.reference} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, reference: ev.target.value } : x))} />
@@ -286,7 +294,18 @@ export default function ProduitsPage() {
                     <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.stock ?? 0} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, stock: +ev.target.value } : x))} />
                     <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex justify-center" title="Retirer"><X size={14} /></button>
                   </div>
-                ))}
+                  );
+                })}
+
+                {/* Bascule pour les références OE automatiques (sans prix) */}
+                {equivs.filter(e => e.prix == null && e.prix_achat == null).length > 0 && (
+                  <button type="button" onClick={() => setShowAutoEquivs(v => !v)}
+                    className="w-full text-xs font-medium text-blue-500 hover:text-blue-400 flex items-center justify-center gap-1 py-1.5 border-t border-slate-100 bg-slate-50/40">
+                    {showAutoEquivs
+                      ? <>Masquer les références OE <ChevronUp size={13} /></>
+                      : <>Voir {equivs.filter(e => e.prix == null && e.prix_achat == null).length} références OE (origine) <ChevronDown size={13} /></>}
+                  </button>
+                )}
 
                 {/* Ligne d'ajout */}
                 <div className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-2 border-t border-slate-200 bg-slate-50/70 min-w-[330px]">
