@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, Equivalence, Application } from "@/types/database";
-import { Car, Search, Package, Tag, Repeat, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { Car, Search, Package, Tag, Repeat, Sparkles, ChevronDown, ChevronUp, Plus, X } from "lucide-react";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
@@ -166,6 +166,25 @@ export default function RecherchePage() {
   const [openRefs, setOpenRefs] = useState<Set<string>>(new Set());
   function toggleRef(id: string) { setOpenRefs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
 
+  // ---------- Ajout rapide d'une référence (depuis cette page) ----------
+  const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
+  const emptyAdd = { reference: "", nom_fr: "", categorie: "filtre_huile", prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2 };
+  const [showAdd, setShowAdd] = useState(false);
+  const [addForm, setAddForm] = useState(emptyAdd);
+  const [addSaving, setAddSaving] = useState(false);
+  function openAdd() { setAddForm({ ...emptyAdd, reference: refQuery.trim().toUpperCase() }); setShowAdd(true); }
+  async function saveNew() {
+    const ref = addForm.reference.trim();
+    if (!ref) { alert("Référence obligatoire."); return; }
+    setAddSaving(true);
+    const payload = { ...addForm, reference: ref, nom_ar: "", notes: "", prix_promo: null };
+    const { error } = await supabase.from("products").insert(payload);
+    setAddSaving(false);
+    if (error) { alert("Erreur : " + error.message); return; }
+    setShowAdd(false);
+    setRefQuery(ref); searchRef(ref);
+  }
+
   async function searchRef(raw: string) {
     const q = raw.trim();
     if (q.length < 2) { setRefResults([]); setSearched(false); return; }
@@ -265,9 +284,14 @@ export default function RecherchePage() {
       {tab === "ref" && (
         <>
           <div className="card p-5 mb-4">
-            <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2">
-              <Tag size={18} /> {t("refSearchTitle")}
-            </h3>
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                <Tag size={18} /> {t("refSearchTitle")}
+              </h3>
+              <button onClick={openAdd} className="btn-secondary flex items-center gap-1.5 text-sm shrink-0">
+                <Plus size={15} /> Ajouter une référence
+              </button>
+            </div>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -289,7 +313,10 @@ export default function RecherchePage() {
           {!refLoading && searched && refResults.length === 0 && (
             <div className="card p-10 text-center text-slate-400">
               <Search size={40} className="mx-auto mb-3 opacity-20" />
-              <p>{t("noRefFound")}</p>
+              <p className="mb-4">{t("noRefFound")}</p>
+              <button onClick={openAdd} className="btn-primary inline-flex items-center gap-1.5">
+                <Plus size={16} /> Ajouter « {refQuery.trim().toUpperCase()} »
+              </button>
             </div>
           )}
 
@@ -541,6 +568,41 @@ export default function RecherchePage() {
             </div>
           )}
         </>
+      )}
+
+      {/* ====== Modal : ajouter une référence ====== */}
+      {showAdd && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowAdd(false)}>
+          <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-800 flex items-center gap-2"><Plus size={18} /> Ajouter une référence</h3>
+              <button onClick={() => setShowAdd(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">{t("reference")} *</label>
+                <input autoFocus className="input font-mono uppercase" value={addForm.reference} onChange={e => setAddForm({ ...addForm, reference: e.target.value.toUpperCase() })} /></div>
+              <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">Nom (FR)</label>
+                <input className="input" placeholder="ex : Filtre à huile…" value={addForm.nom_fr} onChange={e => setAddForm({ ...addForm, nom_fr: e.target.value })} /></div>
+              <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
+                <select className="input" value={addForm.categorie} onChange={e => setAddForm({ ...addForm, categorie: e.target.value })}>
+                  {ADD_CATS.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
+                </select></div>
+              <div><label className="text-xs text-slate-500 mb-1 block">{t("buyPrice")} (MAD)</label>
+                <input type="number" className="input" value={addForm.prix_achat || ""} placeholder="0" onChange={e => setAddForm({ ...addForm, prix_achat: +e.target.value })} /></div>
+              <div><label className="text-xs text-slate-500 mb-1 block">{t("sellPrice")} (MAD)</label>
+                <input type="number" className="input" value={addForm.prix_vente || ""} placeholder="0" onChange={e => setAddForm({ ...addForm, prix_vente: +e.target.value })} /></div>
+              <div><label className="text-xs text-slate-500 mb-1 block">{t("stock")}</label>
+                <input type="number" className="input" value={addForm.stock || ""} placeholder="0" onChange={e => setAddForm({ ...addForm, stock: +e.target.value })} /></div>
+              <div><label className="text-xs text-slate-500 mb-1 block">Stock min</label>
+                <input type="number" className="input" value={addForm.stock_min} onChange={e => setAddForm({ ...addForm, stock_min: +e.target.value })} /></div>
+            </div>
+            <p className="text-[11px] text-slate-400 mt-3">Pour ajouter les marques équivalentes (prix/stock par marque), édite ensuite la fiche dans Produits.</p>
+            <div className="flex gap-2 mt-4 justify-end">
+              <button onClick={() => setShowAdd(false)} className="btn-secondary">{t("cancel")}</button>
+              <button onClick={saveNew} disabled={addSaving} className="btn-primary disabled:opacity-50">{addSaving ? "…" : t("save")}</button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
