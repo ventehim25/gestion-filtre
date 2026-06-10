@@ -365,10 +365,15 @@ export default function RecherchePage() {
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-2"><Repeat size={13} /> {t("equivalents")}</div>
                       <div className="space-y-1.5">
                         {regEquivs.map(e => (
-                          <div key={e.id} className="flex items-baseline gap-2 bg-[var(--surface-2)] rounded-lg px-3 py-2">
-                            <span className="font-mono text-base font-bold text-slate-100">{e.reference}</span>
-                            <span className="text-xs text-indigo-300">{e.marque}</span>
-                            {e.prix ? <span className="text-xs text-emerald-400 ms-auto">{e.prix} MAD</span> : null}
+                          <div key={e.id} className="flex items-center justify-between gap-3 bg-[var(--surface-2)] rounded-lg px-3 py-2">
+                            <div className="min-w-0">
+                              <span className="font-mono text-base font-bold text-slate-100">{e.reference}</span>
+                              <span className="ms-2 text-xs text-indigo-300">{e.marque}</span>
+                            </div>
+                            <div className="text-right shrink-0">
+                              {e.prix ? <div className="text-sm font-bold text-blue-400">{e.prix} MAD</div> : null}
+                              <div className="mt-1 flex justify-end"><StockBadge stock={e.stock ?? 0} stockMin={0} /></div>
+                            </div>
                           </div>
                         ))}
                       </div>
