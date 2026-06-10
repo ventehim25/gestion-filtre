@@ -1,6 +1,6 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
@@ -49,7 +49,7 @@ export default function ProduitsPage() {
   const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number }[]>([]);
   const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
   const [vehMap, setVehMap] = useState<Record<string, { makes: string[]; nb: number }>>({});
-  const [equivMap, setEquivMap] = useState<Record<string, { marque: string; reference: string; prix: number | null; stock: number }[]>>({});
+  const [equivMap, setEquivMap] = useState<Record<string, { marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]>>({});
 
   async function load() {
     // Pagination : récupère toutes les lignes (Supabase limite à 1000/requête)
@@ -63,12 +63,12 @@ export default function ProduitsPage() {
     setProducts(all);
 
     // Variantes de marque (équivalences) par produit
-    const eqMap: Record<string, { marque: string; reference: string; prix: number | null; stock: number }[]> = {};
+    const eqMap: Record<string, { marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]> = {};
     for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("equivalences").select("product_id, marque, reference, prix, stock").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("equivalences").select("product_id, marque, reference, prix, prix_achat, stock").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
-      data.forEach((e: { product_id: string; marque: string; reference: string; prix: number | null; stock: number | null }) => {
-        (eqMap[e.product_id] ??= []).push({ marque: e.marque, reference: e.reference, prix: e.prix, stock: e.stock ?? 0 });
+      data.forEach((e: { product_id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null }) => {
+        (eqMap[e.product_id] ??= []).push({ marque: e.marque, reference: e.reference, prix: e.prix, prix_achat: e.prix_achat, stock: e.stock ?? 0 });
       });
       if (data.length < 1000) break;
     }
@@ -316,22 +316,17 @@ export default function ProduitsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map(p => (
-              <tr key={p.id} className={p.stock <= p.stock_min ? "bg-red-50" : "hover:bg-slate-50"}>
+            {filtered.map(p => {
+              const variants = (equivMap[p.id] ?? []).filter(e => e.prix != null);
+              return (
+              <Fragment key={p.id}>
+              <tr className={p.stock <= p.stock_min ? "bg-red-50" : "hover:bg-slate-50"}>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2.5">
                     <FilterImage reference={p.reference} categorie={p.categorie} imageUrl={p.image_url} wid={80} className="h-9 w-9 rounded object-contain bg-white shrink-0 border border-slate-700/50 p-0.5" />
                     <div className="min-w-0">
                       <span className="font-mono text-xs text-slate-300">{p.reference}</span>
-                      {(equivMap[p.id] ?? []).filter(e => e.prix != null).length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {(equivMap[p.id] ?? []).filter(e => e.prix != null).map((e, i) => (
-                            <span key={i} className="text-[10px] bg-slate-800/60 rounded px-1.5 py-0.5 whitespace-nowrap">
-                              <b className="text-indigo-300">{e.marque}</b> <span className="font-mono text-slate-400">{e.reference}</span>
-                            </span>
-                          ))}
-                        </div>
-                      )}
+                      <span className="ms-2 text-[10px] font-semibold text-amber-400">{p.marque || "Filtron"}</span>
                     </div>
                   </div>
                 </td>
@@ -364,7 +359,31 @@ export default function ProduitsPage() {
                   </div>
                 </td>
               </tr>
-            ))}
+              {variants.map((e, i) => (
+                <tr key={p.id + "-eq-" + i} className="bg-slate-900/20">
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2 ps-11">
+                      <span className="text-indigo-300">↳</span>
+                      <span className="text-xs font-semibold text-indigo-300">{e.marque}</span>
+                      <span className="font-mono text-xs text-slate-400">{e.reference}</span>
+                    </div>
+                  </td>
+                  <td></td>
+                  <td></td>
+                  {showCost && <td className="px-4 py-2 text-xs text-slate-400">{e.prix_achat != null ? `${e.prix_achat} MAD` : "—"}</td>}
+                  <td className="px-4 py-2 font-medium text-blue-600">{e.prix} MAD</td>
+                  <td className="px-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <StockBadge stock={e.stock} stockMin={0} />
+                      <span className="text-xs text-slate-400">{e.stock}</span>
+                    </div>
+                  </td>
+                  <td></td>
+                </tr>
+              ))}
+              </Fragment>
+              );
+            })}
           </tbody>
         </table>
         {filtered.length === 0 && <p className="text-center text-slate-400 py-10">{t("noData")}</p>}
