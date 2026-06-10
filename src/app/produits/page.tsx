@@ -49,7 +49,7 @@ export default function ProduitsPage() {
   const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number }[]>([]);
   const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
   const [vehMap, setVehMap] = useState<Record<string, { makes: string[]; nb: number }>>({});
-  const [equivMap, setEquivMap] = useState<Record<string, { marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]>>({});
+  const [equivMap, setEquivMap] = useState<Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]>>({});
 
   async function load() {
     // Pagination : récupère toutes les lignes (Supabase limite à 1000/requête)
@@ -63,12 +63,12 @@ export default function ProduitsPage() {
     setProducts(all);
 
     // Variantes de marque (équivalences) par produit
-    const eqMap: Record<string, { marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]> = {};
+    const eqMap: Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]> = {};
     for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("equivalences").select("product_id, marque, reference, prix, prix_achat, stock").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("equivalences").select("id, product_id, marque, reference, prix, prix_achat, stock").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
-      data.forEach((e: { product_id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null }) => {
-        (eqMap[e.product_id] ??= []).push({ marque: e.marque, reference: e.reference, prix: e.prix, prix_achat: e.prix_achat, stock: e.stock ?? 0 });
+      data.forEach((e: { id: string; product_id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null }) => {
+        (eqMap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix, prix_achat: e.prix_achat, stock: e.stock ?? 0 });
       });
       if (data.length < 1000) break;
     }
@@ -119,6 +119,13 @@ export default function ProduitsPage() {
   async function remove(id: string) {
     if (confirm(t("confirm") + " " + t("delete") + "?")) {
       await supabase.from("products").delete().eq("id", id);
+      load();
+    }
+  }
+
+  async function removeVariant(equivId: string, label: string) {
+    if (confirm(`Supprimer la variante « ${label} » ?`)) {
+      await supabase.from("equivalences").delete().eq("id", equivId);
       load();
     }
   }
@@ -364,8 +371,8 @@ export default function ProduitsPage() {
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2 ps-11">
                       <span className="text-indigo-300">↳</span>
+                      <span className="font-mono text-xs text-slate-300">{e.reference}</span>
                       <span className="text-xs font-semibold text-indigo-300">{e.marque}</span>
-                      <span className="font-mono text-xs text-slate-400">{e.reference}</span>
                     </div>
                   </td>
                   <td></td>
@@ -378,7 +385,12 @@ export default function ProduitsPage() {
                       <span className="text-xs text-slate-400">{e.stock}</span>
                     </div>
                   </td>
-                  <td></td>
+                  <td className="px-4 py-2">
+                    <div className="flex gap-2">
+                      <button onClick={() => startEdit(p)} title="Modifier la variante (dans la fiche)" className="text-blue-500 hover:text-blue-700"><Pencil size={15} /></button>
+                      <button onClick={() => removeVariant(e.id, `${e.reference} ${e.marque}`)} title="Supprimer la variante" className="text-red-400 hover:text-red-600"><Trash2 size={15} /></button>
+                    </div>
+                  </td>
                 </tr>
               ))}
               </Fragment>
