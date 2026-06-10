@@ -163,8 +163,6 @@ export default function RecherchePage() {
   const [refResults, setRefResults] = useState<RefResult[]>([]);
   const [refLoading, setRefLoading] = useState(false);
   const [searched, setSearched] = useState(false);
-  const [openRefs, setOpenRefs] = useState<Set<string>>(new Set());
-  function toggleRef(id: string) { setOpenRefs(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
 
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
   const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
@@ -335,13 +333,7 @@ export default function RecherchePage() {
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>
-                      <button onClick={() => toggleRef(p.id)} className="text-xl font-bold font-mono text-slate-800 mt-1 flex items-center gap-1.5 hover:text-blue-500">
-                        {p.reference}
-                        {regEquivs.length > 0 && (openRefs.has(p.id) ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
-                      </button>
-                      {regEquivs.length > 0 && !openRefs.has(p.id) && (
-                        <span className="block text-[11px] text-blue-400">↳ {regEquivs.length} autre(s) référence(s) — cliquer</span>
-                      )}
+                      <div className="text-xl font-bold font-mono text-slate-800 mt-1">{p.reference}</div>
                       <div className="text-sm text-slate-500">{p.nom_fr}</div>
                       {p.dimensions && <div className="text-xs text-slate-500 mt-1">📐 {p.dimensions}</div>}
                     </div>
@@ -387,7 +379,7 @@ export default function RecherchePage() {
                     </div>
                   )}
 
-                  {regEquivs.length > 0 && openRefs.has(p.id) && (
+                  {regEquivs.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-100">
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-2"><Repeat size={13} /> {t("equivalents")}</div>
                       <div className="space-y-1.5">
