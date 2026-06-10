@@ -361,7 +361,6 @@ export default function RecherchePage() {
                     <div>
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>
                       <div className="text-xl font-bold font-mono text-slate-800 mt-1">{p.reference}</div>
-                      <div className="text-sm text-slate-500">{p.nom_fr}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-blue-600">{p.prix_vente} MAD</div>
@@ -475,7 +474,6 @@ export default function RecherchePage() {
                     <div>
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>
                       <div className="text-xl font-bold font-mono text-slate-800 mt-1">{p.reference}</div>
-                      <div className="text-sm text-slate-500">{p.nom_fr}</div>
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-blue-600">{p.prix_vente} MAD</div>
@@ -576,7 +574,7 @@ export default function RecherchePage() {
               ) : (
                 <table className="w-full text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200">
-                    <tr>{[t("reference"), t("name"), t("category"), t("sellPrice"), t("stock")].map(h => (
+                    <tr>{[t("reference"), t("category"), t("sellPrice"), t("stock")].map(h => (
                       <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>
                     ))}</tr>
                   </thead>
@@ -584,7 +582,6 @@ export default function RecherchePage() {
                     {compatibles.map(p => (
                       <tr key={p.id} className={p.stock <= p.stock_min ? "bg-red-50" : "hover:bg-slate-50"}>
                         <td className="px-4 py-3 font-mono text-xs text-slate-600">{p.reference}</td>
-                        <td className="px-4 py-3"><div className="font-medium">{p.nom_fr}</div></td>
                         <td className="px-4 py-3 text-slate-600">{categoryLabel(p.categorie)}</td>
                         <td className="px-4 py-3 font-medium text-blue-600">{p.prix_vente} MAD</td>
                         <td className="px-4 py-3"><span className={`font-semibold ${p.stock <= p.stock_min ? "text-red-600" : "text-green-600"}`}>{p.stock}</span></td>
