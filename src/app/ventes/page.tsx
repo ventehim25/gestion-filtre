@@ -181,17 +181,37 @@ export default function VentesPage() {
   }
 
   // Traite un code scanné (caméra ou douchette)
-  function handleScan(raw: string) {
+  async function handleScan(raw: string) {
     const code = raw.trim();
     if (!code || linkCode) return;
+    // 1) Produit principal (code-barres Filtron ou référence)
     const found = products.find(p =>
       (p.code_barre && p.code_barre === code) || p.reference.toUpperCase() === code.toUpperCase());
-    if (found) {
-      addProductToCart(found);
-    } else {
-      setCamOpen(false);
-      setLinkCode(code);
+    if (found) { addProductToCart(found); return; }
+    // 2) Variante de marque (code-barres d'une boîte Mann/Flag/Bosch…)
+    const { data: eq } = await supabase.from("equivalences")
+      .select("id, product_id, marque, reference, prix, prix_achat, stock").eq("code_barre", code).limit(1);
+    const e = eq?.[0] as { id: string; product_id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null } | undefined;
+    if (e) {
+      const parent = products.find(p => p.id === e.product_id);
+      if (parent) { addVariantToCart(parent, e); return; }
     }
+    // 3) Code inconnu → proposer de l'associer à une référence
+    setCamOpen(false);
+    setLinkCode(code);
+  }
+
+  // Ajoute au panier une variante de marque scannée (prix/coût/equivalence pré-réglés)
+  function addVariantToCart(p: Product, e: { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null }) {
+    setLines(prev => {
+      const idx = prev.findIndex(l => l.product_id === p.id && l.equivalence_id === e.id);
+      if (idx >= 0) { const u = [...prev]; u[idx] = { ...u[idx], quantite: u[idx].quantite + 1 }; return u; }
+      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: e.prix ?? p.prix_vente, cout_unitaire: e.prix_achat ?? undefined, equivalence_id: e.id, variant: e.marque, nom: `${e.reference} (${e.marque})` }];
+    });
+    flash(`${e.reference} (${e.marque}) ajouté ✓`);
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
+    fetchCrossSell(p);
+    loadVariants(p);
   }
 
   // Associe un code inconnu à une référence (mémorisé) puis l'ajoute au panier

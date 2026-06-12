@@ -1,11 +1,12 @@
 "use client";
 export const dynamic = "force-dynamic";
 import { Fragment, useEffect, useState } from "react";
+import BarcodeScanner from "@/components/BarcodeScanner";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
@@ -27,7 +28,7 @@ const categoryKeys: Record<ProductCategory, keyof ReturnType<typeof useLang>["t"
   autre: "other",
 };
 
-const empty = { nom_fr: "", nom_ar: "", reference: "", marque: "Filtron", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0 };
+const empty = { nom_fr: "", nom_ar: "", reference: "", marque: "Filtron", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0, code_barre: "" };
 
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe
 function refCompare(a: string, b: string) {
@@ -46,9 +47,11 @@ export default function ProduitsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(empty);
-  const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number }[]>([]);
-  const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
+  const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number; code_barre?: string }[]>([]);
+  const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
   const [showAutoEquivs, setShowAutoEquivs] = useState(false);
+  // Scanner code-barres : cible = "product" | "new" (ligne d'ajout) | index de variante
+  const [scanTarget, setScanTarget] = useState<null | "product" | "new" | number>(null);
   const [vehMap, setVehMap] = useState<Record<string, { makes: string[]; nb: number }>>({});
   const [equivMap, setEquivMap] = useState<Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]>>({});
 
@@ -110,10 +113,10 @@ export default function ProduitsPage() {
     if (productId) {
       await supabase.from("equivalences").delete().eq("product_id", productId);
       const rows = equivs.filter(e => e.marque.trim() && e.reference.trim())
-        .map(e => ({ product_id: productId!, marque: e.marque.trim(), reference: e.reference.trim(), prix: e.prix && e.prix > 0 ? e.prix : null, prix_achat: e.prix_achat && e.prix_achat > 0 ? e.prix_achat : null, stock: e.stock ?? 0 }));
+        .map(e => ({ product_id: productId!, marque: e.marque.trim(), reference: e.reference.trim(), prix: e.prix && e.prix > 0 ? e.prix : null, prix_achat: e.prix_achat && e.prix_achat > 0 ? e.prix_achat : null, stock: e.stock ?? 0, ...(e.code_barre?.trim() ? { code_barre: e.code_barre.trim() } : {}) }));
       if (rows.length) await supabase.from("equivalences").insert(rows);
     }
-    setShowForm(false); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
+    setShowForm(false); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
     load();
   }
 
@@ -133,16 +136,16 @@ export default function ProduitsPage() {
 
   async function startEdit(p: Product) {
     setEditing(p);
-    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, marque: p.marque ?? "Filtron", categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0 });
+    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, marque: p.marque ?? "Filtron", categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0, code_barre: p.code_barre ?? "" });
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
-    setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined, prix_achat: e.prix_achat ?? undefined, stock: e.stock ?? 0 })) ?? []);
-    setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 });
+    setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined, prix_achat: e.prix_achat ?? undefined, stock: e.stock ?? 0, code_barre: e.code_barre ?? "" })) ?? []);
+    setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
     setShowAutoEquivs(false);
     setShowForm(true);
   }
 
   function openNew() {
-    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0 }); setShowAutoEquivs(false);
+    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" }); setShowAutoEquivs(false);
   }
 
   // Diffuse les produits en promo (prix_promo > 0) par WhatsApp
@@ -156,8 +159,17 @@ export default function ProduitsPage() {
 
   function addEquivRow() {
     if (!newEquiv.reference.trim()) return;
-    setEquivs([...equivs, { marque: newEquiv.marque, reference: newEquiv.reference.trim(), prix: newEquiv.prix || undefined, prix_achat: newEquiv.prix_achat || undefined, stock: newEquiv.stock || 0 }]);
-    setNewEquiv({ marque: newEquiv.marque, reference: "", prix: 0, prix_achat: 0, stock: 0 });
+    setEquivs([...equivs, { marque: newEquiv.marque, reference: newEquiv.reference.trim(), prix: newEquiv.prix || undefined, prix_achat: newEquiv.prix_achat || undefined, stock: newEquiv.stock || 0, code_barre: newEquiv.code_barre || "" }]);
+    setNewEquiv({ marque: newEquiv.marque, reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
+  }
+
+  // Reçoit un code scanné et l'affecte à la bonne cible (produit / nouvelle ligne / variante)
+  function onScanCode(code: string) {
+    const c = code.trim();
+    if (scanTarget === "product") setForm(f => ({ ...f, code_barre: c }));
+    else if (scanTarget === "new") setNewEquiv(n => ({ ...n, code_barre: c }));
+    else if (typeof scanTarget === "number") setEquivs(prev => prev.map((x, j) => j === scanTarget ? { ...x, code_barre: c } : x));
+    setScanTarget(null);
   }
 
   const BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram"];
@@ -257,6 +269,12 @@ export default function ProduitsPage() {
               <div><label className="text-xs text-rose-400 mb-1 block">Prix promo (MAD) — 0 = pas de promo</label><input type="number" className="input" value={form.prix_promo} onChange={e => setForm({ ...form, prix_promo: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("stock")}</label><input type="number" className="input" value={form.stock} onChange={e => setForm({ ...form, stock: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">Stock min</label><input type="number" className="input" value={form.stock_min} onChange={e => setForm({ ...form, stock_min: +e.target.value })} /></div>
+              <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">Code-barres (Filtron)</label>
+                <div className="flex gap-2">
+                  <input className="input font-mono flex-1" placeholder="scanne ou tape le code" value={form.code_barre} onChange={e => setForm({ ...form, code_barre: e.target.value })} />
+                  <button type="button" onClick={() => setScanTarget("product")} className="btn-secondary shrink-0 flex items-center gap-1.5"><Barcode size={16} /> Scanner</button>
+                </div>
+              </div>
             </div>
 
             {/* Variantes de marque — Filtron + équivalents sur une seule grille */}
@@ -266,7 +284,7 @@ export default function ProduitsPage() {
 
               <div className="rounded-lg border border-slate-200 overflow-x-auto">
                 {/* En-tête */}
-                <div className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-1.5 bg-slate-100 text-[10px] font-semibold uppercase text-slate-500 min-w-[330px]">
+                <div className="grid grid-cols-[72px_1fr_46px_46px_38px_52px] gap-1.5 items-center px-2.5 py-1.5 bg-slate-100 text-[10px] font-semibold uppercase text-slate-500 min-w-[350px]">
                   <span>Marque</span>
                   <span>Référence</span>
                   <span className="text-center">Achat</span>
@@ -276,7 +294,7 @@ export default function ProduitsPage() {
                 </div>
 
                 {/* Ligne Filtron (le produit lui-même, lecture seule) */}
-                <div className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-2 bg-amber-50 border-t border-slate-200 min-w-[330px]">
+                <div className="grid grid-cols-[72px_1fr_46px_46px_38px_52px] gap-1.5 items-center px-2.5 py-2 bg-amber-50 border-t border-slate-200 min-w-[350px]">
                   <span className="text-xs font-bold text-amber-700">Filtron</span>
                   <span className="text-sm font-mono truncate text-slate-700">{form.reference || <span className="text-slate-300">— réf. —</span>}</span>
                   <span className="text-xs text-center text-slate-600">{form.prix_achat || "—"}</span>
@@ -292,13 +310,16 @@ export default function ProduitsPage() {
                   const isAuto = (e.prix == null && e.prix_achat == null);
                   if (isAuto && !showAutoEquivs) return null;
                   return (
-                  <div key={i} className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-1.5 border-t border-slate-100 min-w-[330px]">
+                  <div key={i} className="grid grid-cols-[72px_1fr_46px_46px_38px_52px] gap-1.5 items-center px-2.5 py-1.5 border-t border-slate-100 min-w-[350px]">
                     <span className="text-xs font-semibold text-indigo-700 truncate" title={e.marque}>{e.marque}</span>
                     <input className="input font-mono py-1 text-xs" value={e.reference} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, reference: ev.target.value } : x))} />
                     <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix_achat ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix_achat: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
                     <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
                     <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.stock ?? 0} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, stock: +ev.target.value } : x))} />
-                    <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600 flex justify-center" title="Retirer"><X size={14} /></button>
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button type="button" onClick={() => setScanTarget(i)} className={e.code_barre ? "text-emerald-500" : "text-slate-400 hover:text-slate-600"} title={e.code_barre ? `Code : ${e.code_barre} (re-scanner)` : "Scanner le code-barres"}><Barcode size={15} /></button>
+                      <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600" title="Retirer"><X size={14} /></button>
+                    </div>
                   </div>
                   );
                 })}
@@ -315,7 +336,7 @@ export default function ProduitsPage() {
                 </div>
 
                 {/* Ligne d'ajout — toujours visible sous la liste */}
-                <div className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-2 border-t border-slate-200 bg-slate-50/70 min-w-[330px]">
+                <div className="grid grid-cols-[72px_1fr_46px_46px_38px_52px] gap-1.5 items-center px-2.5 py-2 border-t border-slate-200 bg-slate-50/70 min-w-[350px]">
                   <select className="input py-1 text-xs px-1" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
                     {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
                     <option value="OE">OE</option>
@@ -326,7 +347,10 @@ export default function ProduitsPage() {
                   <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={newEquiv.prix_achat || ""} onChange={e => setNewEquiv({ ...newEquiv, prix_achat: +e.target.value })} />
                   <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={newEquiv.prix || ""} onChange={e => setNewEquiv({ ...newEquiv, prix: +e.target.value })} />
                   <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={newEquiv.stock || ""} onChange={e => setNewEquiv({ ...newEquiv, stock: +e.target.value })} />
-                  <button onClick={addEquivRow} className="text-emerald-500 hover:text-emerald-600 flex justify-center" title="Ajouter cette marque"><Plus size={16} /></button>
+                  <div className="flex items-center justify-center gap-1.5">
+                    <button type="button" onClick={() => setScanTarget("new")} className={newEquiv.code_barre ? "text-emerald-500" : "text-slate-400 hover:text-slate-600"} title={newEquiv.code_barre ? `Code : ${newEquiv.code_barre}` : "Scanner le code-barres"}><Barcode size={15} /></button>
+                    <button onClick={addEquivRow} className="text-emerald-500 hover:text-emerald-600" title="Ajouter cette marque"><Plus size={16} /></button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -338,6 +362,8 @@ export default function ProduitsPage() {
           </div>
         </div>
       )}
+
+      {scanTarget !== null && <BarcodeScanner onScan={onScanCode} onClose={() => setScanTarget(null)} />}
 
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">

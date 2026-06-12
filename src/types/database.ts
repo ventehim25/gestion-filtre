@@ -110,6 +110,7 @@ export type Equivalence = {
   prix: number | null;        // prix de vente de la variante
   prix_achat: number | null;  // prix d'achat de la variante
   stock: number;              // stock de cette marque
+  code_barre?: string | null; // code-barres de la boîte de cette marque
 };
 
 export type Application = {

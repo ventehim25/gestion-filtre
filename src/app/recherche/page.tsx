@@ -5,7 +5,8 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, Equivalence, Application } from "@/types/database";
-import { Car, Search, Package, Tag, Repeat, Sparkles, ChevronDown, ChevronUp, Plus, X } from "lucide-react";
+import { Car, Search, Package, Tag, Repeat, Sparkles, ChevronDown, ChevronUp, Plus, X, Barcode } from "lucide-react";
+import BarcodeScanner from "@/components/BarcodeScanner";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
@@ -169,10 +170,11 @@ export default function RecherchePage() {
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
   const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
   const ADD_BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram", "OE"];
-  const emptyAdd = { reference: "", marque: "Filtron", filtronRef: "", categorie: "filtre_huile", prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2 };
+  const emptyAdd = { reference: "", marque: "Filtron", filtronRef: "", categorie: "filtre_huile", prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, code_barre: "" };
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState(emptyAdd);
   const [addSaving, setAddSaving] = useState(false);
+  const [addScan, setAddScan] = useState(false);
   function openAdd() { setAddForm({ ...emptyAdd, reference: refQuery.trim().toUpperCase() }); setShowAdd(true); }
   async function saveNew() {
     const ref = addForm.reference.trim();
@@ -191,6 +193,7 @@ export default function RecherchePage() {
           prix: prod.prix_vente > 0 ? prod.prix_vente : null,
           prix_achat: prod.prix_achat > 0 ? prod.prix_achat : null,
           stock: prod.stock || 0,
+          ...(prod.code_barre?.trim() ? { code_barre: prod.code_barre.trim() } : {}),
         });
         setAddSaving(false);
         if (error) { alert("Erreur : " + error.message); return; }
@@ -628,6 +631,12 @@ export default function RecherchePage() {
                 <input type="number" className="input" value={addForm.stock || ""} placeholder="0" onChange={e => setAddForm({ ...addForm, stock: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">Stock min</label>
                 <input type="number" className="input" value={addForm.stock_min} onChange={e => setAddForm({ ...addForm, stock_min: +e.target.value })} /></div>
+              <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">Code-barres <span className="text-slate-500 font-normal">(de cette boîte)</span></label>
+                <div className="flex gap-2">
+                  <input className="input font-mono flex-1" placeholder="scanne ou tape le code" value={addForm.code_barre} onChange={e => setAddForm({ ...addForm, code_barre: e.target.value })} />
+                  <button type="button" onClick={() => setAddScan(true)} className="btn-secondary shrink-0 flex items-center gap-1.5"><Barcode size={16} /> Scanner</button>
+                </div>
+              </div>
             </div>
             <p className="text-[11px] text-slate-400 mt-3">Pour ajouter les marques équivalentes (prix/stock par marque), édite ensuite la fiche dans Produits.</p>
             <div className="flex gap-2 mt-4 justify-end">
@@ -637,6 +646,8 @@ export default function RecherchePage() {
           </div>
         </div>
       )}
+
+      {addScan && <BarcodeScanner onScan={(c) => { setAddForm(f => ({ ...f, code_barre: c.trim() })); setAddScan(false); }} onClose={() => setAddScan(false)} />}
     </div>
   );
 }
