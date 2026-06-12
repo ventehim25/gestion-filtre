@@ -226,13 +226,13 @@ export default function ProduitsPage() {
       <div className="card p-4 mb-4 flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-48">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input className="input ps-9 font-mono uppercase" placeholder={t("searchByRef")} value={refSearch} onChange={e => setRefSearch(e.target.value.toUpperCase())} />
+        </div>
+        <div className="relative flex-1 min-w-48">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input className="input ps-9" placeholder={t("searchByCar")} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <VoiceButton onResult={(txt) => setSearch(txt)} />
-        <div className="relative min-w-40">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input className="input ps-9 font-mono uppercase" placeholder={t("searchByRef")} value={refSearch} onChange={e => setRefSearch(e.target.value.toUpperCase())} />
-        </div>
         <select className="input w-40" value={brandFilter} onChange={e => setBrandFilter(e.target.value)}>
           <option value="">{t("allBrands")}</option>
           {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
