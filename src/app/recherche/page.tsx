@@ -421,7 +421,7 @@ export default function RecherchePage() {
                         {regEquivs.map(e => (
                           <div key={e.id} className="flex items-center justify-between gap-3 bg-[var(--surface-2)] rounded-lg px-3 py-2">
                             <div className="min-w-0">
-                              <span className="font-mono text-base font-bold text-slate-100">{e.reference}</span>
+                              <span className="font-mono text-xl font-bold text-slate-100">{e.reference}</span>
                               <span className="ms-2 text-xs text-indigo-300">{e.marque}</span>
                             </div>
                             <div className="text-right shrink-0">
