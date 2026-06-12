@@ -281,7 +281,9 @@ export default function ProduitsPage() {
                   <span></span>
                 </div>
 
-                {/* Marques équivalentes éditables — les OE auto (sans prix) sont masquées par défaut */}
+                {/* Marques équivalentes éditables — les OE auto (sans prix) sont masquées par défaut.
+                    Liste plafonnée + défilement interne pour garder la ligne d'ajout visible. */}
+                <div className="max-h-[34vh] overflow-y-auto">
                 {equivs.map((e, i) => {
                   const isAuto = (e.prix == null && e.prix_achat == null);
                   if (isAuto && !showAutoEquivs) return null;
@@ -306,8 +308,9 @@ export default function ProduitsPage() {
                       : <>Voir {equivs.filter(e => e.prix == null && e.prix_achat == null).length} références OE (origine) <ChevronDown size={13} /></>}
                   </button>
                 )}
+                </div>
 
-                {/* Ligne d'ajout */}
+                {/* Ligne d'ajout — toujours visible sous la liste */}
                 <div className="grid grid-cols-[76px_1fr_50px_50px_44px_24px] gap-1.5 items-center px-2.5 py-2 border-t border-slate-200 bg-slate-50/70 min-w-[330px]">
                   <select className="input py-1 text-xs px-1" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
                     {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
