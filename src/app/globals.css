@@ -56,6 +56,10 @@ body {
 }
 .input::placeholder { color: #64748b; }
 select.input option { background-color: #14161d; color: #e2e8f0; }
+/* Masque les flèches des champs nombre (gagnent de la place, évitent les chiffres coupés) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
 
 /* ===== Thème sombre : surcharges des utilitaires clairs ===== */
 .bg-white { background-color: var(--surface) !important; }

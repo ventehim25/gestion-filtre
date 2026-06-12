@@ -284,7 +284,7 @@ export default function ProduitsPage() {
 
               <div className="rounded-lg border border-slate-200 overflow-x-auto">
                 {/* En-tête */}
-                <div className="grid grid-cols-[72px_1fr_46px_46px_38px_52px] gap-1.5 items-center px-2.5 py-1.5 bg-slate-100 text-[10px] font-semibold uppercase text-slate-500 min-w-[350px]">
+                <div className="grid grid-cols-[76px_minmax(120px,1fr)_56px_56px_50px_58px] gap-1.5 items-center px-2.5 py-1.5 bg-slate-100 text-[10px] font-semibold uppercase text-slate-500 min-w-[420px]">
                   <span>Marque</span>
                   <span>Référence</span>
                   <span className="text-center">Achat</span>
@@ -294,7 +294,7 @@ export default function ProduitsPage() {
                 </div>
 
                 {/* Ligne Filtron (le produit lui-même, lecture seule) */}
-                <div className="grid grid-cols-[72px_1fr_46px_46px_38px_52px] gap-1.5 items-center px-2.5 py-2 bg-amber-50 border-t border-slate-200 min-w-[350px]">
+                <div className="grid grid-cols-[76px_minmax(120px,1fr)_56px_56px_50px_58px] gap-1.5 items-center px-2.5 py-2 bg-amber-50 border-t border-slate-200 min-w-[420px]">
                   <span className="text-xs font-bold text-amber-700">Filtron</span>
                   <span className="text-sm font-mono truncate text-slate-700">{form.reference || <span className="text-slate-300">— réf. —</span>}</span>
                   <span className="text-xs text-center text-slate-600">{form.prix_achat || "—"}</span>
@@ -310,7 +310,7 @@ export default function ProduitsPage() {
                   const isAuto = (e.prix == null && e.prix_achat == null);
                   if (isAuto && !showAutoEquivs) return null;
                   return (
-                  <div key={i} className="grid grid-cols-[72px_1fr_46px_46px_38px_52px] gap-1.5 items-center px-2.5 py-1.5 border-t border-slate-100 min-w-[350px]">
+                  <div key={i} className="grid grid-cols-[76px_minmax(120px,1fr)_56px_56px_50px_58px] gap-1.5 items-center px-2.5 py-1.5 border-t border-slate-100 min-w-[420px]">
                     <span className="text-xs font-semibold text-indigo-700 truncate" title={e.marque}>{e.marque}</span>
                     <input className="input font-mono py-1 text-xs" value={e.reference} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, reference: ev.target.value } : x))} />
                     <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix_achat ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix_achat: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
@@ -336,7 +336,7 @@ export default function ProduitsPage() {
                 </div>
 
                 {/* Ligne d'ajout — toujours visible sous la liste */}
-                <div className="grid grid-cols-[72px_1fr_46px_46px_38px_52px] gap-1.5 items-center px-2.5 py-2 border-t border-slate-200 bg-slate-50/70 min-w-[350px]">
+                <div className="grid grid-cols-[76px_minmax(120px,1fr)_56px_56px_50px_58px] gap-1.5 items-center px-2.5 py-2 border-t border-slate-200 bg-slate-50/70 min-w-[420px]">
                   <select className="input py-1 text-xs px-1" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
                     {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
                     <option value="OE">OE</option>
