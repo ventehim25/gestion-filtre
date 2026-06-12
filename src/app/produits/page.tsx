@@ -167,12 +167,16 @@ export default function ProduitsPage() {
   const [showCost, setShowCost] = useState(false);
   const [kindFilter, setKindFilter] = useState<"" | "voiture" | "camion">("voiture"); // défaut : voitures
 
+  // Normalise une référence : sans espaces, en majuscules (wl 7510 ↔ wl7510)
+  const norm = (s: string) => s.toUpperCase().replace(/\s+/g, "");
   const filtered = products.filter(p => {
     const q = search.toLowerCase();
+    const qn = norm(search);
     const eqs = equivMap[p.id] ?? [];
-    const matchSearch = !q || p.nom_fr.toLowerCase().includes(q) || p.reference.toLowerCase().includes(q) || p.nom_ar.includes(search)
-      || eqs.some(e => e.reference.toLowerCase().includes(q) || e.marque.toLowerCase().includes(q));
-    const matchRef = !refSearch || p.reference.toUpperCase().startsWith(refSearch) || eqs.some(e => e.reference.toUpperCase().startsWith(refSearch));
+    const matchSearch = !q || p.nom_fr.toLowerCase().includes(q) || norm(p.reference).includes(qn) || p.nom_ar.includes(search)
+      || eqs.some(e => norm(e.reference).includes(qn) || e.marque.toLowerCase().includes(q));
+    const refN = norm(refSearch);
+    const matchRef = !refSearch || norm(p.reference).startsWith(refN) || eqs.some(e => norm(e.reference).startsWith(refN));
     const matchBrand = !brandFilter || p.nom_fr.includes(brandFilter);
     const matchCat = !catFilter || p.categorie === catFilter;
     const matchKind = !kindFilter || classifyKind(p.reference, vehMap[p.id]?.makes) === kindFilter;

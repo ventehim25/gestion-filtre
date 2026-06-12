@@ -215,13 +215,15 @@ export default function RecherchePage() {
     if (q.length < 2) { setRefResults([]); setSearched(false); return; }
     setRefLoading(true);
     setSearched(true);
-    // On enlève les espaces et on cherche le numéro N'IMPORTE OÙ dans la référence
-    // -> permet de dire/taper juste "540" pour trouver OP540, AP540, etc.
+    // On enlève les espaces et on cherche le numéro N'IMPORTE OÙ dans la référence,
+    // en tolérant les espaces dans la réf stockée (wl 7510 ↔ wl7510).
+    // -> permet aussi de taper juste "540" pour trouver OP540, AP540, etc.
     const clean = q.replace(/\s+/g, "");
+    const loose = "%" + clean.replace(/[%_]/g, "").split("").join("%") + "%";
     const sel = "*, equivalences(*), applications(*), compatibilites(vehicules(*))";
     const [{ data: direct }, { data: eqMatches }] = await Promise.all([
-      supabase.from("products").select(sel).ilike("reference", `%${clean}%`).limit(60),
-      supabase.from("equivalences").select("product_id").ilike("reference", `%${clean}%`).limit(60),
+      supabase.from("products").select(sel).ilike("reference", loose).limit(60),
+      supabase.from("equivalences").select("product_id").ilike("reference", loose).limit(60),
     ]);
     let all = [...((direct as unknown as RefResult[]) ?? [])];
     const ids = [...new Set((eqMatches ?? []).map((e: { product_id: string }) => e.product_id))]

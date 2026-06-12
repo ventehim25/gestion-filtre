@@ -22,9 +22,9 @@ export default function ProductPicker({
   }, []);
 
   const matches = useMemo(() => {
-    const s = q.trim().toUpperCase();
+    const s = q.trim().toUpperCase().replace(/\s+/g, "");
     const base = s
-      ? products.filter((p) => p.reference.toUpperCase().includes(s))
+      ? products.filter((p) => p.reference.toUpperCase().replace(/\s+/g, "").includes(s))
       : products;
     return base.slice(0, 30);
   }, [q, products]);
