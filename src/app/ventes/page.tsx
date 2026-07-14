@@ -237,8 +237,11 @@ export default function VentesPage() {
   const oldestDebtDate = clientDebts.length ? clientDebts.reduce((min, s) => (s.date < min ? s.date : min), clientDebts[0].date) : null;
   const fiabDays = oldestDebtDate ? Math.round((Date.now() - new Date(oldestDebtDate).getTime()) / 86400000) : null;
   const fiabilite = fiabDays == null ? null : fiabDays > 30 ? { emoji: "🔴", cls: "bg-red-500/15 text-red-400" } : fiabDays > 7 ? { emoji: "🟠", cls: "bg-orange-500/15 text-orange-400" } : { emoji: "🟢", cls: "bg-green-500/15 text-green-400" };
+  // solde_du n'est jamais mis à jour automatiquement par l'app : on calcule le solde réel
+  // en direct depuis les ventes non soldées (même logique que /rappels et l'accueil).
+  const soldeActuel = clientDebts.reduce((s, sv) => s + (sv.total - sv.montant_paye), 0);
   const creditDepasse = selectedClient && (selectedClient.limite_credit ?? 0) > 0
-    ? (selectedClient.solde_du + total) - (selectedClient.limite_credit ?? 0)
+    ? (soldeActuel + total) - (selectedClient.limite_credit ?? 0)
     : 0;
 
   function resetForm() {

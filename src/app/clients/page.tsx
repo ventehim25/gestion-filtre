@@ -30,8 +30,8 @@ export default function ClientsPage() {
   // Marges (bénéfice + coût fournisseur) cumulées par client, révélées au clic
   const [margins, setMargins] = useState<Record<string, { benefice: number; cost: number }>>({});
   const [reveal, setReveal] = useState<Set<string>>(new Set());
-  // Date de la plus vieille vente non soldée par client → badge fiabilité
-  const [oldestUnpaid, setOldestUnpaid] = useState<Record<string, string>>({});
+  // Dette réelle par client (calculée en direct depuis les ventes — solde_du n'est jamais mis à jour automatiquement)
+  const [debts, setDebts] = useState<Record<string, { total: number; oldest: string }>>({});
   function toggleReveal(id: string) {
     setReveal(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
@@ -63,16 +63,19 @@ export default function ClientsPage() {
   }
 
   async function loadDebts() {
-    const map: Record<string, string> = {};
+    const map: Record<string, { total: number; oldest: string }> = {};
     for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("sales").select("client_id, date, statut").neq("statut", "paye").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("sales").select("client_id, date, total, montant_paye").neq("statut", "paye").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
-      for (const s of data as { client_id: string; date: string }[]) {
-        if (!map[s.client_id] || s.date < map[s.client_id]) map[s.client_id] = s.date;
+      for (const s of data as { client_id: string; date: string; total: number; montant_paye: number }[]) {
+        const cur = map[s.client_id] ?? { total: 0, oldest: s.date };
+        cur.total += s.total - s.montant_paye;
+        if (s.date < cur.oldest) cur.oldest = s.date;
+        map[s.client_id] = cur;
       }
       if (data.length < 1000) break;
     }
-    setOldestUnpaid(map);
+    setDebts(map);
   }
 
   useEffect(() => { load(); loadMargins(); loadDebts(); }, []);
@@ -177,7 +180,7 @@ export default function ClientsPage() {
               {(c.remise_pct ?? 0) > 0 && (
                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">−{c.remise_pct}%</span>
               )}
-              {(() => { const b = fiabiliteBadge(oldestUnpaid[c.id] ?? null); return b && (
+              {(() => { const b = fiabiliteBadge(debts[c.id]?.oldest ?? null); return b && (
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${b.cls}`}>{b.emoji} {b.label}</span>
               ); })()}
             </div>
@@ -192,9 +195,9 @@ export default function ClientsPage() {
                 </a>
               </div>
             )}
-            {c.solde_du > 0 && (
+            {(debts[c.id]?.total ?? 0) > 0 && (
               <div className="mt-2 bg-orange-50 rounded-lg px-3 py-1.5">
-                <p className="text-xs text-orange-600 font-medium">{t("pending")}: {c.solde_du} MAD</p>
+                <p className="text-xs text-orange-600 font-medium">{t("pending")}: {debts[c.id].total.toFixed(0)} MAD</p>
               </div>
             )}
             {margins[c.id] && (
