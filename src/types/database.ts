@@ -152,6 +152,8 @@ export type Product = {
   prix_promo?: number | null;
 };
 
+export type ClientType = "comptoir" | "garage" | "gros";
+
 export type Client = {
   id: string;
   created_at: string;
@@ -161,6 +163,10 @@ export type Client = {
   adresse: string | null;
   notes: string | null;
   solde_du: number;
+  type?: ClientType;
+  remise_pct?: number;
+  limite_credit?: number;
+  derniere_relance?: string | null;
 };
 
 export type SaleStatus = "paye" | "en_attente" | "partiel";

@@ -110,9 +110,15 @@ export default function VentesPage() {
     setLines(updated);
   }
 
+  // Applique la remise % du client sélectionné (Bible §4.1) — arrondi à l'entier, modifiable à la main ensuite
+  function withRemise(price: number) {
+    const pct = clients.find(c => c.id === clientId)?.remise_pct ?? 0;
+    return pct > 0 ? Math.round(price * (1 - pct / 100)) : price;
+  }
+
   function setLineProduct(i: number, p: Product) {
     const updated = [...lines];
-    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: p.prix_vente, nom: p.reference, variant: "Filtron", equivalence_id: null, cout_unitaire: p.prix_achat };
+    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: withRemise(p.prix_vente), nom: p.reference, variant: "Filtron", equivalence_id: null, cout_unitaire: p.prix_achat };
     setLines(updated);
     fetchCrossSell(p);
     loadVariants(p);
@@ -136,7 +142,7 @@ export default function VentesPage() {
     const l = lines[i];
     const v = (variants[l.product_id] || []).find(x => x.marque === marque);
     if (!v) return;
-    setLines(lines.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: v.prix, cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
+    setLines(lines.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: withRemise(v.prix), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
   }
 
   // Vente croisée : autres filtres (catégories différentes) compatibles avec le même véhicule
@@ -172,7 +178,7 @@ export default function VentesPage() {
         u[idx] = { ...u[idx], quantite: u[idx].quantite + 1 };
         return u;
       }
-      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: p.prix_vente, nom: p.reference }];
+      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: withRemise(p.prix_vente), nom: p.reference }];
     });
     flash(`${p.reference} ajouté ✓`);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
@@ -206,7 +212,7 @@ export default function VentesPage() {
     setLines(prev => {
       const idx = prev.findIndex(l => l.product_id === p.id && l.equivalence_id === e.id);
       if (idx >= 0) { const u = [...prev]; u[idx] = { ...u[idx], quantite: u[idx].quantite + 1 }; return u; }
-      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: e.prix ?? p.prix_vente, cout_unitaire: e.prix_achat ?? undefined, equivalence_id: e.id, variant: e.marque, nom: `${e.reference} (${e.marque})` }];
+      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: withRemise(e.prix ?? p.prix_vente), cout_unitaire: e.prix_achat ?? undefined, equivalence_id: e.id, variant: e.marque, nom: `${e.reference} (${e.marque})` }];
     });
     flash(`${e.reference} (${e.marque}) ajouté ✓`);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
@@ -224,6 +230,16 @@ export default function VentesPage() {
   }
 
   const total = lines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
+
+  // Client sélectionné + badge fiabilité (basé sur l'âge de sa dette en cours) + alerte limite de crédit
+  const selectedClient = clients.find(c => c.id === clientId) || null;
+  const clientDebts = clientId ? sales.filter(s => s.client_id === clientId && s.statut !== "paye") : [];
+  const oldestDebtDate = clientDebts.length ? clientDebts.reduce((min, s) => (s.date < min ? s.date : min), clientDebts[0].date) : null;
+  const fiabDays = oldestDebtDate ? Math.round((Date.now() - new Date(oldestDebtDate).getTime()) / 86400000) : null;
+  const fiabilite = fiabDays == null ? null : fiabDays > 30 ? { emoji: "🔴", cls: "bg-red-500/15 text-red-400" } : fiabDays > 7 ? { emoji: "🟠", cls: "bg-orange-500/15 text-orange-400" } : { emoji: "🟢", cls: "bg-green-500/15 text-green-400" };
+  const creditDepasse = selectedClient && (selectedClient.limite_credit ?? 0) > 0
+    ? (selectedClient.solde_du + total) - (selectedClient.limite_credit ?? 0)
+    : 0;
 
   function resetForm() {
     setShowForm(false); setEditingSale(null); setOldLines([]);
@@ -433,6 +449,16 @@ export default function VentesPage() {
                 <option value="">-- Choisir client --</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.nom} — {c.ville}</option>)}
               </select>
+              {selectedClient && (
+                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  {(selectedClient.remise_pct ?? 0) > 0 && (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Remise {selectedClient.remise_pct}% appliquée</span>
+                  )}
+                  {fiabilite && (
+                    <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${fiabilite.cls}`}>{fiabilite.emoji} {fiabDays} j de dette</span>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="mb-3">
@@ -496,6 +522,12 @@ export default function VentesPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {creditDepasse > 0 && (
+              <div className="mb-3 px-3 py-2 rounded-lg bg-red-500/15 text-red-400 text-sm font-medium">
+                ⚠ {selectedClient?.nom} dépasse sa limite de crédit de {creditDepasse.toFixed(0)} MAD (limite {selectedClient?.limite_credit} MAD)
               </div>
             )}
 

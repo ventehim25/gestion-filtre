@@ -4,10 +4,21 @@ import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { Client } from "@/types/database";
+import { Client, ClientType } from "@/types/database";
 import { Plus, Search, Pencil, Trash2, Phone, MessageCircle, Eye } from "lucide-react";
 
-const empty = { nom: "", telephone: "", ville: "", adresse: "", notes: "", solde_du: 0 };
+const empty = { nom: "", telephone: "", ville: "", adresse: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0 };
+
+const TYPE_LABELS: Record<ClientType, string> = { comptoir: "Comptoir", garage: "Garage", gros: "Gros" };
+
+// Badge fiabilité : basé sur l'âge de la dette EN COURS (pas d'historique de délai de paiement disponible)
+function fiabiliteBadge(oldestUnpaidDate: string | null): { emoji: string; label: string; cls: string } | null {
+  if (!oldestUnpaidDate) return null; // rien en cours → pas de jugement
+  const days = Math.round((Date.now() - new Date(oldestUnpaidDate).getTime()) / 86400000);
+  if (days > 30) return { emoji: "🔴", label: `Dette > 30 j`, cls: "bg-red-500/15 text-red-400" };
+  if (days > 7) return { emoji: "🟠", label: `Dette ${days} j`, cls: "bg-orange-500/15 text-orange-400" };
+  return { emoji: "🟢", label: "À jour", cls: "bg-green-500/15 text-green-400" };
+}
 
 export default function ClientsPage() {
   const { t } = useLang();
@@ -19,6 +30,8 @@ export default function ClientsPage() {
   // Marges (bénéfice + coût fournisseur) cumulées par client, révélées au clic
   const [margins, setMargins] = useState<Record<string, { benefice: number; cost: number }>>({});
   const [reveal, setReveal] = useState<Set<string>>(new Set());
+  // Date de la plus vieille vente non soldée par client → badge fiabilité
+  const [oldestUnpaid, setOldestUnpaid] = useState<Record<string, string>>({});
   function toggleReveal(id: string) {
     setReveal(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
@@ -49,7 +62,20 @@ export default function ClientsPage() {
     setMargins(map);
   }
 
-  useEffect(() => { load(); loadMargins(); }, []);
+  async function loadDebts() {
+    const map: Record<string, string> = {};
+    for (let i = 0; i < 20; i++) {
+      const { data } = await supabase.from("sales").select("client_id, date, statut").neq("statut", "paye").range(i * 1000, i * 1000 + 999);
+      if (!data || data.length === 0) break;
+      for (const s of data as { client_id: string; date: string }[]) {
+        if (!map[s.client_id] || s.date < map[s.client_id]) map[s.client_id] = s.date;
+      }
+      if (data.length < 1000) break;
+    }
+    setOldestUnpaid(map);
+  }
+
+  useEffect(() => { load(); loadMargins(); loadDebts(); }, []);
 
   async function save() {
     if (editing) {
@@ -70,7 +96,7 @@ export default function ClientsPage() {
 
   function startEdit(c: Client) {
     setEditing(c);
-    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, adresse: c.adresse ?? "", notes: c.notes ?? "", solde_du: c.solde_du });
+    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, adresse: c.adresse ?? "", notes: c.notes ?? "", solde_du: c.solde_du, type: c.type ?? "comptoir", remise_pct: c.remise_pct ?? 0, limite_credit: c.limite_credit ?? 0 });
     setShowForm(true);
   }
 
@@ -108,6 +134,19 @@ export default function ClientsPage() {
               <div><label className="text-xs text-slate-500 mb-1 block">{t("name")}</label><input className="input" value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("phone")}</label><input className="input" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("city")}</label><input className="input" value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} /></div>
+              <div className="grid grid-cols-3 gap-2">
+                <div><label className="text-[11px] text-slate-500 mb-1 block">Type</label>
+                  <select className="input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value as ClientType })}>
+                    {(Object.keys(TYPE_LABELS) as ClientType[]).map(k => <option key={k} value={k}>{TYPE_LABELS[k]}</option>)}
+                  </select>
+                </div>
+                <div><label className="text-[11px] text-slate-500 mb-1 block">Remise %</label>
+                  <input type="number" className="input" value={form.remise_pct || ""} placeholder="0" onChange={e => setForm({ ...form, remise_pct: +e.target.value })} />
+                </div>
+                <div><label className="text-[11px] text-slate-500 mb-1 block">Limite crédit</label>
+                  <input type="number" className="input" value={form.limite_credit || ""} placeholder="0 = illimité" onChange={e => setForm({ ...form, limite_credit: +e.target.value })} />
+                </div>
+              </div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("notes")}</label><textarea className="input" rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
             </div>
             <div className="flex gap-2 mt-4 justify-end">
@@ -130,6 +169,17 @@ export default function ClientsPage() {
                 <button onClick={() => startEdit(c)} className="text-blue-500 hover:text-blue-700"><Pencil size={15} /></button>
                 <button onClick={() => remove(c.id)} className="text-red-400 hover:text-red-600"><Trash2 size={15} /></button>
               </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+              {c.type && c.type !== "comptoir" && (
+                <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-400">{TYPE_LABELS[c.type]}</span>
+              )}
+              {(c.remise_pct ?? 0) > 0 && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400">−{c.remise_pct}%</span>
+              )}
+              {(() => { const b = fiabiliteBadge(oldestUnpaid[c.id] ?? null); return b && (
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${b.cls}`}>{b.emoji} {b.label}</span>
+              ); })()}
             </div>
             {c.telephone && (
               <div className="flex items-center gap-2 mb-2">

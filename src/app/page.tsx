@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, ClipboardList, MapPin, CloudOff, Banknote } from "lucide-react";
+import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, ClipboardList, MapPin, CloudOff, Banknote, MessageCircle } from "lucide-react";
 // Truck déjà importé pour la tuile Fournisseurs
 import BrandLogo from "@/components/BrandLogo";
 import Logo from "@/components/Logo";
 import VoiceButton from "@/components/VoiceButton";
 import { getPending } from "@/lib/offlineSales";
+import { sendWhatsApp } from "@/lib/whatsapp";
 
 type Stats = {
   totalVentes: number; totalClients: number; totalProduits: number;
@@ -66,6 +67,8 @@ export default function Dashboard() {
   const [dbError, setDbError] = useState("");
   const [pendingOffline, setPendingOffline] = useState(0);
   const [relances, setRelances] = useState<{ id: string; nom: string; days: number; freq: number }[]>([]);
+  // Impayés à relancer (Bible §4.1) — distinct de la relance "réassort" ci-dessus
+  const [impayes, setImpayes] = useState<{ id: string; nom: string; telephone: string | null; solde: number; days: number }[]>([]);
   // Montants sensibles masqués par défaut — révélés au clic
   const [showMoney, setShowMoney] = useState<{ f: boolean; b: boolean; e: boolean }>({ f: false, b: false, e: false });
   const [showVitrine, setShowVitrine] = useState(false);
@@ -136,6 +139,37 @@ export default function Dashboard() {
       rel.sort((a, b) => (b.days / b.freq) - (a.days / a.freq));
       setRelances(rel.slice(0, 6));
 
+      // Impayés à relancer (Bible §4.1) : solde dû par client, hors relances faites il y a < 7 j
+      const unpaidRows: { client_id: string; total: number; montant_paye: number; date: string }[] = [];
+      for (let i = 0; i < 20; i++) {
+        const { data } = await supabase.from("sales").select("client_id, total, montant_paye, date").in("statut", ["en_attente", "partiel"]).range(i * 1000, i * 1000 + 999);
+        if (!data || data.length === 0) break;
+        unpaidRows.push(...(data as typeof unpaidRows));
+        if (data.length < 1000) break;
+      }
+      const { data: clientsInfo } = await supabase.from("clients").select("id, nom, telephone, derniere_relance");
+      const cinfo: Record<string, { nom: string; telephone: string | null; derniere_relance: string | null }> = {};
+      (clientsInfo ?? []).forEach((c: { id: string; nom: string; telephone: string | null; derniere_relance: string | null }) => { cinfo[c.id] = c; });
+      const debtMap: Record<string, { solde: number; oldest: string }> = {};
+      for (const r of unpaidRows) {
+        const cur = debtMap[r.client_id] ?? { solde: 0, oldest: r.date };
+        cur.solde += r.total - r.montant_paye;
+        if (r.date < cur.oldest) cur.oldest = r.date;
+        debtMap[r.client_id] = cur;
+      }
+      const cutoff = new Date(todayMs - 7 * 86400000).toISOString().split("T")[0];
+      const imp: { id: string; nom: string; telephone: string | null; solde: number; days: number }[] = [];
+      for (const [cid, d] of Object.entries(debtMap)) {
+        if (d.solde <= 0) continue;
+        const info = cinfo[cid];
+        if (!info) continue;
+        if (info.derniere_relance && info.derniere_relance >= cutoff) continue;
+        const days = Math.round((todayMs - new Date(d.oldest).getTime()) / 86400000);
+        imp.push({ id: cid, nom: info.nom, telephone: info.telephone, solde: d.solde, days });
+      }
+      imp.sort((a, b) => b.days - a.days);
+      setImpayes(imp.slice(0, 6));
+
       setStats({
         totalVentes, totalClients: r1.count ?? 0, totalProduits: r2.count ?? 0,
         stockFaible: stockFaible?.length ?? 0, benefice, coutMarchandise,
@@ -144,6 +178,14 @@ export default function Dashboard() {
     }
     load();
   }, []);
+
+  // Relance 1-tap : ouvre WhatsApp + mémorise la date pour ne pas re-solliciter avant 7 j
+  async function relancerImpaye(c: { id: string; nom: string; telephone: string | null; solde: number }) {
+    const msg = `Salam ${c.nom} 🙏 Petit rappel : il reste ${c.solde.toFixed(0)} MAD chez FiltroPro. Merci !`;
+    sendWhatsApp(c.telephone, msg);
+    await supabase.from("clients").update({ derniere_relance: new Date().toISOString().split("T")[0] }).eq("id", c.id);
+    setImpayes(prev => prev.filter(x => x.id !== c.id));
+  }
 
   function go(e: React.FormEvent) {
     e.preventDefault();
@@ -304,6 +346,27 @@ export default function Dashboard() {
           </div>
         </button>
       </div>
+
+      {/* Impayés à relancer (Bible §4.1) — l'argent déjà gagné, pas encore encaissé */}
+      {impayes.length > 0 && (
+        <div className="card p-5 mt-6 border-red-500/20">
+          <h3 className="font-semibold text-slate-200 mb-1 flex items-center gap-2"><AlertTriangle size={16} className="text-red-400" /> À relancer (impayés)</h3>
+          <p className="text-xs text-slate-500 mb-3">Un tap envoie un rappel WhatsApp poli — le client ne réapparaît pas avant 7 jours.</p>
+          <div className="space-y-2">
+            {impayes.map(c => (
+              <div key={c.id} className="flex items-center justify-between gap-2 text-sm bg-[var(--surface-2)] rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <span className="text-slate-200 font-medium truncate">{c.nom}</span>
+                  <span className="text-xs text-slate-500 ms-2">· {c.solde.toFixed(0)} MAD · {c.days} j</span>
+                </div>
+                <button onClick={() => relancerImpaye(c)} className="shrink-0 flex items-center gap-1.5 text-xs bg-green-500/15 text-green-400 px-2.5 py-1.5 rounded-lg hover:bg-green-500/25 transition-colors">
+                  <MessageCircle size={13} /> Relancer
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Garages à relancer (réassort) */}
       {relances.length > 0 && (
