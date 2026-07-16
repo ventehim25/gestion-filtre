@@ -5,6 +5,7 @@ const PHOTOS: Record<string, string> = {
   filtre_carburant: "photo-1517524008697-84bbe3c3fd98",
   filtre_habitacle: "photo-1581092335397-9583eb92d232",
   filtre_refroidissement: "photo-1486262715619-67b85e0b08d3",
+  huile_moteur: "photo-1486262715619-67b85e0b08d3",
   autre: "photo-1486262715619-67b85e0b08d3",
 };
 

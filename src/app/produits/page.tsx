@@ -16,7 +16,7 @@ import VoiceButton from "@/components/VoiceButton";
 
 const CATEGORIES: ProductCategory[] = [
   "filtre_huile", "filtre_air", "filtre_carburant",
-  "filtre_habitacle", "filtre_refroidissement", "autre",
+  "filtre_habitacle", "filtre_refroidissement", "huile_moteur", "autre",
 ];
 
 const categoryKeys: Record<ProductCategory, keyof ReturnType<typeof useLang>["t"] extends (k: infer K) => string ? K : never> = {
@@ -25,6 +25,7 @@ const categoryKeys: Record<ProductCategory, keyof ReturnType<typeof useLang>["t"
   filtre_carburant: "filterFuel",
   filtre_habitacle: "filterCabin",
   filtre_refroidissement: "filterCooling",
+  huile_moteur: "motorOil",
   autre: "other",
 };
 

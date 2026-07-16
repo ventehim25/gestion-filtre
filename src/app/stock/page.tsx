@@ -14,15 +14,16 @@ import { queueStock, pendingStockCount, syncStock } from "@/lib/offlineStock";
 
 const CATEGORIES: ProductCategory[] = [
   "filtre_huile", "filtre_air", "filtre_carburant",
-  "filtre_habitacle", "filtre_refroidissement", "autre",
+  "filtre_habitacle", "filtre_refroidissement", "huile_moteur", "autre",
 ];
 
-const categoryKeys: Record<ProductCategory, "filterOil" | "filterAir" | "filterFuel" | "filterCabin" | "filterCooling" | "other"> = {
+const categoryKeys: Record<ProductCategory, "filterOil" | "filterAir" | "filterFuel" | "filterCabin" | "filterCooling" | "motorOil" | "other"> = {
   filtre_huile: "filterOil",
   filtre_air: "filterAir",
   filtre_carburant: "filterFuel",
   filtre_habitacle: "filterCabin",
   filtre_refroidissement: "filterCooling",
+  huile_moteur: "motorOil",
   autre: "other",
 };
 

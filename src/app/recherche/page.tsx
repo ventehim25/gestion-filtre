@@ -144,7 +144,7 @@ export default function RecherchePage() {
     const map: Record<string, string> = {
       filtre_huile: t("filterOil"), filtre_air: t("filterAir"),
       filtre_carburant: t("filterFuel"), filtre_habitacle: t("filterCabin"),
-      filtre_refroidissement: t("filterCooling"), autre: t("other"),
+      filtre_refroidissement: t("filterCooling"), huile_moteur: t("motorOil"), autre: t("other"),
     };
     return map[cat] ?? cat;
   };
@@ -155,6 +155,7 @@ export default function RecherchePage() {
       filtre_air: "bg-sky-100 text-sky-700",
       filtre_carburant: "bg-rose-100 text-rose-700",
       filtre_habitacle: "bg-emerald-100 text-emerald-700",
+      huile_moteur: "bg-orange-100 text-orange-700",
     };
     return map[cat] ?? "bg-slate-100 text-slate-600";
   };
@@ -168,7 +169,7 @@ export default function RecherchePage() {
   function toggleDetails(id: string) { setOpenDetails(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
 
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
-  const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
+  const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "huile_moteur", "autre"];
   const ADD_BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram", "OE"];
   const emptyAdd = { reference: "", marque: "Filtron", filtronRef: "", categorie: "filtre_huile", prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, code_barre: "" };
   const [showAdd, setShowAdd] = useState(false);

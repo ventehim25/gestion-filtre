@@ -131,6 +131,7 @@ export type ProductCategory =
   | "filtre_carburant"
   | "filtre_habitacle"
   | "filtre_refroidissement"
+  | "huile_moteur"
   | "autre";
 
 export type Product = {

@@ -62,12 +62,12 @@ const TEL_DISPLAY = "06 02 35 02 90";
 const WA_DISPLAY = "+212 602-350290";
 const SLOGAN = "Votre spécialiste du filtre auto au Maroc";
 
-const CAT_ORDER = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "autre"];
+const CAT_ORDER = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "huile_moteur", "autre"];
 const CAT_LABEL = {
   filtre_huile: "Filtres à huile", filtre_air: "Filtres à air", filtre_carburant: "Filtres à carburant",
-  filtre_habitacle: "Filtres d'habitacle", filtre_refroidissement: "Filtres de refroidissement", autre: "Autres filtres",
+  filtre_habitacle: "Filtres d'habitacle", filtre_refroidissement: "Filtres de refroidissement", huile_moteur: "Huiles moteur", autre: "Autres filtres",
 };
-const CAT_ICON = { filtre_huile: "🛢️", filtre_air: "💨", filtre_carburant: "⛽", filtre_habitacle: "❄️", filtre_refroidissement: "🌡️", autre: "🔧" };
+const CAT_ICON = { filtre_huile: "🛢️", filtre_air: "💨", filtre_carburant: "⛽", filtre_habitacle: "❄️", filtre_refroidissement: "🌡️", huile_moteur: "🛢️", autre: "🔧" };
 
 // Classement voiture / bus-camion (cf. src/lib/vehicleType.ts — garder synchro)
 const CAMION_PREFIXES = new Set(["OM", "OR", "OT", "AM", "AD", "AE", "AG", "PK"]);
