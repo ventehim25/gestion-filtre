@@ -394,7 +394,9 @@ export default function ProduitsPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {filtered.map(p => {
-              const variants = (equivMap[p.id] ?? []).filter(e => e.prix != null);
+              // Toutes les vraies marques (Flag, Mann, Wix…) s'affichent, même sans prix —
+              // seuls les codes constructeur (OE) importés automatiquement restent masqués ici.
+              const variants = (equivMap[p.id] ?? []).filter(e => KNOWN_BRANDS.has(e.marque.trim().toLowerCase()));
               return (
               <Fragment key={p.id}>
               <tr className={p.stock <= p.stock_min ? "bg-red-50" : "hover:bg-slate-50"}>
@@ -448,7 +450,11 @@ export default function ProduitsPage() {
                   <td></td>
                   <td></td>
                   {showCost && <td className="px-4 py-2 text-xs text-slate-400">{e.prix_achat != null ? `${e.prix_achat} MAD` : "—"}</td>}
-                  <td className="px-4 py-2 font-medium text-blue-600">{e.prix} MAD</td>
+                  <td className="px-4 py-2 font-medium text-blue-600">
+                    {e.prix != null
+                      ? `${e.prix} MAD`
+                      : <span className="text-amber-500 text-xs font-normal" title="Sans prix vente — n'apparaîtra pas dans les ventes">⚠️ sans prix</span>}
+                  </td>
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-2">
                       <StockBadge stock={e.stock} stockMin={0} />
