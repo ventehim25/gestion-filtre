@@ -27,7 +27,7 @@ const categoryKeys: Record<ProductCategory, "filterOil" | "filterAir" | "filterF
   autre: "other",
 };
 
-const BRANDS = ["Filtron", "Mann", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Flag", "Filtrex", "Fram"];
+const BRANDS = ["Filtron", "Mann", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Flag", "Filtrex", "Fram", "Castrol", "Pemko", "Fanfaro", "Mannol"];
 const PAGE_SIZE = 60;
 
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe
@@ -171,7 +171,7 @@ export default function StockPage() {
 
   const filtered = useMemo(() => products.filter(p => {
     const matchRef = !refSearch || p.reference.toUpperCase().includes(refSearch) || p.nom_fr.toLowerCase().includes(refSearch.toLowerCase());
-    const matchBrand = !brandFilter || p.nom_fr.includes(brandFilter);
+    const matchBrand = !brandFilter || (p.marque ?? "Filtron").toLowerCase() === brandFilter.toLowerCase();
     const matchCat = !catFilter || p.categorie === catFilter;
     const matchOut = !onlyOut || effStock(p) <= 0;
     return matchRef && matchBrand && matchCat && matchOut;

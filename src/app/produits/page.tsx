@@ -183,10 +183,14 @@ export default function ProduitsPage() {
     setScanTarget(null);
   }
 
+  // Marques de FILTRES (Filtron = produit principal, les autres = variantes équivalentes).
   const BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram"];
   // Marques reconnues (hors Filtron, + "OE") : toujours visibles dans les variantes, jamais
   // mélangées avec les codes constructeur (Citroën, Ford…) importés automatiquement.
   const KNOWN_BRANDS = new Set([...BRANDS.filter(b => b !== "Filtron"), "OE"].map(b => b.toLowerCase()));
+  // Toutes les marques possibles pour un PRODUIT (filtres + huiles moteur, produits indépendants
+  // sans système de variantes) — utilisé pour la fiche produit et le filtre de la liste.
+  const PRODUCT_BRANDS = [...BRANDS, "Castrol", "Pemko", "Fanfaro", "Mannol"];
   const [brandFilter, setBrandFilter] = useState("");
   const [refSearch, setRefSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
@@ -203,7 +207,7 @@ export default function ProduitsPage() {
       || eqs.some(e => norm(e.reference).includes(qn) || e.marque.toLowerCase().includes(q));
     const refN = norm(refSearch);
     const matchRef = !refSearch || norm(p.reference).startsWith(refN) || eqs.some(e => norm(e.reference).startsWith(refN));
-    const matchBrand = !brandFilter || p.nom_fr.includes(brandFilter);
+    const matchBrand = !brandFilter || (p.marque ?? "Filtron").toLowerCase() === brandFilter.toLowerCase();
     const matchCat = !catFilter || p.categorie === catFilter;
     const matchKind = !kindFilter || classifyKind(p.reference, vehMap[p.id]?.makes) === kindFilter;
     return matchSearch && matchRef && matchBrand && matchCat && matchKind;
@@ -249,7 +253,7 @@ export default function ProduitsPage() {
         <VoiceButton onResult={(txt) => setSearch(txt)} />
         <select className="input w-40" value={brandFilter} onChange={e => setBrandFilter(e.target.value)}>
           <option value="">{t("allBrands")}</option>
-          {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+          {PRODUCT_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
         </select>
         <select className="input w-44" value={catFilter} onChange={e => setCatFilter(e.target.value)}>
           <option value="">{t("category")} — tous</option>
@@ -270,7 +274,7 @@ export default function ProduitsPage() {
               <div><label className="text-xs text-slate-500 mb-1 block">{t("reference")}</label><input className="input font-mono uppercase" value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value.toUpperCase() })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">Marque</label>
                 <select className="input" value={form.marque} onChange={e => setForm({ ...form, marque: e.target.value })}>
-                  {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                  {PRODUCT_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
