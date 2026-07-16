@@ -27,7 +27,7 @@ const categoryKeys: Record<ProductCategory, "filterOil" | "filterAir" | "filterF
   autre: "other",
 };
 
-const BRANDS = ["Filtron", "Mann", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Flag", "Filtrex", "Fram", "Castrol", "Pemko", "Fanfaro", "Mannol"];
+const BRANDS = ["Filtron", "Mann", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Flag", "Filtrex", "Fram", "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
 const PAGE_SIZE = 60;
 
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe

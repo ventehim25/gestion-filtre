@@ -190,7 +190,7 @@ export default function ProduitsPage() {
   const KNOWN_BRANDS = new Set([...BRANDS.filter(b => b !== "Filtron"), "OE"].map(b => b.toLowerCase()));
   // Toutes les marques possibles pour un PRODUIT (filtres + huiles moteur, produits indépendants
   // sans système de variantes) — utilisé pour la fiche produit et le filtre de la liste.
-  const PRODUCT_BRANDS = [...BRANDS, "Castrol", "Pemko", "Fanfaro", "Mannol"];
+  const PRODUCT_BRANDS = [...BRANDS, "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
   const [brandFilter, setBrandFilter] = useState("");
   const [refSearch, setRefSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
