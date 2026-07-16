@@ -204,6 +204,17 @@ export default function RecherchePage() {
       alert(`Filtron « ${fref} » introuvable — la référence est créée comme fiche indépendante.`);
     }
 
+    // Empêche de créer une fiche en double (même référence, casse/espaces différents)
+    const normRef = ref.toUpperCase().replace(/\s+/g, "");
+    const loose = "%" + normRef.split("").join("%") + "%";
+    const { data: candidates } = await supabase.from("products").select("id, reference").ilike("reference", loose).limit(20);
+    const dup = (candidates ?? []).find(c => c.reference.toUpperCase().replace(/\s+/g, "") === normRef);
+    if (dup) {
+      setAddSaving(false);
+      alert(`« ${ref} » existe déjà sous « ${dup.reference} ». Va dans Produits, ouvre cette fiche et ajoute la marque dans « Variantes de marque » au lieu de créer un doublon.`);
+      return;
+    }
+
     // Sinon : créer un produit (Filtron, ou marque sans réf Filtron connue)
     const payload = { ...prod, reference: ref, nom_fr: "", nom_ar: "", notes: "", prix_promo: null };
     const { error } = await supabase.from("products").insert(payload);

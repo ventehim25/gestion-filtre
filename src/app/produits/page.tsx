@@ -106,6 +106,16 @@ export default function ProduitsPage() {
     if (editing) {
       await supabase.from("products").update(payload).eq("id", editing.id);
     } else {
+      // Empêche de créer une fiche en double (même référence, casse/espaces différents) —
+      // redirige plutôt vers la fiche existante pour y ajouter la marque comme variante.
+      const dup = products.find(p => norm(p.reference) === norm(form.reference));
+      if (dup) {
+        const triedMarque = form.marque;
+        alert(`« ${form.reference} » existe déjà sous « ${dup.reference} ».\nJ'ouvre cette fiche : ajoute ${triedMarque !== "Filtron" ? triedMarque : "la marque"} dans « Variantes de marque » juste en dessous, au lieu de créer un doublon.`);
+        await startEdit(dup);
+        if (triedMarque && triedMarque !== "Filtron") setNewEquiv(n => ({ ...n, marque: triedMarque }));
+        return;
+      }
       const { data: inserted } = await supabase.from("products").insert(payload).select().single();
       productId = (inserted as Product | null)?.id;
     }
@@ -173,6 +183,9 @@ export default function ProduitsPage() {
   }
 
   const BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram"];
+  // Marques reconnues (hors Filtron, + "OE") : toujours visibles dans les variantes, jamais
+  // mélangées avec les codes constructeur (Citroën, Ford…) importés automatiquement.
+  const KNOWN_BRANDS = new Set([...BRANDS.filter(b => b !== "Filtron"), "OE"].map(b => b.toLowerCase()));
   const [brandFilter, setBrandFilter] = useState("");
   const [refSearch, setRefSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
@@ -253,7 +266,7 @@ export default function ProduitsPage() {
           <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <h3 className="font-semibold text-slate-800 mb-4">{editing ? t("edit") : t("addProduct")}</h3>
             <div className="grid grid-cols-2 gap-3">
-              <div><label className="text-xs text-slate-500 mb-1 block">{t("reference")}</label><input className="input" value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} /></div>
+              <div><label className="text-xs text-slate-500 mb-1 block">{t("reference")}</label><input className="input font-mono uppercase" value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value.toUpperCase() })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">Marque</label>
                 <select className="input" value={form.marque} onChange={e => setForm({ ...form, marque: e.target.value })}>
                   {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
@@ -303,20 +316,25 @@ export default function ProduitsPage() {
                   <span></span>
                 </div>
 
-                {/* Marques équivalentes éditables — les OE auto (sans prix) sont masquées par défaut.
+                {/* Marques équivalentes éditables — seuls les codes CONSTRUCTEUR (OE, hors liste de
+                    marques connues) sont masqués par défaut. Une vraie marque (Flag, Mann, Wix…)
+                    reste toujours visible, même sans prix, avec un ⚠️ pour ne pas l'oublier.
                     Liste plafonnée + défilement interne pour garder la ligne d'ajout visible. */}
                 <div className="max-h-[34vh] overflow-y-auto">
                 {equivs.map((e, i) => {
-                  const isAuto = (e.prix == null && e.prix_achat == null);
+                  const isKnownBrand = KNOWN_BRANDS.has(e.marque.trim().toLowerCase());
+                  const isAuto = !isKnownBrand && (e.prix == null && e.prix_achat == null);
                   if (isAuto && !showAutoEquivs) return null;
+                  const noPrice = isKnownBrand && e.prix == null;
                   return (
                   <div key={i} className="grid grid-cols-[76px_minmax(120px,1fr)_56px_56px_50px_58px] gap-1.5 items-center px-2.5 py-1.5 border-t border-slate-100 min-w-[420px]">
                     <span className="text-xs font-semibold text-indigo-700 truncate" title={e.marque}>{e.marque}</span>
                     <input className="input font-mono py-1 text-xs" value={e.reference} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, reference: ev.target.value } : x))} />
                     <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix_achat ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix_achat: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
-                    <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.prix ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
+                    <input type="number" className={`input py-1 text-xs text-center ${noPrice ? "ring-1 ring-amber-500" : ""}`} placeholder="0" title={noPrice ? "Sans prix vente : n'apparaîtra pas dans les ventes" : undefined} value={e.prix ?? ""} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, prix: ev.target.value === "" ? undefined : +ev.target.value } : x))} />
                     <input type="number" className="input py-1 text-xs text-center" placeholder="0" value={e.stock ?? 0} onChange={ev => setEquivs(equivs.map((x, j) => j === i ? { ...x, stock: +ev.target.value } : x))} />
                     <div className="flex items-center justify-center gap-1.5">
+                      {noPrice && <span title="Sans prix vente : n'apparaîtra pas dans les ventes" className="text-amber-500 text-xs">⚠️</span>}
                       <button type="button" onClick={() => setScanTarget(i)} className={e.code_barre ? "text-emerald-500" : "text-slate-400 hover:text-slate-600"} title={e.code_barre ? `Code : ${e.code_barre} (re-scanner)` : "Scanner le code-barres"}><Barcode size={15} /></button>
                       <button onClick={() => setEquivs(equivs.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600" title="Retirer"><X size={14} /></button>
                     </div>
@@ -324,13 +342,13 @@ export default function ProduitsPage() {
                   );
                 })}
 
-                {/* Bascule pour les références OE automatiques (sans prix) */}
-                {equivs.filter(e => e.prix == null && e.prix_achat == null).length > 0 && (
+                {/* Bascule pour les codes constructeur (OE) automatiques */}
+                {equivs.filter(e => !KNOWN_BRANDS.has(e.marque.trim().toLowerCase()) && e.prix == null && e.prix_achat == null).length > 0 && (
                   <button type="button" onClick={() => setShowAutoEquivs(v => !v)}
                     className="w-full text-xs font-medium text-blue-500 hover:text-blue-400 flex items-center justify-center gap-1 py-1.5 border-t border-slate-100 bg-slate-50/40">
                     {showAutoEquivs
-                      ? <>Masquer les références OE <ChevronUp size={13} /></>
-                      : <>Voir {equivs.filter(e => e.prix == null && e.prix_achat == null).length} références OE (origine) <ChevronDown size={13} /></>}
+                      ? <>Masquer les codes constructeur (OE) <ChevronUp size={13} /></>
+                      : <>Voir {equivs.filter(e => !KNOWN_BRANDS.has(e.marque.trim().toLowerCase()) && e.prix == null && e.prix_achat == null).length} codes constructeur (OE) <ChevronDown size={13} /></>}
                   </button>
                 )}
                 </div>
