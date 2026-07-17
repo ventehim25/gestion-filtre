@@ -7,7 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { Client, ClientType } from "@/types/database";
 import { Plus, Search, Pencil, Trash2, Phone, MessageCircle, Eye } from "lucide-react";
 
-const empty = { nom: "", telephone: "", ville: "", adresse: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0 };
+const empty = { nom: "", telephone: "", ville: "", adresse: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0, parrain_id: "" };
 
 const TYPE_LABELS: Record<ClientType, string> = { comptoir: "Comptoir", garage: "Garage", gros: "Gros" };
 
@@ -81,11 +81,16 @@ export default function ClientsPage() {
   useEffect(() => { load(); loadMargins(); loadDebts(); }, []);
 
   async function save() {
-    if (editing) {
-      await supabase.from("clients").update(form).eq("id", editing.id);
-    } else {
-      await supabase.from("clients").insert(form);
+    // parrain_id "" → null ; si la colonne n'existe pas encore (SQL Bible §4.15 pas collé), on réessaie sans
+    const payload: Record<string, unknown> = { ...form, parrain_id: form.parrain_id || null };
+    const attempt = (p: Record<string, unknown>) =>
+      editing ? supabase.from("clients").update(p).eq("id", editing.id) : supabase.from("clients").insert(p);
+    let { error } = await attempt(payload);
+    if (error && /parrain/i.test(error.message)) {
+      delete payload.parrain_id;
+      ({ error } = await attempt(payload));
     }
+    if (error) { alert("Erreur : " + error.message); return; }
     setShowForm(false); setEditing(null); setForm(empty);
     load();
   }
@@ -99,7 +104,7 @@ export default function ClientsPage() {
 
   function startEdit(c: Client) {
     setEditing(c);
-    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, adresse: c.adresse ?? "", notes: c.notes ?? "", solde_du: c.solde_du, type: c.type ?? "comptoir", remise_pct: c.remise_pct ?? 0, limite_credit: c.limite_credit ?? 0 });
+    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, adresse: c.adresse ?? "", notes: c.notes ?? "", solde_du: c.solde_du, type: c.type ?? "comptoir", remise_pct: c.remise_pct ?? 0, limite_credit: c.limite_credit ?? 0, parrain_id: c.parrain_id ?? "" });
     setShowForm(true);
   }
 
@@ -150,6 +155,15 @@ export default function ClientsPage() {
                   <input type="number" className="input" value={form.limite_credit || ""} placeholder="0 = illimité" onChange={e => setForm({ ...form, limite_credit: +e.target.value })} />
                 </div>
               </div>
+              {/* Parrainage (Bible §4.15) : le parrain reçoit 100 MAD d'avoir à la 1ère vente du filleul */}
+              <div><label className="text-xs text-slate-500 mb-1 block">Parrainé par (optionnel — 🎁 100 MAD d&apos;avoir au parrain)</label>
+                <select className="input" value={form.parrain_id} onChange={e => setForm({ ...form, parrain_id: e.target.value })}>
+                  <option value="">— Personne —</option>
+                  {clients.filter(c => c.id !== editing?.id && (c.type === "garage" || c.type === "gros")).map(c => (
+                    <option key={c.id} value={c.id}>{c.nom} — {c.ville}</option>
+                  ))}
+                </select>
+              </div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("notes")}</label><textarea className="input" rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
             </div>
             <div className="flex gap-2 mt-4 justify-end">
@@ -183,6 +197,9 @@ export default function ClientsPage() {
               {(() => { const b = fiabiliteBadge(debts[c.id]?.oldest ?? null); return b && (
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${b.cls}`}>{b.emoji} {b.label}</span>
               ); })()}
+              {(c.avoir ?? 0) > 0 && (
+                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-400">🎁 Avoir {(c.avoir ?? 0).toFixed(0)} MAD</span>
+              )}
             </div>
             {c.telephone && (
               <div className="flex items-center gap-2 mb-2">

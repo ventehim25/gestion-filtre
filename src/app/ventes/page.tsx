@@ -15,6 +15,7 @@ type LastSale = {
   clientNom: string; clientTel: string | null; ville: string; date: string;
   lines: { nom: string; quantite: number; prix_unitaire: number }[];
   total: number; statut: SaleStatus; montant_paye: number; offline: boolean;
+  parrainMsg?: string; // « 🎁 avoir crédité à … » (Bible §4.15)
 };
 
 type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string; variant?: string; equivalence_id?: string | null; cout_unitaire?: number };
@@ -51,6 +52,10 @@ export default function VentesPage() {
   const [payEdit, setPayEdit] = useState<(Sale & { client: Client }) | null>(null);
   const [payStatut, setPayStatut] = useState<SaleStatus>("paye");
   const [payMontant, setPayMontant] = useState(0);
+  // Pack vidange (Bible §4.11) : rangée « + l'huile ? » refermée par l'utilisateur
+  const [oilDismissed, setOilDismissed] = useState(false);
+  // Avoir du client déduit sur cette vente (Bible §4.15)
+  const [useAvoir, setUseAvoir] = useState(false);
   // Marges révélées au clic (par vente)
   const [revealMargin, setRevealMargin] = useState<Set<string>>(new Set());
   function toggleMargin(id: string) {
@@ -231,6 +236,25 @@ export default function VentesPage() {
 
   const total = lines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
 
+  // Pack vidange (Bible §4.11) : un filtre à huile au panier et pas encore d'huile
+  // → suggérer les huiles moteur en stock (déjà en mémoire, tri stock décroissant).
+  const productById = (id: string) => products.find(p => p.id === id);
+  const hasOilFilter = lines.some(l => productById(l.product_id)?.categorie === "filtre_huile");
+  const hasOil = lines.some(l => productById(l.product_id)?.categorie === "huile_moteur");
+  const oilSuggest = hasOilFilter && !hasOil && !oilDismissed
+    ? products.filter(p => p.categorie === "huile_moteur" && p.stock > 0)
+        .sort((a, b) => b.stock - a.stock || a.reference.localeCompare(b.reference)).slice(0, 6)
+    : [];
+
+  // Pastille de marge par ligne (Bible §4.3) : 🔴 sous le coût, 🟠 < 15 %, 🟢 sinon.
+  function margeDot(l: LineItem): string {
+    const cout = l.cout_unitaire ?? productById(l.product_id)?.prix_achat ?? 0;
+    if (cout <= 0 || l.prix_unitaire <= 0) return "bg-slate-600";
+    if (l.prix_unitaire < cout) return "bg-red-500";
+    if ((l.prix_unitaire - cout) / l.prix_unitaire < 0.15) return "bg-orange-400";
+    return "bg-green-500";
+  }
+
   // Client sélectionné + badge fiabilité (basé sur l'âge de sa dette en cours) + alerte limite de crédit
   const selectedClient = clients.find(c => c.id === clientId) || null;
   const clientDebts = clientId ? sales.filter(s => s.client_id === clientId && s.statut !== "paye") : [];
@@ -244,10 +268,16 @@ export default function VentesPage() {
     ? (soldeActuel + total) - (selectedClient.limite_credit ?? 0)
     : 0;
 
+  // Avoir à déduire (Bible §4.15) — proposé seulement en ligne (la décrémentation doit passer tout de suite)
+  const avoirDispo = !editingSale && selectedClient && (typeof navigator === "undefined" || navigator.onLine)
+    ? (selectedClient.avoir ?? 0) : 0;
+  const avoirApplique = useAvoir ? Math.min(avoirDispo, total) : 0;
+  const totalNet = total - avoirApplique;
+
   function resetForm() {
     setShowForm(false); setEditingSale(null); setOldLines([]);
     setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye");
-    setCrossSell([]);
+    setCrossSell([]); setOilDismissed(false); setUseAvoir(false);
   }
 
   function openNew() {
@@ -322,15 +352,20 @@ export default function VentesPage() {
     const validLines = lines.filter(l => l.product_id && l.quantite > 0);
     if (!clientId || validLines.length === 0) return;
     const client = clients.find(c => c.id === clientId);
-    const saleTotal = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
+    const brut = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
+    // Avoir déduit du total (Bible §4.15)
+    const avoirDeduit = useAvoir ? Math.min(avoirDispo, brut) : 0;
+    const saleTotal = brut - avoirDeduit;
+    const saleNotes = avoirDeduit > 0 ? [notes, `Avoir déduit : ${avoirDeduit.toFixed(0)} MAD`].filter(Boolean).join(" · ") : notes;
     const montant = statut === "paye" ? saleTotal : montantPaye;
     const date = new Date().toISOString().split("T")[0];
+    let parrainMsg: string | undefined;
 
     let savedOnline = false;
     if (typeof navigator === "undefined" || navigator.onLine) {
       try {
         const { data: sale, error } = await supabase.from("sales").insert({
-          client_id: clientId, date, total: saleTotal, montant_paye: montant, statut, notes: notes || null,
+          client_id: clientId, date, total: saleTotal, montant_paye: montant, statut, notes: saleNotes || null,
         }).select().single();
         if (error || !sale) throw error || new Error("insert");
         const { error: e2 } = await supabase.from("sale_items").insert(
@@ -341,6 +376,19 @@ export default function VentesPage() {
           if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: l.quantite });
           else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
         }
+        // Avoir utilisé → le retirer du crédit du client (Bible §4.15)
+        if (avoirDeduit > 0) {
+          await supabase.from("clients").update({ avoir: Math.max(0, (client?.avoir ?? 0) - avoirDeduit) }).eq("id", clientId);
+        }
+        // Parrainage : première vente encaissée du filleul → 100 MAD d'avoir au parrain
+        if (client?.parrain_id && !client.parrain_paye && statut !== "en_attente" && !sales.some(s => s.client_id === clientId)) {
+          const parrain = clients.find(c => c.id === client.parrain_id);
+          const { error: pErr } = await supabase.from("clients").update({ avoir: (parrain?.avoir ?? 0) + 100 }).eq("id", client.parrain_id);
+          if (!pErr) {
+            await supabase.from("clients").update({ parrain_paye: true }).eq("id", clientId);
+            parrainMsg = `🎁 Avoir de 100 MAD crédité à ${parrain?.nom ?? "son parrain"} (parrainage)`;
+          }
+        }
         savedOnline = true;
       } catch { savedOnline = false; }
     }
@@ -350,7 +398,7 @@ export default function VentesPage() {
         localId: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
         client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
         lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: l.fournisseur_id || null, equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
-        total: saleTotal, statut, montant_paye: montant, notes: notes || null, createdAt: Date.now(),
+        total: saleTotal, statut, montant_paye: montant, notes: saleNotes || null, createdAt: Date.now(),
       });
       setPendingCount(getPending().length);
     }
@@ -358,9 +406,10 @@ export default function VentesPage() {
     setLastSale({
       clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, ville: client?.ville ?? "", date,
       lines: validLines.map(l => ({ nom: l.nom, quantite: l.quantite, prix_unitaire: l.prix_unitaire })),
-      total: saleTotal, statut, montant_paye: montant, offline: !savedOnline,
+      total: saleTotal, statut, montant_paye: montant, offline: !savedOnline, parrainMsg,
     });
     setShowForm(false); setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye");
+    setOilDismissed(false); setUseAvoir(false);
     if (savedOnline) load();
   }
 
@@ -378,7 +427,7 @@ export default function VentesPage() {
       `📅 ${date}`,
       "————————————", L, "————————————",
       `🧮 *TOTAL : ${tot.toFixed(2)} MAD*`,
-      "", "Devis indicatif, sous réserve de disponibilité.",
+      "", "✅ Valable 7 jours · sous réserve de disponibilité.",
       "📞 06 02 35 02 90",
     ].filter(Boolean).join("\n");
     sendWhatsApp(client?.telephone, text);
@@ -448,7 +497,7 @@ export default function VentesPage() {
             <h3 className="font-semibold text-slate-800 mb-4">{editingSale ? "Modifier la vente" : t("addSale")}</h3>
             <div className="mb-4">
               <label className="text-xs text-slate-500 mb-1 block">{t("clients")}</label>
-              <select className="input" value={clientId} onChange={e => setClientId(e.target.value)}>
+              <select className="input" value={clientId} onChange={e => { setClientId(e.target.value); setUseAvoir(false); }}>
                 <option value="">-- Choisir client --</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.nom} — {c.ville}</option>)}
               </select>
@@ -496,7 +545,11 @@ export default function VentesPage() {
                     <input type="number" className="input col-span-2" value={l.quantite} onChange={e => updateLine(i, "quantite", +e.target.value)} min={1} />
                     <input type="number" className="input col-span-3" value={l.prix_unitaire} onChange={e => updateLine(i, "prix_unitaire", +e.target.value)} />
                     <button onClick={() => setLines(lines.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-600 flex items-center justify-center"><Trash2 size={15} /></button>
-                    <div className="col-span-1 flex items-center text-sm font-medium text-slate-600">{(l.quantite * l.prix_unitaire).toFixed(0)}</div>
+                    <div className="col-span-1 flex items-center gap-1 text-sm font-medium text-slate-600">
+                      {/* Pastille de marge (Bible §4.3) — code couleur connu de moi seul */}
+                      <span className={`h-2 w-2 shrink-0 rounded-full ${margeDot(l)}`} />
+                      {(l.quantite * l.prix_unitaire).toFixed(0)}
+                    </div>
                   </div>
                   {variants[l.product_id] && variants[l.product_id].length > 1 && (
                     <select className="input mt-1 py-1 text-xs" value={l.variant ?? "Filtron"} onChange={e => applyVariant(i, e.target.value)}>
@@ -528,15 +581,47 @@ export default function VentesPage() {
               </div>
             )}
 
+            {/* Pack vidange (Bible §4.11) : filtre à huile au panier → proposer l'huile en 1 tap */}
+            {oilSuggest.length > 0 && (
+              <div className="mb-3 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-xs text-amber-300 font-medium">🛢️ + l&apos;huile ? (vidange complète = panier ×5)</p>
+                  <button type="button" onClick={() => setOilDismissed(true)} className="text-slate-500 hover:text-slate-300"><X size={14} /></button>
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto pb-1">
+                  {oilSuggest.map(p => (
+                    <button key={p.id} type="button" onClick={() => addProductToCart(p)}
+                      className="shrink-0 flex items-center gap-1 text-xs bg-amber-500/15 text-amber-200 px-2 py-1 rounded-lg hover:bg-amber-500/25">
+                      <Plus size={11} /> {p.marque ? `${p.marque} · ` : ""}<span className="font-mono">{p.reference}</span> <span className="text-slate-400">· {p.prix_vente} MAD</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {creditDepasse > 0 && (
               <div className="mb-3 px-3 py-2 rounded-lg bg-red-500/15 text-red-400 text-sm font-medium">
                 ⚠ {selectedClient?.nom} dépasse sa limite de crédit de {creditDepasse.toFixed(0)} MAD (limite {selectedClient?.limite_credit} MAD)
               </div>
             )}
 
+            {/* Avoir du client (Bible §4.15) — déduction en 1 tap */}
+            {avoirDispo > 0 && (
+              <div className="mb-3 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-between gap-2">
+                <span className="text-sm text-yellow-300 font-medium">🎁 Avoir : {avoirDispo.toFixed(0)} MAD</span>
+                <button type="button" onClick={() => setUseAvoir(v => !v)}
+                  className={`text-xs px-2.5 py-1 rounded-lg font-medium ${useAvoir ? "bg-yellow-500/30 text-yellow-200" : "bg-yellow-500/15 text-yellow-300 hover:bg-yellow-500/25"}`}>
+                  {useAvoir ? `✓ Déduit (−${avoirApplique.toFixed(0)} MAD)` : "Déduire"}
+                </button>
+              </div>
+            )}
+
             <div className="bg-slate-50 rounded-lg p-3 mb-4 flex items-center justify-between">
               <span className="font-semibold">{t("total")}</span>
-              <span className="text-lg font-bold text-blue-600">{total.toFixed(2)} MAD</span>
+              <span className="text-lg font-bold text-blue-600">
+                {avoirApplique > 0 && <span className="text-xs font-normal text-slate-500 me-2 line-through">{total.toFixed(0)}</span>}
+                {totalNet.toFixed(2)} MAD
+              </span>
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-4">
@@ -681,6 +766,7 @@ export default function VentesPage() {
             </h3>
             <p className="text-sm text-slate-400">{lastSale.clientNom || "Client"} · <b className="text-blue-400">{lastSale.total.toFixed(2)} MAD</b></p>
             {lastSale.offline && <p className="text-xs text-yellow-400 mt-2">Elle sera synchronisée automatiquement dès le retour d&apos;internet.</p>}
+            {lastSale.parrainMsg && <p className="text-xs text-yellow-300 mt-2">{lastSale.parrainMsg}</p>}
             <div className="flex flex-col gap-2 mt-5">
               <button onClick={() => sendWhatsApp(lastSale.clientTel, buildReceipt(lastSale))}
                 className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium">
