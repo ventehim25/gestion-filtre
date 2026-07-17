@@ -168,6 +168,19 @@ export type Client = {
   remise_pct?: number;
   limite_credit?: number;
   derniere_relance?: string | null;
+  derniere_relance_com?: string | null; // relance commerciale « client endormi » (Bible §4.14)
+  avoir?: number;                       // crédit à déduire sur une prochaine vente (Bible §4.15)
+  parrain_id?: string | null;           // client qui l'a amené (parrainage)
+  parrain_paye?: boolean;               // avoir du parrain déjà crédité
+};
+
+// Référence demandée au comptoir que je n'avais pas (Bible §4.12)
+export type DemandeManquee = {
+  id: string;
+  created_at: string;
+  reference: string;
+  note: string | null;
+  traite: boolean;
 };
 
 export type SaleStatus = "paye" | "en_attente" | "partiel";
