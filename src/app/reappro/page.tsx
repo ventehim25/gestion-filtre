@@ -1,13 +1,17 @@
 "use client";
 export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product } from "@/types/database";
-import { MessageCircle, Printer, AlertTriangle } from "lucide-react";
+import { MessageCircle, Printer, AlertTriangle, Check, Plus } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import StockBadge from "@/components/StockBadge";
+
+// Demandes « j'ai pas » agrégées par référence (Bible §4.12)
+type Demande = { reference: string; count: number; last: string; ids: string[] };
 
 function refCompare(a: string, b: string) {
   const parse = (r: string): [string, number, number, string] => {
@@ -20,10 +24,44 @@ function refCompare(a: string, b: string) {
 
 export default function ReapproPage() {
   const { t } = useLang();
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [qty, setQty] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"seuil" | "demande">("seuil");
+  const [demandes, setDemandes] = useState<Demande[]>([]);
+  const [demandesOk, setDemandesOk] = useState(true);
+
+  async function loadDemandes() {
+    try {
+      const rows: { id: string; reference: string; created_at: string }[] = [];
+      for (let i = 0; i < 10; i++) {
+        const { data, error } = await supabase.from("demandes_manquees")
+          .select("id, reference, created_at").eq("traite", false)
+          .order("created_at", { ascending: false }).range(i * 1000, i * 1000 + 999);
+        if (error) { setDemandesOk(false); return; }
+        if (!data || data.length === 0) break;
+        rows.push(...(data as typeof rows));
+        if (data.length < 1000) break;
+      }
+      const map = new Map<string, Demande>();
+      for (const r of rows) {
+        const cur = map.get(r.reference) ?? { reference: r.reference, count: 0, last: r.created_at, ids: [] };
+        cur.count += 1;
+        cur.ids.push(r.id);
+        if (r.created_at > cur.last) cur.last = r.created_at;
+        map.set(r.reference, cur);
+      }
+      setDemandes([...map.values()].sort((a, b) => b.count - a.count || b.last.localeCompare(a.last)));
+      setDemandesOk(true);
+    } catch { setDemandesOk(false); }
+  }
+
+  async function marquerTraite(d: Demande) {
+    await supabase.from("demandes_manquees").update({ traite: true }).in("id", d.ids);
+    setDemandes(prev => prev.filter(x => x.reference !== d.reference));
+  }
 
   useEffect(() => {
     (async () => {
@@ -37,6 +75,7 @@ export default function ReapproPage() {
       setProducts(all);
       setLoading(false);
     })();
+    loadDemandes();
   }, []);
 
   // Produits à recommander : stock <= seuil
@@ -95,6 +134,71 @@ export default function ReapproPage() {
         </div>
       } />
 
+      {/* Onglets : sous seuil (existant) / demandé « j'ai pas » (Bible §4.12) */}
+      <div className="flex gap-2 mb-4">
+        <button onClick={() => setTab("seuil")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === "seuil" ? "bg-red-600 text-white" : "card text-slate-300 hover:text-slate-100"}`}>
+          Sous seuil ({low.length})
+        </button>
+        <button onClick={() => setTab("demande")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium ${tab === "demande" ? "bg-red-600 text-white" : "card text-slate-300 hover:text-slate-100"}`}>
+          🔎 Demandé ({demandes.length})
+          {demandes.some(d => d.count >= 3) && <span className="ms-1.5 inline-block h-2 w-2 rounded-full bg-red-400 animate-pulse" />}
+        </button>
+      </div>
+
+      {tab === "demande" && (
+        <div className="card overflow-x-auto">
+          {!demandesOk && (
+            <p className="text-center text-slate-400 py-10 px-4">
+              Table absente — colle le SQL <span className="font-mono text-slate-300">supabase/idees_bible_19_24.sql</span> dans l&apos;éditeur Supabase (Bible §4.12).
+            </p>
+          )}
+          {demandesOk && demandes.length === 0 && (
+            <p className="text-center text-slate-400 py-10 px-4">
+              Aucune demande notée. Quand un client demande une référence que tu n&apos;as pas :
+              Recherche → « ❌ J&apos;ai pas » — à la 3ᵉ demande, elle s&apos;allume ici.
+            </p>
+          )}
+          {demandesOk && demandes.length > 0 && (
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200">
+                <tr>
+                  {["Référence", "Demandé", "Dernière fois", ""].map((h, i) => (
+                    <th key={i} className="text-left px-3 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {demandes.map(d => (
+                  <tr key={d.reference} className={d.count >= 3 ? "bg-red-500/5" : "hover:bg-slate-50"}>
+                    <td className="px-3 py-2.5 font-mono text-slate-200">{d.reference}</td>
+                    <td className="px-3 py-2.5">
+                      <span className={`font-semibold ${d.count >= 3 ? "text-red-400" : "text-slate-300"}`}>{d.count}×</span>
+                      {d.count >= 3 && <span className="ms-2 text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">à stocker</span>}
+                    </td>
+                    <td className="px-3 py-2.5 text-slate-400 text-xs">{new Date(d.last).toLocaleDateString("fr-FR")}</td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-2 justify-end">
+                        <button onClick={() => router.push(`/recherche?q=${encodeURIComponent(d.reference)}`)}
+                          className="flex items-center gap-1 text-xs bg-blue-500/15 text-blue-300 px-2 py-1 rounded-lg hover:bg-blue-500/25" title="Créer / rechercher la référence">
+                          <Plus size={12} /> Créer
+                        </button>
+                        <button onClick={() => marquerTraite(d)}
+                          className="flex items-center gap-1 text-xs bg-green-500/15 text-green-400 px-2 py-1 rounded-lg hover:bg-green-500/25" title="Marquer traité">
+                          <Check size={12} /> Traité
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
+      {tab === "seuil" && (<>
       <div className="card p-4 mb-4 flex items-center gap-3">
         <AlertTriangle size={22} className="text-yellow-400 shrink-0" />
         <div>
@@ -133,6 +237,7 @@ export default function ReapproPage() {
         {!loading && low.length === 0 && <p className="text-center text-slate-400 py-10">✅ Aucun produit sous le seuil — stock OK.</p>}
         {loading && <p className="text-center text-slate-400 py-10">{t("loading")}</p>}
       </div>
+      </>)}
     </div>
   );
 }

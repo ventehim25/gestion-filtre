@@ -165,6 +165,36 @@ export default function RecherchePage() {
   const [refResults, setRefResults] = useState<RefResult[]>([]);
   const [refLoading, setRefLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+
+  // ---------- Registre « j'ai pas » (Bible §4.12) : noter la demande perdue en 1 tap ----------
+  const [missedNoted, setMissedNoted] = useState<string | null>(null);
+  async function noteMissing() {
+    const ref = refQuery.trim().toUpperCase().replace(/\s+/g, "");
+    if (!ref) return;
+    let failed = false;
+    try {
+      const { error } = await supabase.from("demandes_manquees").insert({ reference: ref });
+      failed = !!error;
+    } catch { failed = true; }
+    if (failed) {
+      // Hors-ligne ou table absente → file locale, resynchronisée au prochain chargement
+      const q: { reference: string }[] = JSON.parse(localStorage.getItem("fp_demandes") ?? "[]");
+      q.push({ reference: ref });
+      localStorage.setItem("fp_demandes", JSON.stringify(q));
+    }
+    setMissedNoted(ref);
+  }
+  useEffect(() => {
+    // Resynchronise les demandes notées hors-ligne
+    (async () => {
+      try {
+        const q: { reference: string }[] = JSON.parse(localStorage.getItem("fp_demandes") ?? "[]");
+        if (!q.length || (typeof navigator !== "undefined" && !navigator.onLine)) return;
+        const { error } = await supabase.from("demandes_manquees").insert(q.map(d => ({ reference: d.reference })));
+        if (!error) localStorage.removeItem("fp_demandes");
+      } catch { /* silencieux */ }
+    })();
+  }, []);
   const [openDetails, setOpenDetails] = useState<Set<string>>(new Set());
   function toggleDetails(id: string) { setOpenDetails(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
 
@@ -356,9 +386,20 @@ export default function RecherchePage() {
             <div className="card p-10 text-center text-slate-400">
               <Search size={40} className="mx-auto mb-3 opacity-20" />
               <p className="mb-4">{t("noRefFound")}</p>
-              <button onClick={openAdd} className="btn-primary inline-flex items-center gap-1.5">
-                <Plus size={16} /> Ajouter « {refQuery.trim().toUpperCase()} »
-              </button>
+              <div className="flex flex-wrap justify-center gap-2">
+                <button onClick={openAdd} className="btn-primary inline-flex items-center gap-1.5">
+                  <Plus size={16} /> Ajouter « {refQuery.trim().toUpperCase()} »
+                </button>
+                {/* Bible §4.12 : le client demande, je n'ai pas → noter la demande (1 tap) */}
+                {missedNoted === refQuery.trim().toUpperCase().replace(/\s+/g, "") ? (
+                  <span className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-green-500/15 text-green-400 text-sm font-medium">✓ Demande notée</span>
+                ) : (
+                  <button onClick={noteMissing} className="btn-secondary inline-flex items-center gap-1.5">
+                    ❌ J&apos;ai pas (noter la demande)
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 mt-3">« Noter la demande » = à la 3ᵉ demande, l&apos;app te dira de la stocker (Réappro → Demandé).</p>
             </div>
           )}
 
