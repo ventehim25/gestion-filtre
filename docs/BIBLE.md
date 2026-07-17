@@ -10,7 +10,7 @@
 >
 > Et une règle d'usage : **si une fonctionnalité demande plus de 2 gestes ou une explication, elle est mal conçue.** On la redessine ou on la jette.
 >
-> **Dernière mise à jour : 17/07/2026** — ✅ §4.1 livré (segments clients, limite de crédit, relances 1-tap — commit b7ae4b0) · 🆕 catégorie **Huile moteur** au catalogue (Castrol, Motul, Total, Mannol, Fanfaro, Pemko, Kansler) → nouvelle idée 18 « Pack vidange » (§4.11).
+> **Dernière mise à jour : 17/07/2026** — ✅ §4.1 livré (segments clients, limite de crédit, relances 1-tap — commit b7ae4b0) · 🆕 catégorie **Huile moteur** au catalogue (Castrol, Motul, Total, Mannol, Fanfaro, Pemko, Kansler) → nouvelle idée 18 « Pack vidange » (§4.11) · 🆕 idées 19-25 (ventes perdues, kit véhicule, clients endormis, devis, arrivages, parrainage, Google Business — specs §4.12 à §4.16).
 
 ---
 
@@ -74,6 +74,13 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 | 16 | 💡 BONUS — Achats groupés entre confrères | 💰💰 | Année 3+ | L | — |
 | 17 | Marketplace / listings payants confrères | 💰💰💰 | Année 4+ | L | — |
 | 18 | 🆕 Pack vidange (filtre + huile en 1 tap) | 💰💰💰 | Immédiat | S | 1 tap |
+| 19 | 🆕 Registre « j'ai pas » (ventes perdues) | 💰💰💰 | Dès le 1er mois | S | 1 tap |
+| 20 | 🆕 Kit véhicule (huile + air + habitacle du même véhicule) | 💰💰 | Immédiat | M | 1 tap |
+| 21 | 🆕 Clients endormis (« à réveiller » 45 j) | 💰💰 | Chaque mois | S | 1 tap |
+| 22 | 🆕 Devis WhatsApp 1-tap | 💰💰 | Immédiat | S | 1 tap |
+| 23 | 🆕 Diffusion arrivages/promos (statut WhatsApp) | 💰💰 | Chaque semaine | S | 1 tap + partager |
+| 24 | 🆕 Parrainage garages (avoir 100 MAD) | 💰💰 | Mois 2-3 | S | 1 choix |
+| 25 | 💡 BONUS — Fiche Google Business (zéro code) | 💰💰 | Mois 1-3 | S | 1 h un dimanche |
 
 **Comment lire ce tableau :** les idées 1-6 sont la trajectoire T1 (l'argent déjà gagné), 7-12 ouvrent T2 (la croissance), 10 et 17 construisent T3 (la plateforme). L'ordre du tableau EST l'ordre de construction. **✅ = déjà en ligne** (idées 1-2-3 livrées le 14/07/2026). L'idée 18 est arrivée avec la catégorie Huile moteur : elle se classe en réalité juste derrière les relances — à construire en phase 1.
 
@@ -191,6 +198,62 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 - **Le geste.** 1 tap sur la suggestion qui apparaît toute seule. Rien à chercher, rien à configurer.
 - **Effort : S** — spec §4.11.
 
+### Idée 19 · 🆕 Registre « j'ai pas » — *l'étude de marché gratuite que tu jettes chaque jour*
+
+- **Le problème.** Chaque jour, on te demande 3-5 références que tu n'as pas. Tu dis « j'ai pas », le client va en face, et l'information disparaît. C'est la meilleure étude de marché possible — de la demande RÉELLE, avec le client devant toi — et elle part à la poubelle.
+- **La solution.** Quand la recherche ne trouve rien (ou que tu n'as pas le stock), un bouton « ❌ J'ai pas » enregistre la référence demandée en 1 tap. À la 3ᵉ demande de la même référence, l'app te dit : « OE667/6 demandé 3× ce mois → stocke-le ».
+- **Pourquoi ça rapporte.** Une référence ajoutée sur demande réelle est une vente quasi garantie à ~40 % de marge, ET un client qui apprend que « lui, il a » — il revient et il le dit. 5 références identifiées par mois × 2-3 ventes chacune × 12 MAD de marge ≈ **150-400 MAD/mois qui composent** : le mois suivant elles vendent encore. Au bout d'un an, ton stock est sculpté par la demande de TA ville, pas par le catalogue du fournisseur.
+- **Le geste.** Le client demande → tu cherches → pas trouvé → 1 tap « ❌ J'ai pas » (la réf est déjà tapée dans la recherche, rien à ressaisir). La liste triée par fréquence t'attend dans `/reappro`.
+- **Effort : S** — spec §4.12.
+
+### Idée 20 · 🆕 Kit véhicule — *la vente croisée par la donnée que toi seul possèdes*
+
+- **Le problème.** Le client vient pour le filtre à huile du Duster. Les filtres air et habitacle du MÊME véhicule, il les changera « plus tard » — c'est-à-dire ailleurs. Tu as pourtant dans `applications` la liste exacte des filtres de chaque véhicule : la donnée est là, elle ne vend pas.
+- **La solution.** À la vente, quand le filtre ajouté est lié à un véhicule, l'app affiche les AUTRES filtres compatibles du même véhicule **en stock** : « Ce véhicule prend aussi : filtre air {réf} · habitacle {réf} — ajouter ? ». Jamais de devinette : uniquement les compatibilités de la table `applications`.
+- **Pourquoi ça rapporte.** +1 filtre sur 1 vente sur 5, c'est +12-20 MAD de marge par occurrence. À 15 ventes de filtres/jour, ça fait **~900-1 800 MAD de marge/mois** sur des clients déjà devant toi. Pour les garages : le kit complet (huile + air + habitacle + bidon) monte le panier vidange de 30 à 450+ MAD.
+- **Le geste.** 1 tap par filtre suggéré. La rangée s'ignore sans friction.
+- **Effort : M** — spec §4.13.
+
+### Idée 21 · 🆕 Clients endormis — *le client qui a disparu sans bruit*
+
+- **Le problème.** Un garage qui commandait chaque mois s'arrête. Tu ne le remarques que 6 mois plus tard — il est déjà installé chez le concurrent. Un client régulier perdu = 200-500 MAD de marge mensuelle évaporée en silence.
+- **La solution.** Le miroir exact des relances impayés (déjà livrées) : une carte accueil « 😴 À réveiller » — clients avec ≥ 3 achats dans l'historique et AUCUN achat depuis 45 jours. Un tap → WhatsApp : « Salam {nom} 🙏 Ça fait un moment ! Dis-moi ce qu'il te faut, je te prépare ça » (+ la promo en cours s'il y en a une).
+- **Pourquoi ça rapporte.** Réveiller UN garage régulier par mois = 200-500 MAD/mois de marge récupérée, en continu. Coût : un tap. C'est la rétention la moins chère qui existe — et le message arrive souvent pile quand le concurrent a fait une erreur.
+- **Le geste.** Accueil → carte « À réveiller » → tap WhatsApp. Le client sort de la liste 30 jours.
+- **Effort : S** — spec §4.14.
+
+### Idée 22 · 🆕 Devis WhatsApp — *l'écrit vend mieux que le marchandage*
+
+- **Le problème.** « Fais-moi un prix pour cette liste » — tu réponds de tête, le garage compare, rappelle, tu as oublié ce que tu avais dit. Pas de trace = pas de relance = négociation recommencée à zéro à chaque fois.
+- **La solution.** Le panier de `/ventes` peut sortir en **devis** au lieu d'une vente : un tap « 📄 Devis WhatsApp » compose un message propre (lignes, remise du client déjà appliquée, total, « valable 7 jours ») et l'envoie au client.
+- **Pourquoi ça rapporte.** Un prix écrit avec une validité **ferme la porte au marchandage ligne par ligne** (+1-2 points de marge préservés) et convertit mieux : le garage transfère ton devis à son client final pour valider la réparation — c'est lui qui vend pour toi. Et le devis non conclu à J+5 est une relance toute prête.
+- **Le geste.** Composer le panier comme d'habitude → 1 tap « Devis » au lieu de « Vendre ». Rien d'autre.
+- **Effort : S** — spec §4.15.
+
+### Idée 23 · 🆕 Diffusion arrivages & promos — *le statut WhatsApp, ta vitrine gratuite*
+
+- **Le problème.** Tu reçois de la marchandise, personne ne le sait. Tes 300+ contacts WhatsApp (clients, garages, confrères) regardent les statuts tous les jours — et tu ne publies rien, ou un effort manuel irrégulier.
+- **La solution.** Un bouton « 📣 Arrivages » compose automatiquement le message de la semaine : produits reçus/réapprovisionnés depuis 7 jours + promos en cours (`prix_promo`), format propre avec ton numéro. Tu le partages en statut WhatsApp et dans ta liste de diffusion garages.
+- **Pourquoi ça rapporte.** Le statut WhatsApp est le canal marketing le plus vu au Maroc et il est **gratuit**. 2-3 ventes déclenchées par semaine à 100-300 MAD de panier ≈ **1 000-3 000 MAD/mois de CA** pour 1 tap hebdomadaire. Régularité = les clients prennent l'habitude de checker TON statut avant d'acheter.
+- **Le geste.** Vendredi : 1 tap « Arrivages » → partager. 30 secondes.
+- **Effort : S** — spec §4.16.
+
+### Idée 24 · 🆕 Parrainage garages — *tes meilleurs commerciaux travaillent déjà pour toi gratuitement*
+
+- **Le problème.** Tes garages contents parlent de toi… quand ça se présente. Rien ne les motive à le faire activement, et tu ne sais jamais qui t'a amené qui.
+- **La solution.** Une règle simple, annoncée à tous : « amène-moi un garage, tu as **100 MAD d'avoir** à sa première commande ». À la création d'un client garage, tu choisis le parrain ; à la première vente du filleul, l'app crée l'avoir du parrain et te le rappelle à sa prochaine vente (« avoir 100 MAD à déduire »).
+- **Pourquoi ça rapporte.** Un garage actif vaut 200-500 MAD de marge PAR MOIS ; tu l'acquiers pour 100 MAD **une seule fois**, payés uniquement au succès. Il n'existe pas de coût d'acquisition plus bas — et le filleul arrive pré-vendu par quelqu'un qu'il croit.
+- **Le geste.** À la création du garage : 1 choix dans une liste « parrainé par… ». Le reste est automatique.
+- **Effort : S** — spec §4.15 (même chantier que l'avoir).
+
+### Idée 25 · 💡 BONUS — Fiche Google Business (zéro ligne de code, une heure un dimanche)
+
+- **Le problème.** Quelqu'un tape « pièces auto » + ta ville sur Google Maps : tu n'existes pas. Tes concurrents non plus, souvent — la place est à prendre gratuitement.
+- **La solution.** Créer la fiche Google Business « FiltroPro » : photos de la boutique et des rayons, horaires, lien `wa.me`, lien vers le catalogue public `/c/` quand il sera en ligne (§4.8). Demander un avis 5★ aux 10 meilleurs clients (un message WhatsApp chacun).
+- **Pourquoi ça rapporte.** « Filtre à huile près de moi », « pièces auto {ta ville} » : la fiche Maps capte ce trafic **avant même le SEO**. 1-2 nouveaux clients par semaine qui savent où tu es et t'écrivent direct sur WhatsApp. Coût : zéro, pour toujours. Et la fiche + le catalogue se renforcent mutuellement sur Google.
+- **Le geste.** Aucun dans l'app — une heure de configuration, puis répondre aux avis.
+- **Effort : S** — pas de spec : c'est TOI qui la fais, pas Opus.
+
 ### Idées 14-17 · Année 2 et au-delà (résumé — détails et seuils au §5)
 
 - **14 · Abonnement « réappro auto » garages.** Le garage abonné (149 MAD/mois) ne commande plus : TU passes avec ce qu'il faut, calculé sur sa consommation réelle. NE PAS lancer avant ~30 garages actifs et 6 mois d'historique fiable — la rente exige une confiance déjà installée. C'est le premier revenu qui ne dépend pas d'un carton porté.
@@ -205,12 +268,14 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 ## Phase 1 — 0-6 mois : ENCAISSER (trajectoire T1)
 
 **Chantiers (6) :** ① ✅ relances impayés 1-tap (§4.1 — livré 14/07/2026) · ② ✅ prix par segment + limite de crédit + badge (§4.1 — livré) · ③ 🆕 pack vidange filtre + huile (§4.11) · ④ promo stock dormant (§4.2) · ⑤ marge visible (§4.3) · ⑥ bilan hebdo (§4.4) — et en bonus rapide la fiche produit WhatsApp (§4.5).
+**Renforts rapides à glisser entre deux chantiers (effort S, gain immédiat) :** registre « j'ai pas » (§4.12) · clients endormis (§4.14) · devis WhatsApp (§4.15) · diffusion arrivages (§4.16) · fiche Google Business (idée 25 — toi, pas Opus).
 **Résultat attendu :** impayés divisés par 2, +2-3 points de marge, stock dormant liquidé une première fois, zéro vente à perte. Ordre de grandeur : **+1 500 à 3 000 MAD de bénéfice/mois à volume constant**.
 **Signal de passage à la phase 2 :** deux mois de suite avec encaissé/vendu ≥ 85 % ET impayés totaux < 1 mois de bénéfice.
 
 ## Phase 2 — 6-24 mois : CROÎTRE (T2 + graine de T3)
 
 **Chantiers (5) :** ① commande WhatsApp → vente préparée + liste de chargement (§4.6) · ② réappro prédictif (§4.7) · ③ catalogue public SEO (§4.8) · ④ fidélité paliers (§4.9) · ⑤ rappel vidange (§4.10).
+**Renforts croissance :** kit véhicule (§4.13) · parrainage garages (§4.15) — les deux nourrissent directement le nombre de garages actifs (chiffre n° 5 du tableau de bord).
 **Résultat attendu :** 20-40 garages en commande régulière, tournées vendues d'avance, premières demandes entrantes depuis Google. Ordre de grandeur : **CA ×1,5 à ×2**.
 **Signal de passage :** ≥ 30 garages actifs/mois ET catalogue ≥ 500 visites/mois.
 
@@ -570,6 +635,174 @@ Implémente la suggestion « pack vidange » filtre + huile (Bible §4.11). Pas 
 3) Ne JAMAIS suggérer une huile hors stock. Aucun mapping viscosité↔véhicule
    inventé : la suggestion est triée par popularité réelle des ventes, le choix
    de la bonne huile reste à l'utilisateur.
+Contraintes : §4.0. Commit + push.
+```
+
+## §4.12 🆕 Registre « j'ai pas » — ventes perdues (idée 19)
+
+**Instructions pour Opus — copiable tel quel :**
+
+```
+Implémente le registre des ventes perdues (Bible §4.12).
+
+1) SQL à fournir dans supabase/demandes_manquees.sql :
+```
+
+```sql
+create table if not exists demandes_manquees (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  reference text not null,           -- la référence telle que cherchée (normalisée majuscules)
+  note text,                          -- optionnel : « pour Clio 4 », nom du client…
+  traite boolean not null default false
+);
+alter table demandes_manquees enable row level security;
+drop policy if exists demandes_all on demandes_manquees;
+create policy demandes_all on demandes_manquees for all using (true) with check (true);
+notify pgrst, 'reload schema';
+```
+
+```
+2) Page /recherche — quand la recherche par référence ne donne AUCUN résultat
+   (ou en complément des résultats) : bouton « ❌ J'ai pas » qui insère la
+   référence tapée (normalisée : majuscules, espaces retirés) dans
+   demandes_manquees, avec un mini-champ note optionnel. Toast de confirmation,
+   1 tap au total. Marche aussi hors-ligne (file d'attente comme les ventes).
+
+3) Page /reappro — onglet « Demandé » : agréger demandes_manquees non traitées
+   par référence (count + date de dernière demande), trié par count décroissant.
+   Badge rouge sur l'onglet si une référence atteint 3 demandes sur 30 jours.
+   Bouton par ligne « ✔ Traité » (traite = true) et « ➕ Créer le produit »
+   (préremplit /produits avec la référence — SANS inventer marque ni prix :
+   champs vides à compléter à la main).
+
+4) Accueil — dans les alertes existantes : « {réf} demandé {n}× ce mois »
+   quand n ≥ 3.
+Contraintes : §4.0. Commit + push.
+```
+
+## §4.13 🆕 Kit véhicule — vente croisée par compatibilité (idée 20)
+
+**Instructions pour Opus — copiable tel quel :**
+
+```
+Implémente la suggestion « kit véhicule » à la vente (Bible §4.13). Pas de SQL.
+
+1) Page /ventes — quand une ligne est ajoutée au panier et que son produit a
+   des lignes dans applications :
+   - prendre les véhicules du produit (applications du product_id, paginer) ;
+   - chercher les AUTRES produits (catégorie différente : filtre_air,
+     filtre_habitacle, filtre_carburant) partageant au moins un véhicule
+     identique (même marque + modele + code_moteur si présent, sinon
+     marque + modele + moteur) — requête sur applications, paginer .range() ;
+   - ne garder que les produits avec stock > 0 (produit ou une variante) ;
+   - afficher une rangée discrète refermable « 🚗 Ce véhicule prend aussi : »
+     avec max 3 suggestions « {catégorie} {référence} — {prix} MAD » ;
+   - 1 tap = ajoute la ligne (remise client, cout_unitaire figé, logique
+     existante) ; ✕ referme ; une seule apparition par vente ;
+   - si plusieurs véhicules matchent des kits différents, prendre le premier
+     véhicule commun — ne rien afficher en cas d'ambiguïté totale plutôt
+     que de suggérer faux. JAMAIS de compatibilité hors table applications.
+
+2) Si le pack vidange (§4.11) est en place : fusionner les deux rangées en une
+   seule « Compléter : 🛢️ huile · 🚗 kit véhicule » pour ne pas empiler.
+Contraintes : §4.0. Commit + push.
+```
+
+## §4.14 🆕 Clients endormis (idée 21)
+
+**Instructions pour Opus — copiable tel quel :**
+
+```
+Implémente la relance des clients endormis (Bible §4.14).
+
+1) SQL à fournir dans supabase/clients_reveil.sql :
+```
+
+```sql
+alter table clients add column if not exists derniere_relance_com date;  -- relance commerciale (≠ derniere_relance impayés)
+notify pgrst, 'reload schema';
+```
+
+```
+2) Accueil — carte « 😴 À réveiller » (sous « À relancer ») :
+   clients avec ≥ 3 ventes au total ET aucune vente depuis 45 jours
+   (paginer sales .range() ; réutiliser le chargement existant de l'accueil)
+   ET (derniere_relance_com null OU < aujourd'hui − 30 j).
+   Chaque ligne : nom, « dernier achat il y a {n} j », total des 6 derniers mois
+   (masquable par l'œil), bouton WhatsApp :
+   FR : « Salam {nom} 🙏 Ça fait un moment ! Dis-moi ce qu'il te faut,
+   je te le prépare. » — ajouter « 🔥 En ce moment : {produits en prix_promo,
+   max 3} » s'il y a des promos actives.
+   Après le tap : derniere_relance_com = aujourd'hui → sort de la liste 30 j.
+   Trier par total 6 mois décroissant (réveiller les plus gros d'abord).
+Contraintes : §4.0. Commit + push.
+```
+
+## §4.15 🆕 Devis WhatsApp + avoir de parrainage (idées 22 et 24)
+
+**Instructions pour Opus — copiable tel quel :**
+
+```
+Implémente le devis WhatsApp et l'avoir de parrainage (Bible §4.15).
+
+1) SQL à fournir dans supabase/devis_parrainage.sql :
+```
+
+```sql
+alter table clients add column if not exists avoir numeric not null default 0;        -- crédit à déduire (MAD)
+alter table clients add column if not exists parrain_id uuid references clients(id);  -- qui l'a amené
+alter table clients add column if not exists parrain_paye boolean not null default false;
+notify pgrst, 'reload schema';
+```
+
+```
+2) Devis — page /ventes : à côté du bouton de validation, bouton « 📄 Devis » :
+   compose un texte WhatsApp depuis le panier SANS créer de vente ni toucher
+   au stock :
+   « 📄 Devis FiltroPro — {date}
+     {qté} × {référence} ({marque}) — {prix} MAD
+     …
+     Total : {total} MAD
+     ✅ Valable 7 jours · 📞 {téléphone /parametres} »
+   La remise du client est déjà appliquée aux lignes. Ouvre wa.me du client
+   (ou sans destinataire si pas de téléphone). Aucune persistance : simple,
+   zéro friction.
+
+3) Parrainage — page /clients : à la création/édition d'un client, sélecteur
+   optionnel « Parrainé par » (liste des clients type garage/gros).
+   À l'enregistrement d'une VENTE payée/partielle d'un client dont
+   parrain_id est renseigné ET parrain_paye = false ET c'est sa 1ère vente :
+   avoir du parrain += 100 ; parrain_paye = true ; toast « 🎁 Avoir de
+   100 MAD crédité à {parrain} ».
+
+4) Page /ventes — si le client sélectionné a avoir > 0 : bandeau doré
+   « 🎁 Avoir : {avoir} MAD — déduire ? » ; 1 tap déduit du total
+   (min(avoir, total)), décrémente clients.avoir, trace dans sale.notes
+   (« avoir déduit : X MAD »).
+Contraintes : §4.0. Commit + push.
+```
+
+## §4.16 🆕 Diffusion arrivages & promos (idée 23)
+
+**Instructions pour Opus — copiable tel quel :**
+
+```
+Implémente le message hebdo « Arrivages » (Bible §4.16). Pas de SQL.
+
+Accueil (ou /produits) — bouton « 📣 Arrivages » :
+compose un message WhatsApp à partager (statut / liste de diffusion) :
+- « 🆕 Arrivé cette semaine : » produits créés depuis 7 jours
+  (products.created_at, paginer) — « {référence} {marque} ({catégorie FR}) »,
+  SANS prix (le prix se discute), max 10 lignes + « … et X autres » ;
+- « 🔥 Promos en cours : » produits avec prix_promo non null —
+  « {référence} : {prix_promo} MAD au lieu de {prix_vente} » (ici OUI avec
+  prix : c'est le but d'une promo), max 5 lignes ;
+- « 🛢️ Huiles dispo : {marques huile_moteur en stock} » ;
+- « 📞 FiltroPro — {téléphone} · on livre les garages 🚚 ».
+Si aucune section n'a de contenu : bouton grisé « rien de nouveau ».
+Ouvre wa.me sans destinataire (l'utilisateur choisit statut ou diffusion).
+Version AR du gabarit selon la langue active.
 Contraintes : §4.0. Commit + push.
 ```
 
