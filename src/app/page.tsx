@@ -66,7 +66,11 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({ totalVentes: 0, totalClients: 0, totalProduits: 0, stockFaible: 0, benefice: 0, coutMarchandise: 0, toRecommend: 0, unpaid: 0, encaisseJour: 0, encaisseSemaine: 0 });
   const [dbError, setDbError] = useState("");
   const [pendingOffline, setPendingOffline] = useState(0);
-  const [relances, setRelances] = useState<{ id: string; nom: string; days: number; freq: number }[]>([]);
+  const [relances, setRelances] = useState<{ id: string; nom: string; telephone: string | null; days: number; freq: number }[]>([]);
+  // Promos actives (jointes au message de réveil §4.14 et aux arrivages §4.16)
+  const [promos, setPromos] = useState<{ reference: string; prix_promo: number; prix_vente: number }[]>([]);
+  // Référence la plus demandée « j'ai pas » (Bible §4.12)
+  const [demandeHot, setDemandeHot] = useState<{ reference: string; count: number } | null>(null);
   // Impayés à relancer (Bible §4.1) — distinct de la relance "réassort" ci-dessus
   const [impayes, setImpayes] = useState<{ id: string; nom: string; telephone: string | null; solde: number; days: number }[]>([]);
   // Montants sensibles masqués par défaut — révélés au clic
@@ -118,26 +122,56 @@ export default function Dashboard() {
       }
       const toRecommend = lowList.filter((p) => p.stock <= p.stock_min).length;
 
-      // Clients/garages à relancer : intervalle d'achat dépassé
-      const { data: cl } = await supabase.from("clients").select("id, nom");
-      const names: Record<string, string> = {};
-      (cl ?? []).forEach((c: { id: string; nom: string }) => { names[c.id] = c.nom; });
+      // Clients/garages à relancer : intervalle d'achat dépassé (réveil WhatsApp — Bible §4.14)
+      // derniere_relance_com peut ne pas exister tant que le SQL §4.14 n'est pas collé → repli sans la colonne
+      type ClRow = { id: string; nom: string; telephone: string | null; derniere_relance_com?: string | null };
+      let clRows: ClRow[] = [];
+      {
+        const r = await supabase.from("clients").select("id, nom, telephone, derniere_relance_com");
+        if (r.error) {
+          const r2 = await supabase.from("clients").select("id, nom, telephone");
+          clRows = (r2.data ?? []) as ClRow[];
+        } else clRows = (r.data ?? []) as ClRow[];
+      }
+      const cinfo0: Record<string, ClRow> = {};
+      clRows.forEach(c => { cinfo0[c.id] = c; });
       const byClient: Record<string, string[]> = {};
       for (const s of sales) { if (s.client_id && s.date) (byClient[s.client_id] ??= []).push(s.date); }
       const todayMs = Date.now();
-      const rel: { id: string; nom: string; days: number; freq: number }[] = [];
+      const snooze = new Date(todayMs - 30 * 86400000).toISOString().split("T")[0];
+      const rel: { id: string; nom: string; telephone: string | null; days: number; freq: number }[] = [];
       for (const [cid, dates] of Object.entries(byClient)) {
         if (dates.length < 2) continue;
+        const info = cinfo0[cid];
+        // Déjà réveillé il y a moins de 30 j → on laisse respirer
+        if (info?.derniere_relance_com && info.derniere_relance_com >= snooze) continue;
         const sorted = [...dates].sort();
         const first = new Date(sorted[0]).getTime();
         const last = new Date(sorted[sorted.length - 1]).getTime();
         const freq = (last - first) / (86400000 * (sorted.length - 1));
         if (!(freq > 0)) continue;
         const daysSince = Math.round((todayMs - last) / 86400000);
-        if (daysSince > freq * 1.2 && daysSince >= 7) rel.push({ id: cid, nom: names[cid] ?? "Client", days: daysSince, freq: Math.round(freq) });
+        if (daysSince > freq * 1.2 && daysSince >= 7) rel.push({ id: cid, nom: info?.nom ?? "Client", telephone: info?.telephone ?? null, days: daysSince, freq: Math.round(freq) });
       }
       rel.sort((a, b) => (b.days / b.freq) - (a.days / a.freq));
       setRelances(rel.slice(0, 6));
+
+      // Promos actives (max 3 dans les messages)
+      const { data: pr } = await supabase.from("products").select("reference, prix_promo, prix_vente").not("prix_promo", "is", null).limit(3);
+      setPromos((pr ?? []) as { reference: string; prix_promo: number; prix_vente: number }[]);
+
+      // Référence demandée ≥ 3× sur 30 j (registre « j'ai pas » — Bible §4.12)
+      try {
+        const since = new Date(todayMs - 30 * 86400000).toISOString();
+        const { data: dm, error: dmErr } = await supabase.from("demandes_manquees")
+          .select("reference").eq("traite", false).gte("created_at", since).limit(1000);
+        if (!dmErr && dm) {
+          const counts = new Map<string, number>();
+          for (const d of dm as { reference: string }[]) counts.set(d.reference, (counts.get(d.reference) ?? 0) + 1);
+          const hot = [...counts.entries()].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1])[0];
+          setDemandeHot(hot ? { reference: hot[0], count: hot[1] } : null);
+        }
+      } catch { /* table absente */ }
 
       // Impayés à relancer (Bible §4.1) : solde dû par client, hors relances faites il y a < 7 j
       const unpaidRows: { client_id: string; total: number; montant_paye: number; date: string }[] = [];
@@ -187,6 +221,45 @@ export default function Dashboard() {
     setImpayes(prev => prev.filter(x => x.id !== c.id));
   }
 
+  // Réveil 1-tap d'un client endormi (Bible §4.14) : WhatsApp + snooze 30 j
+  async function reveiller(c: { id: string; nom: string; telephone: string | null }) {
+    const lignes = [`Salam ${c.nom} 🙏 Ça fait un moment ! Dis-moi ce qu'il te faut, je te le prépare.`];
+    if (promos.length > 0) {
+      lignes.push("", "🔥 En ce moment :");
+      for (const p of promos) lignes.push(`• ${p.reference} : ${p.prix_promo} MAD au lieu de ${p.prix_vente}`);
+    }
+    sendWhatsApp(c.telephone, lignes.join("\n"));
+    try { await supabase.from("clients").update({ derniere_relance_com: new Date().toISOString().split("T")[0] }).eq("id", c.id); } catch { /* colonne absente */ }
+    setRelances(prev => prev.filter(x => x.id !== c.id));
+  }
+
+  // Message « Arrivages » à partager en statut WhatsApp / diffusion (Bible §4.16)
+  async function arrivages() {
+    const weekAgoIso = new Date(Date.now() - 7 * 86400000).toISOString();
+    const [{ data: nouveaux }, { data: pro }, { data: huiles }] = await Promise.all([
+      supabase.from("products").select("reference, marque, categorie").gte("created_at", weekAgoIso).order("created_at", { ascending: false }).limit(30),
+      supabase.from("products").select("reference, prix_promo, prix_vente").not("prix_promo", "is", null).limit(5),
+      supabase.from("products").select("marque").eq("categorie", "huile_moteur").gt("stock", 0).limit(200),
+    ]);
+    const nv = (nouveaux ?? []) as { reference: string; marque?: string; categorie: string }[];
+    const pr2 = (pro ?? []) as { reference: string; prix_promo: number; prix_vente: number }[];
+    const marquesHuile = [...new Set(((huiles ?? []) as { marque?: string }[]).map(h => h.marque).filter(Boolean))];
+    if (nv.length === 0 && pr2.length === 0 && marquesHuile.length === 0) { alert("Rien de nouveau cette semaine — ajoute des produits ou une promo d'abord."); return; }
+    const lignes: string[] = ["📣 *FiltroPro — cette semaine*"];
+    if (nv.length > 0) {
+      lignes.push("", "🆕 Arrivé cette semaine :");
+      for (const p of nv.slice(0, 10)) lignes.push(`• ${p.reference}${p.marque ? ` (${p.marque})` : ""}`);
+      if (nv.length > 10) lignes.push(`… et ${nv.length - 10} autres`);
+    }
+    if (pr2.length > 0) {
+      lignes.push("", "🔥 Promos en cours :");
+      for (const p of pr2) lignes.push(`• ${p.reference} : *${p.prix_promo} MAD* au lieu de ${p.prix_vente}`);
+    }
+    if (marquesHuile.length > 0) lignes.push("", `🛢️ Huiles dispo : ${marquesHuile.join(", ")}`);
+    lignes.push("", "📞 06 02 35 02 90 · on livre les garages 🚚");
+    sendWhatsApp(null, lignes.join("\n"));
+  }
+
   function go(e: React.FormEvent) {
     e.preventDefault();
     if (q.trim()) router.push(`/recherche?q=${encodeURIComponent(q.trim())}`);
@@ -201,9 +274,17 @@ export default function Dashboard() {
 
   return (
     <div>
-      {/* Alertes utiles (cliquables) */}
-      {(stats.toRecommend > 0 || stats.unpaid > 0 || pendingOffline > 0) && (
-        <div className="flex flex-wrap gap-2 mb-4">
+      {/* Alertes utiles (cliquables) + diffusion arrivages */}
+      <div className="flex flex-wrap gap-2 mb-4">
+          {/* Arrivages & promos de la semaine → statut WhatsApp (Bible §4.16) */}
+          <button onClick={arrivages} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-green-500/15 text-green-300 border border-green-500/30 hover:bg-green-500/25 transition-colors">
+            <MessageCircle size={15} /> 📣 Arrivages
+          </button>
+          {demandeHot && (
+            <button onClick={() => router.push("/reappro")} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25 transition-colors">
+              🔎 {demandeHot.reference} demandé {demandeHot.count}× — à stocker
+            </button>
+          )}
           {stats.toRecommend > 0 && (
             <button onClick={() => router.push("/reappro")} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-colors">
               <ClipboardList size={15} /> {stats.toRecommend} à recommander
@@ -219,8 +300,7 @@ export default function Dashboard() {
               <CloudOff size={15} /> {pendingOffline} à synchroniser
             </button>
           )}
-        </div>
-      )}
+      </div>
 
       {/* HERO : carrousel + recherche */}
       <div className="relative rounded-2xl overflow-hidden mb-6 min-h-[190px] md:min-h-[240px] flex items-center">
@@ -368,17 +448,22 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Garages à relancer (réassort) */}
+      {/* Clients endormis — réveil WhatsApp 1-tap (Bible §4.14) */}
       {relances.length > 0 && (
         <div className="card p-5 mt-6">
-          <h3 className="font-semibold text-slate-200 mb-1 flex items-center gap-2"><AlertTriangle size={16} className="text-amber-400" /> À relancer (réassort)</h3>
-          <p className="text-xs text-slate-500 mb-3">Garages qui n'ont pas commandé depuis plus longtemps que d'habitude.</p>
+          <h3 className="font-semibold text-slate-200 mb-1 flex items-center gap-2"><AlertTriangle size={16} className="text-amber-400" /> 😴 À réveiller (réassort)</h3>
+          <p className="text-xs text-slate-500 mb-3">Clients qui n'ont pas commandé depuis plus longtemps que d'habitude. Un tap = un message — le client sort de la liste 30 jours.</p>
           <div className="space-y-2">
             {relances.map(r => (
-              <button key={r.id} onClick={() => router.push("/clients")} className="w-full flex items-center justify-between gap-2 text-sm bg-[var(--surface-2)] rounded-lg px-3 py-2 hover:bg-slate-800 text-left">
-                <span className="text-slate-200 font-medium truncate">{r.nom}</span>
-                <span className="text-xs text-slate-400 shrink-0">il y a {r.days} j · ~tous les {r.freq} j</span>
-              </button>
+              <div key={r.id} className="flex items-center justify-between gap-2 text-sm bg-[var(--surface-2)] rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <span className="text-slate-200 font-medium truncate">{r.nom}</span>
+                  <span className="text-xs text-slate-400 ms-2">il y a {r.days} j · ~tous les {r.freq} j</span>
+                </div>
+                <button onClick={() => reveiller(r)} className="shrink-0 flex items-center gap-1.5 text-xs bg-green-500/15 text-green-400 px-2.5 py-1.5 rounded-lg hover:bg-green-500/25 transition-colors">
+                  <MessageCircle size={13} /> Réveiller
+                </button>
+              </div>
             ))}
           </div>
         </div>
