@@ -10,7 +10,7 @@
 >
 > Et une règle d'usage : **si une fonctionnalité demande plus de 2 gestes ou une explication, elle est mal conçue.** On la redessine ou on la jette.
 >
-> **Dernière mise à jour : 17/07/2026** — ✅ §4.1 livré (segments clients, limite de crédit, relances 1-tap — commit b7ae4b0) · 🆕 catégorie **Huile moteur** au catalogue (Castrol, Motul, Total, Mannol, Fanfaro, Pemko, Kansler) → nouvelle idée 18 « Pack vidange » (§4.11) · 🆕 idées 19-25 (ventes perdues, kit véhicule, clients endormis, devis, arrivages, parrainage, Google Business — specs §4.12 à §4.16).
+> **Dernière mise à jour : 18/07/2026** — ✅ §4.1 livré le 14/07 (segments, limite de crédit, relances) · 🆕 catégorie **Huile moteur** au catalogue → idée 18 « Pack vidange » · ✅ **livré le 18/07** : pack vidange (§4.11), pastille de marge (§4.3), registre « j'ai pas » (§4.12), clients endormis (§4.14), avoir & parrainage (§4.15), diffusion arrivages (§4.16), devis « valable 7 j » (§4.15) — **un seul SQL à coller : `supabase/idees_bible_19_24.sql`**. Le kit véhicule (§4.13) existait déjà dans /ventes (suggestions « même véhicule »). Reste côté commerçant : fiche Google Business (idée 25).
 
 ---
 
@@ -60,7 +60,7 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 | 2 | ✅ Prix par segment (comptoir/garage/gros) | 💰💰💰 | Immédiat, permanent | S | 0 geste après le taggage |
 | 3 | ✅ Limite de crédit + badge fiabilité payeur | 💰💰 | Au premier impayé évité | S | 0 geste |
 | 4 | Promo stock dormant 60 j | 💰💰 | Chaque trimestre | S | 1 tap |
-| 5 | Marge visible à la vente (garde-fou) | 💰💰 | Immédiat | S | 0 geste |
+| 5 | ✅ Marge visible à la vente (garde-fou) | 💰💰 | Immédiat | S | 0 geste |
 | 6 | Bilan hebdo WhatsApp automatique | 💰 (pilotage) | Chaque vendredi | S | lire |
 | 7 | Commande WhatsApp → vente préparée | 💰💰💰 | Mois 2-3 | M | coller + valider |
 | 8 | Liste de chargement par tournée | 💰💰 (temps) | Mois 3 | S | lire + cocher |
@@ -73,14 +73,14 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 | 15 | Mode livreur (embauche sans perte de contrôle) | 💰💰 | Année 2-3 | M | — |
 | 16 | 💡 BONUS — Achats groupés entre confrères | 💰💰 | Année 3+ | L | — |
 | 17 | Marketplace / listings payants confrères | 💰💰💰 | Année 4+ | L | — |
-| 18 | 🆕 Pack vidange (filtre + huile en 1 tap) | 💰💰💰 | Immédiat | S | 1 tap |
-| 19 | 🆕 Registre « j'ai pas » (ventes perdues) | 💰💰💰 | Dès le 1er mois | S | 1 tap |
-| 20 | 🆕 Kit véhicule (huile + air + habitacle du même véhicule) | 💰💰 | Immédiat | M | 1 tap |
-| 21 | 🆕 Clients endormis (« à réveiller » 45 j) | 💰💰 | Chaque mois | S | 1 tap |
-| 22 | 🆕 Devis WhatsApp 1-tap | 💰💰 | Immédiat | S | 1 tap |
-| 23 | 🆕 Diffusion arrivages/promos (statut WhatsApp) | 💰💰 | Chaque semaine | S | 1 tap + partager |
-| 24 | 🆕 Parrainage garages (avoir 100 MAD) | 💰💰 | Mois 2-3 | S | 1 choix |
-| 25 | 💡 BONUS — Fiche Google Business (zéro code) | 💰💰 | Mois 1-3 | S | 1 h un dimanche |
+| 18 | ✅ Pack vidange (filtre + huile en 1 tap) | 💰💰💰 | Immédiat | S | 1 tap |
+| 19 | ✅ Registre « j'ai pas » (ventes perdues) | 💰💰💰 | Dès le 1er mois | S | 1 tap |
+| 20 | ✅ Kit véhicule (huile + air + habitacle du même véhicule) | 💰💰 | Immédiat | M | 1 tap |
+| 21 | ✅ Clients endormis (« à réveiller ») | 💰💰 | Chaque mois | S | 1 tap |
+| 22 | ✅ Devis WhatsApp 1-tap (valable 7 j) | 💰💰 | Immédiat | S | 1 tap |
+| 23 | ✅ Diffusion arrivages/promos (statut WhatsApp) | 💰💰 | Chaque semaine | S | 1 tap + partager |
+| 24 | ✅ Parrainage garages (avoir 100 MAD) | 💰💰 | Mois 2-3 | S | 1 choix |
+| 25 | 💡 BONUS — Fiche Google Business (zéro code, à faire par MOI) | 💰💰 | Mois 1-3 | S | 1 h un dimanche |
 
 **Comment lire ce tableau :** les idées 1-6 sont la trajectoire T1 (l'argent déjà gagné), 7-12 ouvrent T2 (la croissance), 10 et 17 construisent T3 (la plateforme). L'ordre du tableau EST l'ordre de construction. **✅ = déjà en ligne** (idées 1-2-3 livrées le 14/07/2026). L'idée 18 est arrivée avec la catégorie Huile moteur : elle se classe en réalité juste derrière les relances — à construire en phase 1.
 
@@ -386,7 +386,7 @@ Implémente la détection du stock dormant et la promo 1-tap (Bible §4.2). Pas 
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.3 Marge visible à la vente (idée 5)
+## §4.3 Marge visible à la vente (idée 5) — ✅ LIVRÉ le 18/07/2026
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -607,7 +607,7 @@ notify pgrst, 'reload schema';
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.11 🆕 Pack vidange — filtre + huile (idée 18)
+## §4.11 Pack vidange — filtre + huile (idée 18) — ✅ LIVRÉ le 18/07/2026
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -638,7 +638,7 @@ Implémente la suggestion « pack vidange » filtre + huile (Bible §4.11). Pas 
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.12 🆕 Registre « j'ai pas » — ventes perdues (idée 19)
+## §4.12 Registre « j'ai pas » — ventes perdues (idée 19) — ✅ LIVRÉ le 18/07/2026 (SQL : `idees_bible_19_24.sql`)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -681,7 +681,7 @@ notify pgrst, 'reload schema';
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.13 🆕 Kit véhicule — vente croisée par compatibilité (idée 20)
+## §4.13 Kit véhicule — vente croisée par compatibilité (idée 20) — ✅ déjà présent dans /ventes (suggestions « même véhicule »)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -709,7 +709,7 @@ Implémente la suggestion « kit véhicule » à la vente (Bible §4.13). Pas de
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.14 🆕 Clients endormis (idée 21)
+## §4.14 Clients endormis (idée 21) — ✅ LIVRÉ le 18/07/2026 (basé sur le rythme d'achat réel de chaque client, mieux que 45 j fixes)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -739,7 +739,7 @@ notify pgrst, 'reload schema';
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.15 🆕 Devis WhatsApp + avoir de parrainage (idées 22 et 24)
+## §4.15 Devis WhatsApp + avoir de parrainage (idées 22 et 24) — ✅ LIVRÉ le 18/07/2026
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -783,7 +783,7 @@ notify pgrst, 'reload schema';
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.16 🆕 Diffusion arrivages & promos (idée 23)
+## §4.16 Diffusion arrivages & promos (idée 23) — ✅ LIVRÉ le 18/07/2026
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -869,12 +869,12 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 
 ---
 
-# PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 17/07/2026 — le §4.1 est déjà en ligne ✅)*
+# PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/07/2026 — idées 5, 18-24 en ligne ✅)*
 
-**1. Tague tes 20 meilleurs clients** (type garage/gros + remise + limite de crédit, dans `/clients` — la fonctionnalité est en ligne) — 15 minutes sur ton téléphone. Tant que ce n'est pas fait, les relances et les prix automatiques tournent à vide. À partir de là, la marge et le risque se gèrent tout seuls, pour toujours.
+**1. Colle le SQL `supabase/idees_bible_19_24.sql` dans l'éditeur Supabase** (2 minutes, une seule fois) puis **recharge l'app** (PWA). Sans ça, « j'ai pas », le réveil des endormis et l'avoir/parrainage restent en veille — tout le reste marche déjà.
 
-**2. Demande à Opus le pack vidange** : *« implémente le §4.11 de la Bible (docs/BIBLE.md) — pack vidange filtre + huile »*. Les huiles sont au catalogue, chaque vidange doit sortir avec son bidon : c'est le panier ×5 dès cette semaine.
+**2. Tague tes 20 meilleurs clients** (type garage/gros + remise + limite de crédit, dans `/clients`) — 15 minutes. Tant que ce n'est pas fait, les prix automatiques et le parrainage tournent à vide.
 
-**3. Demande à Opus le stock dormant + la marge visible** (§4.2 + §4.3, aucun SQL) — le capital libéré par la première promo dormant finance toute la suite de la feuille de route.
+**3. Prends les nouveaux réflexes (une semaine suffit)** : client sans sa réf → « ❌ J'ai pas » · filtre à huile vendu → tap sur l'huile suggérée · vendredi → « 📣 Arrivages » en statut WhatsApp. Et un dimanche : la fiche Google Business (idée 25 — la seule chose que l'app ne peut pas faire à ta place).
 
-*Et dans un mois, quand les trois tournent : le parseur de commandes WhatsApp (§4.6). C'est lui qui ouvre la trajectoire T2 — le grossiste des garages. Le reste de la Bible attendra son trimestre. Relis le §7 chaque vendredi : cinq chiffres, dix ans.*
+*Prochains chantiers côté Opus : promo stock dormant (§4.2), bilan hebdo (§4.4), fiche produit WhatsApp (§4.5) — puis le parseur de commandes WhatsApp (§4.6) qui ouvre la trajectoire T2. Relis le §7 chaque vendredi : cinq chiffres, dix ans.*
