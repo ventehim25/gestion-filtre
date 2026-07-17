@@ -100,6 +100,18 @@ export type Garage = {
   refs_demandees: string | null;
   photo_url: string | null;
   jour: number | null;
+  client_id?: string | null; // fiche client liée (commandes WhatsApp — Bible §4.6)
+};
+
+// Rappel vidange d'un client final (Bible §4.10)
+export type RappelVidange = {
+  id: string;
+  created_at: string;
+  garage_id: string | null;
+  client_id: string | null;
+  vehicule: string;
+  date_prevue: string;
+  fait: boolean;
 };
 
 export type Equivalence = {

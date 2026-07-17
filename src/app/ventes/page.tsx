@@ -16,6 +16,7 @@ type LastSale = {
   lines: { nom: string; quantite: number; prix_unitaire: number }[];
   total: number; statut: SaleStatus; montant_paye: number; offline: boolean;
   parrainMsg?: string; // « 🎁 avoir crédité à … » (Bible §4.15)
+  clientId?: string;    // pour le rappel vidange (Bible §4.10)
 };
 
 type LineItem = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string; variant?: string; equivalence_id?: string | null; cout_unitaire?: number };
@@ -56,6 +57,19 @@ export default function VentesPage() {
   const [oilDismissed, setOilDismissed] = useState(false);
   // Avoir du client déduit sur cette vente (Bible §4.15)
   const [useAvoir, setUseAvoir] = useState(false);
+  // Rappel vidange après vente (Bible §4.10) : 1 champ, 5 secondes
+  const [vidVehicule, setVidVehicule] = useState("");
+  const [vidDate, setVidDate] = useState("");
+  const [vidSaved, setVidSaved] = useState(false);
+  async function saveRappelVidange() {
+    if (!vidVehicule.trim() || !lastSale?.clientId) return;
+    const { error } = await supabase.from("rappels_vidange").insert({
+      client_id: lastSale.clientId, vehicule: vidVehicule.trim(),
+      date_prevue: vidDate || new Date(Date.now() + 150 * 86400000).toISOString().slice(0, 10),
+    });
+    if (error) { alert("Table absente — colle le SQL supabase/idees_bible_2eme_vague.sql dans Supabase."); return; }
+    setVidSaved(true);
+  }
   // Marges révélées au clic (par vente)
   const [revealMargin, setRevealMargin] = useState<Set<string>>(new Set());
   function toggleMargin(id: string) {
@@ -403,10 +417,11 @@ export default function VentesPage() {
       setPendingCount(getPending().length);
     }
 
+    setVidVehicule(""); setVidDate(new Date(Date.now() + 150 * 86400000).toISOString().slice(0, 10)); setVidSaved(false);
     setLastSale({
       clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, ville: client?.ville ?? "", date,
       lines: validLines.map(l => ({ nom: l.nom, quantite: l.quantite, prix_unitaire: l.prix_unitaire })),
-      total: saleTotal, statut, montant_paye: montant, offline: !savedOnline, parrainMsg,
+      total: saleTotal, statut, montant_paye: montant, offline: !savedOnline, parrainMsg, clientId,
     });
     setShowForm(false); setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye");
     setOilDismissed(false); setUseAvoir(false);
@@ -767,6 +782,28 @@ export default function VentesPage() {
             <p className="text-sm text-slate-400">{lastSale.clientNom || "Client"} · <b className="text-blue-400">{lastSale.total.toFixed(2)} MAD</b></p>
             {lastSale.offline && <p className="text-xs text-yellow-400 mt-2">Elle sera synchronisée automatiquement dès le retour d&apos;internet.</p>}
             {lastSale.parrainMsg && <p className="text-xs text-yellow-300 mt-2">{lastSale.parrainMsg}</p>}
+            {/* Rappel vidange (Bible §4.10) — optionnel, 5 secondes, dans 5 mois l'app te le rappelle */}
+            {!lastSale.offline && (
+              <div className="mt-4 text-left bg-[var(--surface-2)] rounded-lg p-3">
+                {vidSaved ? (
+                  <p className="text-xs text-green-400 font-medium">🔔 Rappel enregistré — je te préviens à la date prévue ✓</p>
+                ) : (
+                  <>
+                    <p className="text-xs text-slate-400 mb-2">🔔 Rappel vidange (optionnel) : quelle voiture ?</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      <input className="input col-span-2 text-sm" placeholder="Ex : Dacia Dokker de Ahmed"
+                        value={vidVehicule} onChange={e => setVidVehicule(e.target.value)} />
+                      <input type="date" className="input text-sm" value={vidDate} onChange={e => setVidDate(e.target.value)} />
+                    </div>
+                    {vidVehicule.trim() && (
+                      <button onClick={saveRappelVidange} className="mt-2 w-full text-xs bg-blue-500/15 text-blue-300 px-2 py-1.5 rounded-lg hover:bg-blue-500/25 font-medium">
+                        Enregistrer le rappel
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
             <div className="flex flex-col gap-2 mt-5">
               <button onClick={() => sendWhatsApp(lastSale.clientTel, buildReceipt(lastSale))}
                 className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-green-600 hover:bg-green-500 text-white font-medium">

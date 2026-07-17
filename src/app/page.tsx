@@ -71,6 +71,8 @@ export default function Dashboard() {
   const [promos, setPromos] = useState<{ reference: string; prix_promo: number; prix_vente: number }[]>([]);
   // Référence la plus demandée « j'ai pas » (Bible §4.12)
   const [demandeHot, setDemandeHot] = useState<{ reference: string; count: number } | null>(null);
+  // Vidanges à rappeler cette semaine (Bible §4.10)
+  const [vidanges, setVidanges] = useState<{ id: string; vehicule: string; nom: string; telephone: string | null }[]>([]);
   // Impayés à relancer (Bible §4.1) — distinct de la relance "réassort" ci-dessus
   const [impayes, setImpayes] = useState<{ id: string; nom: string; telephone: string | null; solde: number; days: number }[]>([]);
   // Montants sensibles masqués par défaut — révélés au clic
@@ -173,6 +175,17 @@ export default function Dashboard() {
         }
       } catch { /* table absente */ }
 
+      // Vidanges dues sous 7 jours (Bible §4.10)
+      try {
+        const limite = new Date(todayMs + 7 * 86400000).toISOString().split("T")[0];
+        const { data: rv, error: rvErr } = await supabase.from("rappels_vidange")
+          .select("id, vehicule, client:clients(nom, telephone)").eq("fait", false).lte("date_prevue", limite).limit(10);
+        if (!rvErr && rv) {
+          setVidanges((rv as unknown as { id: string; vehicule: string; client: { nom: string; telephone: string | null } | null }[])
+            .map(r => ({ id: r.id, vehicule: r.vehicule, nom: r.client?.nom ?? "?", telephone: r.client?.telephone ?? null })));
+        }
+      } catch { /* table absente */ }
+
       // Impayés à relancer (Bible §4.1) : solde dû par client, hors relances faites il y a < 7 j
       const unpaidRows: { client_id: string; total: number; montant_paye: number; date: string }[] = [];
       for (let i = 0; i < 20; i++) {
@@ -219,6 +232,13 @@ export default function Dashboard() {
     sendWhatsApp(c.telephone, msg);
     await supabase.from("clients").update({ derniere_relance: new Date().toISOString().split("T")[0] }).eq("id", c.id);
     setImpayes(prev => prev.filter(x => x.id !== c.id));
+  }
+
+  // Rappel vidange 1-tap (Bible §4.10) : le garage gagne un client rappelé, moi je gagne le filtre
+  async function rappelerVidange(v: { id: string; vehicule: string; nom: string; telephone: string | null }) {
+    sendWhatsApp(v.telephone, `Salam ${v.nom} 🙏 La ${v.vehicule} arrive à sa vidange — je te livre le filtre (et l'huile) ?`);
+    await supabase.from("rappels_vidange").update({ fait: true }).eq("id", v.id);
+    setVidanges(prev => prev.filter(x => x.id !== v.id));
   }
 
   // Réveil 1-tap d'un client endormi (Bible §4.14) : WhatsApp + snooze 30 j
@@ -441,6 +461,27 @@ export default function Dashboard() {
                 </div>
                 <button onClick={() => relancerImpaye(c)} className="shrink-0 flex items-center gap-1.5 text-xs bg-green-500/15 text-green-400 px-2.5 py-1.5 rounded-lg hover:bg-green-500/25 transition-colors">
                   <MessageCircle size={13} /> Relancer
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Vidanges à rappeler (Bible §4.10) */}
+      {vidanges.length > 0 && (
+        <div className="card p-5 mt-6 border-blue-500/20">
+          <h3 className="font-semibold text-slate-200 mb-1 flex items-center gap-2">🔔 Vidanges à rappeler</h3>
+          <p className="text-xs text-slate-500 mb-3">Le client gagne un rappel, toi tu gagnes le filtre + l&apos;huile.</p>
+          <div className="space-y-2">
+            {vidanges.map(v => (
+              <div key={v.id} className="flex items-center justify-between gap-2 text-sm bg-[var(--surface-2)] rounded-lg px-3 py-2">
+                <div className="min-w-0">
+                  <span className="text-slate-200 font-medium truncate">{v.vehicule}</span>
+                  <span className="text-xs text-slate-500 ms-2">· {v.nom}</span>
+                </div>
+                <button onClick={() => rappelerVidange(v)} className="shrink-0 flex items-center gap-1.5 text-xs bg-blue-500/15 text-blue-300 px-2.5 py-1.5 rounded-lg hover:bg-blue-500/25 transition-colors">
+                  <MessageCircle size={13} /> Rappeler
                 </button>
               </div>
             ))}

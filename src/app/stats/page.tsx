@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
+import { buildBilanHebdo } from "@/lib/bilan";
+import { sendWhatsApp } from "@/lib/whatsapp";
 
 type MonthlyStat = { mois: string; total: number; count: number };
 type CityStat = { ville: string; total: number };
@@ -34,6 +36,15 @@ export default function StatsPage() {
   const [supplierRows, setSupplierRows] = useState<SupplierRow[]>([]);
   const [cat, setCat] = useState({ capVentes: 0, capBenef: 0, credVentes: 0, credBenef: 0, nonAttr: 0 });
   const [capEvol, setCapEvol] = useState<CapPoint[]>([]);
+  // Bilan hebdo WhatsApp (Bible §4.4)
+  const [bilanLoading, setBilanLoading] = useState(false);
+  async function monBilan() {
+    setBilanLoading(true);
+    try {
+      const text = await buildBilanHebdo();
+      sendWhatsApp(null, text); // à soi-même : choisir son propre contact
+    } finally { setBilanLoading(false); }
+  }
 
   useEffect(() => {
     async function load() {
@@ -185,7 +196,12 @@ export default function StatsPage() {
 
   return (
     <div>
-      <Header title="stats" />
+      <Header title="stats" action={
+        <button onClick={monBilan} disabled={bilanLoading}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium disabled:opacity-50">
+          📊 {bilanLoading ? "Calcul…" : "Mon bilan de la semaine"}
+        </button>
+      } />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <div className="card p-5">

@@ -32,6 +32,41 @@ export default function ClientsPage() {
   const [reveal, setReveal] = useState<Set<string>>(new Set());
   // Dette réelle par client (calculée en direct depuis les ventes — solde_du n'est jamais mis à jour automatiquement)
   const [debts, setDebts] = useState<Record<string, { total: number; oldest: string }>>({});
+  // Fidélité paliers trimestriels (Bible §4.9) : CA du trimestre en cours par client
+  const [trimCA, setTrimCA] = useState<Record<string, number>>({});
+  const [palierIgnore, setPalierIgnore] = useState<Set<string>>(new Set());
+
+  // Palier suggéré selon le CA trimestriel : jamais appliqué sans validation (c'est du prix)
+  function palierPour(ca: number): number {
+    if (ca >= 15000) return 10;
+    if (ca >= 8000) return 8;
+    if (ca >= 3000) return 5;
+    return 0;
+  }
+  function prochainPalier(ca: number): { seuil: number; remise: number } | null {
+    if (ca < 3000) return { seuil: 3000, remise: 5 };
+    if (ca < 8000) return { seuil: 8000, remise: 8 };
+    if (ca < 15000) return { seuil: 15000, remise: 10 };
+    return null;
+  }
+
+  async function loadTrimCA() {
+    const now = new Date();
+    const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1).toISOString().slice(0, 10);
+    const map: Record<string, number> = {};
+    for (let i = 0; i < 20; i++) {
+      const { data } = await supabase.from("sales").select("client_id, total").gte("date", qStart).range(i * 1000, i * 1000 + 999);
+      if (!data || data.length === 0) break;
+      for (const s of data as { client_id: string; total: number }[]) map[s.client_id] = (map[s.client_id] ?? 0) + s.total;
+      if (data.length < 1000) break;
+    }
+    setTrimCA(map);
+  }
+
+  async function appliquerPalier(c: Client, remise: number) {
+    await supabase.from("clients").update({ remise_pct: remise }).eq("id", c.id);
+    setClients(prev => prev.map(x => x.id === c.id ? { ...x, remise_pct: remise } : x));
+  }
   function toggleReveal(id: string) {
     setReveal(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
@@ -78,7 +113,7 @@ export default function ClientsPage() {
     setDebts(map);
   }
 
-  useEffect(() => { load(); loadMargins(); loadDebts(); }, []);
+  useEffect(() => { load(); loadMargins(); loadDebts(); loadTrimCA(); }, []);
 
   async function save() {
     // parrain_id "" → null ; si la colonne n'existe pas encore (SQL Bible §4.15 pas collé), on réessaie sans
@@ -217,6 +252,27 @@ export default function ClientsPage() {
                 <p className="text-xs text-orange-600 font-medium">{t("pending")}: {debts[c.id].total.toFixed(0)} MAD</p>
               </div>
             )}
+            {/* Fidélité paliers trimestriels (Bible §4.9) — suggestion à valider, jamais automatique */}
+            {(c.type === "garage" || c.type === "gros") && (() => {
+              const ca = trimCA[c.id] ?? 0;
+              const suggere = palierPour(ca);
+              const next = prochainPalier(ca);
+              if (suggere > (c.remise_pct ?? 0) && !palierIgnore.has(c.id)) {
+                return (
+                  <div className="mt-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg px-3 py-2 flex items-center justify-between gap-2">
+                    <p className="text-xs text-yellow-400 font-medium">💡 {ca.toFixed(0)} MAD ce trim. → palier −{suggere}%</p>
+                    <div className="flex gap-1.5 shrink-0">
+                      <button onClick={() => appliquerPalier(c, suggere)} className="text-[11px] bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded-lg hover:bg-yellow-500/30 font-medium">Appliquer</button>
+                      <button onClick={() => setPalierIgnore(prev => new Set(prev).add(c.id))} className="text-[11px] text-slate-500 hover:text-slate-300 px-1">✕</button>
+                    </div>
+                  </div>
+                );
+              }
+              if (next && ca > 0) {
+                return <p className="mt-2 text-[11px] text-slate-500">🎯 Encore {(next.seuil - ca).toFixed(0)} MAD ce trimestre pour −{next.remise}%</p>;
+              }
+              return null;
+            })()}
             {margins[c.id] && (
               <div className="mt-2">
                 {reveal.has(c.id) ? (

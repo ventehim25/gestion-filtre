@@ -6,7 +6,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
@@ -166,6 +166,28 @@ export default function ProduitsPage() {
     const lignes = promos.map(p => `• ${p.reference} — ${p.nom_fr}\n   ${p.prix_vente} ➜ *${p.prix_promo} MAD*`).join("\n");
     const text = ["🔥 *PROMOS FiltroPro* 🔥", "", lignes, "", "Dispo jusqu'à épuisement du stock.", "📞 06 02 35 02 90"].join("\n");
     sendWhatsApp(null, text);
+  }
+
+  // Fiche produit WhatsApp (Bible §4.5) : photo mentale de la boîte en 5 secondes —
+  // compatibilités = UNIQUEMENT la table applications, jamais inventées.
+  async function ficheWhatsApp(p: Product) {
+    const { data: apps, count } = await supabase.from("applications")
+      .select("marque, modele, moteur", { count: "exact" }).eq("product_id", p.id).limit(4);
+    const variantes = (equivMap[p.id] ?? []).filter(e => e.stock > 0).map(e => e.marque);
+    const lignes = [
+      `🔧 *${p.nom_fr || "Filtre"} ${p.marque || "Filtron"} ${p.reference}*`,
+    ];
+    if (p.dimensions) lignes.push(`📏 ${p.dimensions}`);
+    const appRows = (apps ?? []) as { marque: string; modele: string; moteur: string | null }[];
+    if (appRows.length > 0) {
+      lignes.push("", "🚗 Compatible :");
+      for (const a of appRows) lignes.push(`• ${a.marque} ${a.modele}${a.moteur ? ` ${a.moteur}` : ""}`);
+      const reste = (count ?? appRows.length) - appRows.length;
+      if (reste > 0) lignes.push(`… et ${reste} autres véhicules`);
+    }
+    if (variantes.length > 0) lignes.push("", `🏷️ Marques dispo : ${[...new Set(variantes)].join(", ")}`);
+    lignes.push("", "📞 *FiltroPro* — 06 02 35 02 90 · on livre 🚚");
+    sendWhatsApp(null, lignes.join("\n"));
   }
 
   function addEquivRow() {
@@ -438,6 +460,7 @@ export default function ProduitsPage() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
+                    <button onClick={() => ficheWhatsApp(p)} className="text-green-500 hover:text-green-400" title="Fiche produit WhatsApp"><MessageCircle size={15} /></button>
                     <button onClick={() => startEdit(p)} className="text-blue-500 hover:text-blue-700"><Pencil size={15} /></button>
                     <button onClick={() => remove(p.id)} className="text-red-400 hover:text-red-600"><Trash2 size={15} /></button>
                   </div>
