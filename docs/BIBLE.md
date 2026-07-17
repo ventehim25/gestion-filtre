@@ -9,6 +9,8 @@
 > Tout le reste — nouveaux clients, nouvelles villes, nouveaux services — vient APRÈS ces trois lois.
 >
 > Et une règle d'usage : **si une fonctionnalité demande plus de 2 gestes ou une explication, elle est mal conçue.** On la redessine ou on la jette.
+>
+> **Dernière mise à jour : 17/07/2026** — ✅ §4.1 livré (segments clients, limite de crédit, relances 1-tap — commit b7ae4b0) · 🆕 catégorie **Huile moteur** au catalogue (Castrol, Motul, Total, Mannol, Fanfaro, Pemko, Kansler) → nouvelle idée 18 « Pack vidange » (§4.11).
 
 ---
 
@@ -54,9 +56,9 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 
 | # | Idée | Argent | Quand ça paye | Effort | Geste utilisateur |
 |---|------|--------|---------------|--------|-------------------|
-| 1 | Relances impayés WhatsApp 1-tap | 💰💰💰 | Semaine 1 | S | 1 tap |
-| 2 | Prix par segment (comptoir/garage/gros) | 💰💰💰 | Immédiat, permanent | S | 0 geste après le taggage |
-| 3 | Limite de crédit + badge fiabilité payeur | 💰💰 | Au premier impayé évité | S | 0 geste |
+| 1 | ✅ Relances impayés WhatsApp 1-tap | 💰💰💰 | Semaine 1 | S | 1 tap |
+| 2 | ✅ Prix par segment (comptoir/garage/gros) | 💰💰💰 | Immédiat, permanent | S | 0 geste après le taggage |
+| 3 | ✅ Limite de crédit + badge fiabilité payeur | 💰💰 | Au premier impayé évité | S | 0 geste |
 | 4 | Promo stock dormant 60 j | 💰💰 | Chaque trimestre | S | 1 tap |
 | 5 | Marge visible à la vente (garde-fou) | 💰💰 | Immédiat | S | 0 geste |
 | 6 | Bilan hebdo WhatsApp automatique | 💰 (pilotage) | Chaque vendredi | S | lire |
@@ -71,8 +73,9 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 | 15 | Mode livreur (embauche sans perte de contrôle) | 💰💰 | Année 2-3 | M | — |
 | 16 | 💡 BONUS — Achats groupés entre confrères | 💰💰 | Année 3+ | L | — |
 | 17 | Marketplace / listings payants confrères | 💰💰💰 | Année 4+ | L | — |
+| 18 | 🆕 Pack vidange (filtre + huile en 1 tap) | 💰💰💰 | Immédiat | S | 1 tap |
 
-**Comment lire ce tableau :** les idées 1-6 sont la trajectoire T1 (l'argent déjà gagné), 7-12 ouvrent T2 (la croissance), 10 et 17 construisent T3 (la plateforme). L'ordre du tableau EST l'ordre de construction.
+**Comment lire ce tableau :** les idées 1-6 sont la trajectoire T1 (l'argent déjà gagné), 7-12 ouvrent T2 (la croissance), 10 et 17 construisent T3 (la plateforme). L'ordre du tableau EST l'ordre de construction. **✅ = déjà en ligne** (idées 1-2-3 livrées le 14/07/2026). L'idée 18 est arrivée avec la catégorie Huile moteur : elle se classe en réalité juste derrière les relances — à construire en phase 1.
 
 ## 2.2 Détail des idées (problème → solution → argent → geste)
 
@@ -180,6 +183,14 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 - **Le geste.** 1 tap depuis la fiche produit.
 - **Effort : S** — spec §4.5.
 
+### Idée 18 · 🆕 Pack vidange — *filtre + huile sur la même visite*
+
+- **Le problème.** Le client (ou le garage) t'achète le filtre OE667/6 à ~30 MAD… et achète le bidon d'huile à 300 MAD ailleurs. Or une vidange, c'est TOUJOURS les deux ensemble — tu laisses partir la plus grosse ligne du ticket. L'huile est maintenant au catalogue (Castrol, Motul, Total, Mannol, Fanfaro, Pemko, Kansler) : il faut qu'elle sorte systématiquement avec le filtre.
+- **La solution.** À la vente, dès qu'un filtre à huile entre dans le panier, l'app propose discrètement « 🛢️ + l'huile ? » avec les huiles en stock — un tap et la ligne s'ajoute (remise du client appliquée, pastille de marge comprise).
+- **Pourquoi ça rapporte.** C'est le panier multiplié par 5 à 10 **sur une visite déjà payée**. La marge huile (15-25 %) est plus faible en %, mais énorme en absolu : ~45-70 MAD par bidon contre ~12 MAD sur le filtre seul. Si 10 vidanges par semaine passent au pack, c'est **+2 000 à 2 500 MAD de marge par mois** — sans un client de plus, sans un geste de plus qu'un tap.
+- **Le geste.** 1 tap sur la suggestion qui apparaît toute seule. Rien à chercher, rien à configurer.
+- **Effort : S** — spec §4.11.
+
 ### Idées 14-17 · Année 2 et au-delà (résumé — détails et seuils au §5)
 
 - **14 · Abonnement « réappro auto » garages.** Le garage abonné (149 MAD/mois) ne commande plus : TU passes avec ce qu'il faut, calculé sur sa consommation réelle. NE PAS lancer avant ~30 garages actifs et 6 mois d'historique fiable — la rente exige une confiance déjà installée. C'est le premier revenu qui ne dépend pas d'un carton porté.
@@ -193,7 +204,7 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 
 ## Phase 1 — 0-6 mois : ENCAISSER (trajectoire T1)
 
-**Chantiers (5) :** ① relances impayés 1-tap (§4.1) · ② prix par segment + limite de crédit + badge (§4.1) · ③ promo stock dormant (§4.2) · ④ marge visible (§4.3) · ⑤ bilan hebdo (§4.4) — et en bonus rapide la fiche produit WhatsApp (§4.5).
+**Chantiers (6) :** ① ✅ relances impayés 1-tap (§4.1 — livré 14/07/2026) · ② ✅ prix par segment + limite de crédit + badge (§4.1 — livré) · ③ 🆕 pack vidange filtre + huile (§4.11) · ④ promo stock dormant (§4.2) · ⑤ marge visible (§4.3) · ⑥ bilan hebdo (§4.4) — et en bonus rapide la fiche produit WhatsApp (§4.5).
 **Résultat attendu :** impayés divisés par 2, +2-3 points de marge, stock dormant liquidé une première fois, zéro vente à perte. Ordre de grandeur : **+1 500 à 3 000 MAD de bénéfice/mois à volume constant**.
 **Signal de passage à la phase 2 :** deux mois de suite avec encaissé/vendu ≥ 85 % ET impayés totaux < 1 mois de bénéfice.
 
@@ -231,7 +242,9 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 
 ---
 
-## §4.1 Segments clients, limite de crédit, relances (idées 1-2-3)
+## §4.1 Segments clients, limite de crédit, relances (idées 1-2-3) — ✅ LIVRÉ le 14/07/2026
+
+> **Fait** (commit b7ae4b0) : SQL `supabase/clients_segments.sql` appliqué ; `/clients` (type + remise + limite + badge fiabilité basé sur l'âge de la dette en cours) ; accueil (carte « À relancer », WhatsApp 1-tap, masquage 7 jours) ; `/ventes` (remise auto sur chaque ligne, bandeau limite de crédit non bloquant). Le solde client est désormais **calculé en direct** depuis les ventes (commit b8f5240) — ne plus se fier à `clients.solde_du` stocké. La spec d'origine est conservée ci-dessous pour référence.
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -529,6 +542,37 @@ notify pgrst, 'reload schema';
 Contraintes : §4.0. Commit + push.
 ```
 
+## §4.11 🆕 Pack vidange — filtre + huile (idée 18)
+
+**Instructions pour Opus — copiable tel quel :**
+
+```
+Implémente la suggestion « pack vidange » filtre + huile (Bible §4.11). Pas de SQL
+(la catégorie 'huile_moteur' existe déjà — commit 94f5d11).
+
+1) Page /ventes — quand une ligne de catégorie 'filtre_huile' est ajoutée au panier
+   (scan, recherche ou variante) ET qu'aucune ligne 'huile_moteur' n'est déjà
+   dans le panier :
+   - afficher SOUS la ligne une rangée discrète refermable « 🛢️ + l'huile ? » :
+     les produits categorie 'huile_moteur' avec stock > 0, triés par quantités
+     vendues sur 90 jours (paginer sale_items avec .range(), fallback tri par nom),
+     6 suggestions max, format « {marque/nom} — {prix} MAD » ;
+   - 1 tap sur une suggestion = ajoute la ligne au panier avec la logique
+     existante (remise du client appliquée, cout_unitaire figé, pastille de
+     marge §4.3 si déjà en place) et referme la rangée ;
+   - croix ✕ pour fermer sans ajouter ; ne réapparaît pas dans la même vente ;
+   - discret : une seule rangée horizontale scrollable, pas de modal,
+     pas de popup — zéro friction si on l'ignore.
+
+2) Fiche produit WhatsApp (§4.5, si déjà implémentée) : pour un filtre à huile,
+   ajouter une ligne « 🛢️ Huiles disponibles : {marques en stock} » (sans prix).
+
+3) Ne JAMAIS suggérer une huile hors stock. Aucun mapping viscosité↔véhicule
+   inventé : la suggestion est triée par popularité réelle des ventes, le choix
+   de la bonne huile reste à l'utilisateur.
+Contraintes : §4.0. Commit + push.
+```
+
 ---
 
 # 5. MODÈLE ÉCONOMIQUE
@@ -538,7 +582,7 @@ Contraintes : §4.0. Commit + push.
 Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD vendu 30). Ton levier n'est **PAS** le prix de vente — le marché le fixe. Tes trois vrais leviers :
 1. **La rotation du capital** : 10 000 MAD qui tournent 12 fois/an à 40 % rapportent plus que 30 000 MAD qui tournent 3 fois.
 2. **Le taux d'encaissement** : une vente non encaissée est un prêt gratuit que TU fais.
-3. **Le mix** : vendre la variante Mann HU7032Z quand le client veut de la qualité — marge absolue supérieure sur la même visite, même client, même geste.
+3. **Le mix** : vendre la variante Mann HU7032Z quand le client veut de la qualité, et surtout **l'huile avec le filtre** (idée 18) — marge absolue supérieure sur la même visite, même client, même geste. Un bidon à 300 MAD rapporte 4 à 6 fois la marge du filtre qu'il accompagne.
 
 ## 5.2 Comment tu gagnes demain
 
@@ -592,12 +636,12 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 
 ---
 
-# PAR OÙ JE COMMENCE LUNDI MATIN
+# PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 17/07/2026 — le §4.1 est déjà en ligne ✅)*
 
-**1. Colle le SQL du §4.1 dans l'éditeur Supabase** (2 minutes), puis demande à Opus : *« implémente le §4.1 de la Bible (docs/BIBLE.md) — segments, limite de crédit, relances »*. C'est ton argent déjà gagné qui rentre.
+**1. Tague tes 20 meilleurs clients** (type garage/gros + remise + limite de crédit, dans `/clients` — la fonctionnalité est en ligne) — 15 minutes sur ton téléphone. Tant que ce n'est pas fait, les relances et les prix automatiques tournent à vide. À partir de là, la marge et le risque se gèrent tout seuls, pour toujours.
 
-**2. Tague tes 20 meilleurs clients** (type garage/gros + remise + limite de crédit) — 15 minutes sur ton téléphone. À partir de là, la marge et le risque se gèrent tout seuls, pour toujours.
+**2. Demande à Opus le pack vidange** : *« implémente le §4.11 de la Bible (docs/BIBLE.md) — pack vidange filtre + huile »*. Les huiles sont au catalogue, chaque vidange doit sortir avec son bidon : c'est le panier ×5 dès cette semaine.
 
-**3. Lance la première promo stock dormant** dès que le §4.2 est en ligne — le capital libéré finance toute la suite de la feuille de route.
+**3. Demande à Opus le stock dormant + la marge visible** (§4.2 + §4.3, aucun SQL) — le capital libéré par la première promo dormant finance toute la suite de la feuille de route.
 
 *Et dans un mois, quand les trois tournent : le parseur de commandes WhatsApp (§4.6). C'est lui qui ouvre la trajectoire T2 — le grossiste des garages. Le reste de la Bible attendra son trimestre. Relis le §7 chaque vendredi : cinq chiffres, dix ans.*
