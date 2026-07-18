@@ -581,6 +581,7 @@ export default function Dashboard() {
           <span className="font-bold text-slate-200">{t("appName")}</span>
         </div>
         <p className="text-xs text-slate-500">Pièces &amp; Filtres Auto · Maroc — © 2026</p>
+        <a href="/c/OE667%2F6" className="text-[11px] text-slate-600 hover:text-slate-400 underline">Catalogue public</a>
       </footer>
     </div>
   );
