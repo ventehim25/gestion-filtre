@@ -10,7 +10,7 @@
 >
 > Et une règle d'usage : **si une fonctionnalité demande plus de 2 gestes ou une explication, elle est mal conçue.** On la redessine ou on la jette.
 >
-> **Dernière mise à jour : 18/07/2026** — ✅ §4.1 livré le 14/07 (segments, limite de crédit, relances) · 🆕 catégorie **Huile moteur** au catalogue → idée 18 « Pack vidange » · ✅ **livré le 18/07** : pack vidange (§4.11), pastille de marge (§4.3), registre « j'ai pas » (§4.12), clients endormis (§4.14), avoir & parrainage (§4.15), diffusion arrivages (§4.16), devis « valable 7 j » (§4.15) — **un seul SQL à coller : `supabase/idees_bible_19_24.sql`**. Le kit véhicule (§4.13) existait déjà dans /ventes (suggestions « même véhicule »). Reste côté commerçant : fiche Google Business (idée 25).
+> **Dernière mise à jour : 18/07/2026** — **TOUTES les idées des phases 1-2 sont en ligne** ✅ : §4.1 (14/07), §4.3/§4.11-§4.16 (18/07, SQL `idees_bible_19_24.sql` collé ✓), puis §4.2 dormant, §4.4 bilan hebdo, §4.5 fiche produit, §4.6 commandes garages + chargement (page `/commandes`), §4.7 prédictif, §4.8 catalogue public SEO (`/c/…` + sitemap), §4.9 paliers, §4.10 rappels vidange — **SQL à coller : `supabase/idees_bible_2eme_vague.sql`**. Reste côté commerçant : taguer les clients, fiche Google Business (idée 25). Prochaines constructions = phase 3 (abonnement réappro, mode livreur) quand les seuils du §5.3 sont atteints.
 
 ---
 
@@ -59,16 +59,16 @@ Les trois trajectoires ne sont pas des choix : elles se **cumulent**. T1 tout de
 | 1 | ✅ Relances impayés WhatsApp 1-tap | 💰💰💰 | Semaine 1 | S | 1 tap |
 | 2 | ✅ Prix par segment (comptoir/garage/gros) | 💰💰💰 | Immédiat, permanent | S | 0 geste après le taggage |
 | 3 | ✅ Limite de crédit + badge fiabilité payeur | 💰💰 | Au premier impayé évité | S | 0 geste |
-| 4 | Promo stock dormant 60 j | 💰💰 | Chaque trimestre | S | 1 tap |
+| 4 | ✅ Promo stock dormant 60 j | 💰💰 | Chaque trimestre | S | 1 tap |
 | 5 | ✅ Marge visible à la vente (garde-fou) | 💰💰 | Immédiat | S | 0 geste |
-| 6 | Bilan hebdo WhatsApp automatique | 💰 (pilotage) | Chaque vendredi | S | lire |
-| 7 | Commande WhatsApp → vente préparée | 💰💰💰 | Mois 2-3 | M | coller + valider |
-| 8 | Liste de chargement par tournée | 💰💰 (temps) | Mois 3 | S | lire + cocher |
-| 9 | Réappro prédictif (jours de stock restants) | 💰💰 | Mois 3-4 | M | lire + commander |
-| 10 | Catalogue public SEO | 💰💰💰 | Mois 6-12 (composé) | M | 0 geste |
-| 11 | Fidélité paliers garages (remise trimestrielle) | 💰💰 | Mois 6 | S | 1 tap pour valider |
-| 12 | 💡 BONUS — Rappel vidange client final | 💰💰💰 | Mois 6-9 | M | 1 tap |
-| 13 | 💡 BONUS — Fiche produit WhatsApp | 💰 | Immédiat | S | 1 tap |
+| 6 | ✅ Bilan hebdo WhatsApp (bouton /stats) | 💰 (pilotage) | Chaque vendredi | S | lire |
+| 7 | ✅ Commande WhatsApp → vente préparée | 💰💰💰 | Mois 2-3 | M | coller + valider |
+| 8 | ✅ Liste de chargement (onglet /commandes) | 💰💰 (temps) | Mois 3 | S | lire + cocher |
+| 9 | ✅ Réappro prédictif (jours de stock restants) | 💰💰 | Mois 3-4 | M | lire + commander |
+| 10 | ✅ Catalogue public SEO (/c/…) | 💰💰💰 | Mois 6-12 (composé) | M | 0 geste |
+| 11 | ✅ Fidélité paliers garages (remise trimestrielle) | 💰💰 | Mois 6 | S | 1 tap pour valider |
+| 12 | ✅ Rappel vidange client final | 💰💰💰 | Mois 6-9 | M | 1 tap |
+| 13 | ✅ Fiche produit WhatsApp | 💰 | Immédiat | S | 1 tap |
 | 14 | Abonnement « réappro auto » garages | 💰💰💰 | Année 2+ | L | — |
 | 15 | Mode livreur (embauche sans perte de contrôle) | 💰💰 | Année 2-3 | M | — |
 | 16 | 💡 BONUS — Achats groupés entre confrères | 💰💰 | Année 3+ | L | — |
@@ -357,7 +357,7 @@ notify pgrst, 'reload schema';
 Contraintes : §4.0 de la Bible. Commit + push.
 ```
 
-## §4.2 Promo stock dormant (idée 4)
+## §4.2 Promo stock dormant (idée 4) — ✅ LIVRÉ le 18/07/2026 (onglet 💤 Dormant dans /reappro)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -404,7 +404,7 @@ connaît le code. Recalculer à chaque modification du prix ou de la quantité.
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.4 Bilan hebdo WhatsApp (idée 6)
+## §4.4 Bilan hebdo WhatsApp (idée 6) — ✅ LIVRÉ le 18/07/2026 (bouton dans /stats)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -426,7 +426,7 @@ Paginer toutes les requêtes (.range()).
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.5 Fiche produit WhatsApp (idée 13)
+## §4.5 Fiche produit WhatsApp (idée 13) — ✅ LIVRÉ le 18/07/2026 (bouton vert dans /produits)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -445,7 +445,7 @@ Ne JAMAIS inventer une compatibilité : uniquement la table applications.
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.6 Commande WhatsApp → vente préparée + liste de chargement (idées 7-8)
+## §4.6 Commande WhatsApp → vente préparée + liste de chargement (idées 7-8) — ✅ LIVRÉ le 18/07/2026 (page /commandes, SQL `idees_bible_2eme_vague.sql`)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -491,7 +491,7 @@ notify pgrst, 'reload schema';
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.7 Réappro prédictif (idée 9)
+## §4.7 Réappro prédictif (idée 9) — ✅ LIVRÉ le 18/07/2026 (onglet 📈 Prédictif dans /reappro)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -512,7 +512,7 @@ Page /reappro — onglet « Prédictif » (l'onglet stock_min actuel reste) :
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.8 Catalogue public SEO (idée 10)
+## §4.8 Catalogue public SEO (idée 10) — ✅ LIVRÉ le 18/07/2026 (/c/[réf] + sitemap.xml + robots.txt, hors service worker)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -546,7 +546,7 @@ Implémente le catalogue public SEO (Bible §4.8). Pas de SQL.
 Aucune donnée sensible exposée. Contraintes : §4.0. Commit + push.
 ```
 
-## §4.9 Fidélité paliers garages (idée 11)
+## §4.9 Fidélité paliers garages (idée 11) — ✅ LIVRÉ le 18/07/2026 (suggestions sur les fiches /clients)
 
 **Instructions pour Opus — copiable tel quel :**
 
@@ -567,7 +567,7 @@ Page /clients — pour les clients type 'garage' ou 'gros' :
 Contraintes : §4.0. Commit + push.
 ```
 
-## §4.10 💡 Rappel vidange client final (idée 12)
+## §4.10 💡 Rappel vidange client final (idée 12) — ✅ LIVRÉ le 18/07/2026 (après-vente + carte accueil, SQL `idees_bible_2eme_vague.sql`)
 
 **Instructions pour Opus — copiable tel quel :**
 
