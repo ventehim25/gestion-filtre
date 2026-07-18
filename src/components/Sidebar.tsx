@@ -18,6 +18,7 @@ const navItems = [
   { href: "/catalogues", icon: FileText, key: "catalogues" as const },
   { href: "/clients", icon: Users, key: "clients" as const },
   { href: "/ventes", icon: ShoppingCart, key: "sales" as const },
+  { href: "/commandes", icon: ClipboardList, key: "orders" as const },
   { href: "/rappels", icon: AlertCircle, key: "reminders" as const },
   { href: "/stats", icon: BarChart2, key: "stats" as const },
   { href: "/tournees", icon: MapPin, key: "tours" as const },
