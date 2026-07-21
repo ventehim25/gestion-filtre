@@ -386,6 +386,27 @@ export default function VentesPage() {
       : "dinoun non payé (paiement annulé)");
   }
 
+  // Supprimer une vente : rend le stock (sauf commande préparée qui n'avait pas décrémenté)
+  // et supprime le bon (les paiements dinoun liés partent en cascade via avances.sale_id).
+  async function deleteSale(s: Sale & { client: Client }) {
+    if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Suppression impossible hors-ligne."); return; }
+    if (!confirm(`Supprimer la vente de ${s.client?.nom ?? "ce client"} — ${s.total.toFixed(0)} MAD ?\nLe stock des articles sera rendu.`)) return;
+    try {
+      const prepared = (s.notes ?? "").startsWith("Commande WhatsApp"); // vente préparée = stock jamais retiré
+      if (!prepared) {
+        const { data } = await supabase.from("sale_items").select("product_id, quantite, equivalence_id").eq("sale_id", s.id);
+        for (const it of (data ?? []) as { product_id: string; quantite: number; equivalence_id: string | null }[]) {
+          if (it.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: it.equivalence_id, qty: -it.quantite });
+          else await supabase.rpc("decrement_stock", { p_id: it.product_id, qty: -it.quantite });
+        }
+      }
+      await supabase.from("sale_items").delete().eq("sale_id", s.id);
+      await supabase.from("sales").delete().eq("id", s.id);
+      flash("Vente supprimée ✓");
+    } catch { alert("Erreur lors de la suppression."); }
+    load();
+  }
+
   // Modification rapide du paiement uniquement
   function openPayEdit(s: Sale & { client: Client }) {
     setPayEdit(s); setPayStatut(s.statut); setPayMontant(s.montant_paye);
@@ -763,6 +784,7 @@ export default function VentesPage() {
                   <button onClick={() => openEditSale(s)} className="text-blue-400 hover:text-blue-300" title="Modifier la vente"><Pencil size={15} /></button>
                   <button onClick={() => whatsForSale(s)} className="text-green-500 hover:text-green-400" title="Envoyer la fiche sur WhatsApp"><MessageCircle size={16} /></button>
                   <button onClick={() => printReceipt(s)} className="text-slate-400 hover:text-blue-600" title={t("printReceipt")}><Printer size={15} /></button>
+                  <button onClick={() => deleteSale(s)} className="text-red-400 hover:text-red-300" title="Supprimer la vente"><Trash2 size={15} /></button>
                 </div>
               </td>
               </tr>
