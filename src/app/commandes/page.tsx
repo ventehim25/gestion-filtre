@@ -88,7 +88,9 @@ export default function CommandesPage() {
       let qty = 1;
       let refPart = raw;
       const pre = raw.match(/^(\d{1,3})\s+(.+)$/);
-      const suf = raw.match(/^(.+?)\s*[x×*]\s*(\d{1,3})$/i);
+      // Espace obligatoire avant x/×/* : une référence terminée par une lettre + chiffres
+      // sans espace (ex. « AX2 ») ne doit jamais être lue comme « quantité 2 de A ».
+      const suf = raw.match(/^(.+?)\s+[x×*]\s*(\d{1,3})$/i);
       if (suf) { qty = parseInt(suf[2], 10); refPart = suf[1]; }
       else if (pre) { qty = parseInt(pre[1], 10); refPart = pre[2]; }
       const key = norm(refPart);
@@ -118,6 +120,21 @@ export default function CommandesPage() {
   // Choix manuel pour une ligne rouge (jamais de devinette automatique)
   function fixLine(i: number, p: Product) {
     setLines(prev => prev.map((l, j) => j === i ? { ...l, status: "ok", product: p, equiv: null } : l));
+  }
+
+  // Variantes de marque disponibles pour un produit (prix requis) — permet, ligne par ligne,
+  // de facturer la MARQUE réellement demandée (Mann/Wix…) au lieu du Filtron par défaut,
+  // qu'elle ait été reconnue automatiquement ou choisie à la main sur une ligne rouge.
+  function variantesDisponibles(productId: string) {
+    return equivs.filter(e => e.product_id === productId && e.prix != null);
+  }
+  function setLineMarque(i: number, marque: string) {
+    setLines(prev => prev.map((l, j) => {
+      if (j !== i || !l.product) return l;
+      if (marque === "Filtron") return { ...l, equiv: null };
+      const v = variantesDisponibles(l.product.id).find(e => e.marque === marque);
+      return v ? { ...l, equiv: v } : l;
+    }));
   }
 
   const okLines = lines.filter(l => l.status === "ok" && l.product);
@@ -243,6 +260,14 @@ export default function CommandesPage() {
                   )}
                   {l.status !== "ok" && (
                     <div className="mt-1.5"><ProductPicker products={products} value="" onSelect={(p) => fixLine(i, p)} /></div>
+                  )}
+                  {l.status === "ok" && l.product && variantesDisponibles(l.product.id).length > 0 && (
+                    <select className="input mt-1.5 py-1 text-xs" value={l.equiv?.marque ?? "Filtron"} onChange={e => setLineMarque(i, e.target.value)}>
+                      <option value="Filtron">{l.product.reference} · Filtron · {l.product.prix_vente} MAD</option>
+                      {variantesDisponibles(l.product.id).map(v => (
+                        <option key={v.id} value={v.marque}>{v.reference} · {v.marque} · {v.prix} MAD</option>
+                      ))}
+                    </select>
                   )}
                 </div>
               ))}

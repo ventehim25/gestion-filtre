@@ -87,15 +87,23 @@ export default function Dashboard() {
   useEffect(() => {
     setPendingOffline(getPending().length);
     async function load() {
-      const [r1, r2, r3, r4] = await Promise.all([
+      const [r1, r2, r4] = await Promise.all([
         supabase.from("clients").select("*", { count: "exact", head: true }),
         supabase.from("products").select("*", { count: "exact", head: true }),
-        supabase.from("sales").select("total, montant_paye, statut, date, client_id"),
         supabase.from("products").select("id").gt("stock", 0).lte("stock", 2),
       ]);
-      const errors = [r1.error, r2.error, r3.error, r4.error].filter(Boolean);
+      const errors = [r1.error, r2.error, r4.error].filter(Boolean);
       if (errors.length > 0) { setDbError(errors.map((e) => e?.message).join(" | ")); return; }
-      const sales = (r3.data ?? []) as { total: number; montant_paye: number; statut: string; date: string; client_id: string }[];
+      // Toutes les ventes (paginé — Supabase limite à 1000/requête). Sert au CA, au bénéfice,
+      // aux impayés ET au calcul « clients à réveiller » : tronquer silencieusement fausserait tout.
+      const sales: { total: number; montant_paye: number; statut: string; date: string; client_id: string }[] = [];
+      for (let i = 0; i < 30; i++) {
+        const { data, error } = await supabase.from("sales").select("total, montant_paye, statut, date, client_id").range(i * 1000, i * 1000 + 999);
+        if (error) { setDbError(error.message); return; }
+        if (!data || data.length === 0) break;
+        sales.push(...(data as typeof sales));
+        if (data.length < 1000) break;
+      }
       const stockFaible = r4.data;
       // Articles vendus paginés → coût marchandise & bénéfice exacts
       const saleItems: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] = [];

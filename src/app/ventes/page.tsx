@@ -357,6 +357,17 @@ export default function VentesPage() {
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Modification impossible hors-ligne."); return; }
     const montant = payStatut === "paye" ? payEdit.total : payMontant;
     await supabase.from("sales").update({ statut: payStatut, montant_paye: montant }).eq("id", payEdit.id);
+    // Parrainage (Bible §4.15) : cette vente (souvent créée depuis /commandes en 'en_attente')
+    // devient la 1ère vente ENCAISSÉE du filleul → crédite le parrain maintenant.
+    if (payStatut !== "en_attente") {
+      const client = clients.find(c => c.id === payEdit.client_id);
+      if (client?.parrain_id && !client.parrain_paye
+        && !sales.some(s => s.client_id === payEdit.client_id && s.id !== payEdit.id && s.statut !== "en_attente")) {
+        const parrain = clients.find(c => c.id === client.parrain_id);
+        const { error: pErr } = await supabase.from("clients").update({ avoir: (parrain?.avoir ?? 0) + 100 }).eq("id", client.parrain_id);
+        if (!pErr) await supabase.from("clients").update({ parrain_paye: true }).eq("id", payEdit.client_id);
+      }
+    }
     setPayEdit(null);
     load();
   }
@@ -394,8 +405,11 @@ export default function VentesPage() {
         if (avoirDeduit > 0) {
           await supabase.from("clients").update({ avoir: Math.max(0, (client?.avoir ?? 0) - avoirDeduit) }).eq("id", clientId);
         }
-        // Parrainage : première vente encaissée du filleul → 100 MAD d'avoir au parrain
-        if (client?.parrain_id && !client.parrain_paye && statut !== "en_attente" && !sales.some(s => s.client_id === clientId)) {
+        // Parrainage : première vente ENCAISSÉE du filleul → 100 MAD d'avoir au parrain
+        // (on regarde les ventes déjà encaissées, pas juste "une vente existe" — une vente
+        // en_attente créée depuis /commandes ne doit pas bloquer le crédit à venir).
+        if (client?.parrain_id && !client.parrain_paye && statut !== "en_attente"
+          && !sales.some(s => s.client_id === clientId && s.statut !== "en_attente")) {
           const parrain = clients.find(c => c.id === client.parrain_id);
           const { error: pErr } = await supabase.from("clients").update({ avoir: (parrain?.avoir ?? 0) + 100 }).eq("id", client.parrain_id);
           if (!pErr) {

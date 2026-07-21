@@ -15,7 +15,7 @@ type Demande = { reference: string; count: number; last: string; ids: string[] }
 
 // Article vendu sur 90 j (dormant §4.2 + prédictif §4.7)
 type Item90 = { product_id: string; equivalence_id: string | null; quantite: number; fournisseur_id: string | null; sales: { date: string } | null };
-type EquivRow = { id: string; product_id: string; marque: string; reference: string; stock: number; prix_achat: number | null };
+type EquivRow = { id: string; product_id: string; marque: string; reference: string; stock: number; prix_achat: number | null; prix: number | null };
 
 function refCompare(a: string, b: string) {
   const parse = (r: string): [string, number, number, string] => {
@@ -106,7 +106,7 @@ export default function ReapproPage() {
       const rows: EquivRow[] = [];
       for (let i = 0; i < 30; i++) {
         const { data } = await supabase.from("equivalences")
-          .select("id, product_id, marque, reference, stock, prix_achat").range(i * 1000, i * 1000 + 999);
+          .select("id, product_id, marque, reference, stock, prix_achat, prix").range(i * 1000, i * 1000 + 999);
         if (!data || data.length === 0) break;
         rows.push(...(data as EquivRow[]));
         if (data.length < 1000) break;
@@ -165,8 +165,13 @@ export default function ReapproPage() {
       if (it.fournisseur_id && (!lastFour.has(it.product_id) || d > lastFour.get(it.product_id)!.date))
         lastFour.set(it.product_id, { date: d, fournisseur_id: it.fournisseur_id });
     }
+    // Seules les variantes AVEC prix de vente sont réellement vendables (même filtre que /ventes) —
+    // sinon le stock d'une variante sans prix gonfle "jours restants" et masque une rupture réelle.
     const stockEquiv = new Map<string, number>();
-    for (const e of equivs) stockEquiv.set(e.product_id, (stockEquiv.get(e.product_id) ?? 0) + Math.max(0, e.stock));
+    for (const e of equivs) {
+      if (e.prix == null) continue;
+      stockEquiv.set(e.product_id, (stockEquiv.get(e.product_id) ?? 0) + Math.max(0, e.stock));
+    }
     const fourName = (id?: string) => fours.find(f => f.id === id)?.nom ?? "—";
     const rows: { id: string; reference: string; stockTotal: number; parJour: number; jours: number; suggestion: number; fournisseur: string }[] = [];
     for (const p of products) {
