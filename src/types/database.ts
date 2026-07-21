@@ -207,6 +207,7 @@ export type Sale = {
   montant_paye: number;
   statut: SaleStatus;
   notes: string | null;
+  fournisseur_paye?: boolean; // j'ai payé le fournisseur (dinoun) pour ce bon (Bible §5, roulement)
   client?: Client;
   items?: SaleItem[];
 };

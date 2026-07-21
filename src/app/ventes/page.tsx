@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/types/database";
-import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye } from "lucide-react";
+import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
 import ProductPicker from "@/components/ProductPicker";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { addPending, getPending, syncPending } from "@/lib/offlineSales";
@@ -346,6 +346,16 @@ export default function VentesPage() {
     } catch { alert("Erreur lors de la modification."); }
     resetForm();
     load();
+  }
+
+  // Coche « fournisseur (dinoun) payé » pour ce bon (roulement bon par bon)
+  async function toggleFournisseurPaye(s: Sale & { client: Client }) {
+    if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Impossible hors-ligne."); return; }
+    const nv = !s.fournisseur_paye;
+    const { error } = await supabase.from("sales").update({ fournisseur_paye: nv }).eq("id", s.id);
+    if (error) { alert("Colle d'abord le SQL supabase/sale_fournisseur_paye.sql dans Supabase."); return; }
+    setSales(prev => prev.map(x => x.id === s.id ? { ...x, fournisseur_paye: nv } : x));
+    flash(nv ? `${s.client?.nom ?? "Bon"} : dinoun payé ✓` : `${s.client?.nom ?? "Bon"} : dinoun non payé`);
   }
 
   // Modification rapide du paiement uniquement
@@ -717,6 +727,7 @@ export default function VentesPage() {
                 </td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
+                  <button onClick={() => toggleFournisseurPaye(s)} className={s.fournisseur_paye ? "text-emerald-500 hover:text-emerald-400" : "text-slate-500 hover:text-slate-300"} title={s.fournisseur_paye ? "Fournisseur (dinoun) payé pour ce bon ✓ — clique pour annuler" : "Marquer : j'ai payé le fournisseur (dinoun) pour ce bon"}><Truck size={16} /></button>
                   <button onClick={() => openPayEdit(s)} className="text-amber-500 hover:text-amber-400" title="Modifier le paiement"><Wallet size={16} /></button>
                   <button onClick={() => openEditSale(s)} className="text-blue-400 hover:text-blue-300" title="Modifier la vente"><Pencil size={15} /></button>
                   <button onClick={() => whatsForSale(s)} className="text-green-500 hover:text-green-400" title="Envoyer la fiche sur WhatsApp"><MessageCircle size={16} /></button>
