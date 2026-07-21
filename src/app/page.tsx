@@ -75,6 +75,8 @@ export default function Dashboard() {
   const [vidanges, setVidanges] = useState<{ id: string; vehicule: string; nom: string; telephone: string | null }[]>([]);
   // Impayés à relancer (Bible §4.1) — distinct de la relance "réassort" ci-dessus
   const [impayes, setImpayes] = useState<{ id: string; nom: string; telephone: string | null; solde: number; days: number }[]>([]);
+  // Détail d'un impayé : part bénéfice · coût déjà payé (capital) · coût à récupérer (crédit)
+  const [impayeDetail, setImpayeDetail] = useState<Record<string, { benefice: number; coutPaye: number; coutARecup: number }>>({});
   // Montants sensibles masqués par défaut — révélés au clic
   const [showMoney, setShowMoney] = useState<{ f: boolean; b: boolean; e: boolean }>({ f: false, b: false, e: false });
   const [showVitrine, setShowVitrine] = useState(false);
@@ -224,6 +226,46 @@ export default function Dashboard() {
       }
       imp.sort((a, b) => b.days - a.days);
       setImpayes(imp.slice(0, 6));
+
+      // Détail de chaque impayé : bénéfice vs coût, et coût déjà payé (source capital) vs
+      // à récupérer (source crédit / non attribuée). Réutilise la source choisie à la vente.
+      try {
+        type L = {
+          quantite: number; prix_unitaire: number; cout_unitaire: number | null;
+          product: { prix_achat: number } | null; fournisseur: { type: string } | null;
+          sale: { id: string; client_id: string; total: number; montant_paye: number } | null;
+        };
+        const lignes: L[] = [];
+        for (let i = 0; i < 30; i++) {
+          const { data } = await supabase.from("sale_items")
+            .select("quantite, prix_unitaire, cout_unitaire, product:products(prix_achat), fournisseur:fournisseurs(type), sale:sales!inner(id, client_id, total, montant_paye)")
+            .in("sales.statut", ["en_attente", "partiel"]).range(i * 1000, i * 1000 + 999);
+          if (!data || data.length === 0) break;
+          lignes.push(...(data as unknown as L[]));
+          if (data.length < 1000) break;
+        }
+        // 1) agrège par vente (pour proratiser selon le reste dû), 2) puis par client
+        const perSale = new Map<string, { client_id: string; total: number; paye: number; revenue: number; coutPaye: number; coutARecup: number }>();
+        for (const l of lignes) {
+          const s = l.sale; if (!s) continue;
+          const cur = perSale.get(s.id) ?? { client_id: s.client_id, total: s.total, paye: s.montant_paye, revenue: 0, coutPaye: 0, coutARecup: 0 };
+          const cout = l.quantite * (l.cout_unitaire ?? l.product?.prix_achat ?? 0);
+          cur.revenue += l.quantite * l.prix_unitaire;
+          if (l.fournisseur?.type === "capital") cur.coutPaye += cout; else cur.coutARecup += cout;
+          perSale.set(s.id, cur);
+        }
+        const detail: Record<string, { benefice: number; coutPaye: number; coutARecup: number }> = {};
+        for (const s of perSale.values()) {
+          const ratio = s.total > 0 ? Math.max(0, s.total - s.paye) / s.total : 1; // part encore due
+          const benefice = Math.max(0, s.revenue - (s.coutPaye + s.coutARecup));
+          const d = detail[s.client_id] ?? { benefice: 0, coutPaye: 0, coutARecup: 0 };
+          d.benefice += benefice * ratio;
+          d.coutPaye += s.coutPaye * ratio;
+          d.coutARecup += s.coutARecup * ratio;
+          detail[s.client_id] = d;
+        }
+        setImpayeDetail(detail);
+      } catch { /* pas de détail dispo */ }
 
       setStats({
         totalVentes, totalClients: r1.count ?? 0, totalProduits: r2.count ?? 0,
@@ -461,17 +503,29 @@ export default function Dashboard() {
           <h3 className="font-semibold text-slate-200 mb-1 flex items-center gap-2"><AlertTriangle size={16} className="text-red-400" /> À relancer (impayés)</h3>
           <p className="text-xs text-slate-500 mb-3">Un tap envoie un rappel WhatsApp poli — le client ne réapparaît pas avant 7 jours.</p>
           <div className="space-y-2">
-            {impayes.map(c => (
+            {impayes.map(c => {
+              const d = impayeDetail[c.id];
+              return (
               <div key={c.id} className="flex items-center justify-between gap-2 text-sm bg-[var(--surface-2)] rounded-lg px-3 py-2">
-                <div className="min-w-0">
-                  <span className="text-slate-200 font-medium truncate">{c.nom}</span>
-                  <span className="text-xs text-slate-500 ms-2">· {c.solde.toFixed(0)} MAD · {c.days} j</span>
+                <div className="min-w-0 flex-1">
+                  <div>
+                    <span className="text-slate-200 font-medium truncate">{c.nom}</span>
+                    <span className="text-xs text-slate-500 ms-2">· {c.solde.toFixed(0)} MAD · {c.days} j</span>
+                  </div>
+                  {d && (d.benefice + d.coutPaye + d.coutARecup) > 0 && (
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      ton bénéfice <span className="text-emerald-400">{d.benefice.toFixed(0)}</span>
+                      {d.coutPaye > 0 && <> · coût <span className="text-emerald-400">{d.coutPaye.toFixed(0)} ✓ payé (capital)</span></>}
+                      {d.coutARecup > 0 && <> · coût <span className="text-orange-400">{d.coutARecup.toFixed(0)} à récupérer</span></>}
+                    </p>
+                  )}
                 </div>
                 <button onClick={() => relancerImpaye(c)} className="shrink-0 flex items-center gap-1.5 text-xs bg-green-500/15 text-green-400 px-2.5 py-1.5 rounded-lg hover:bg-green-500/25 transition-colors">
                   <MessageCircle size={13} /> Relancer
                 </button>
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
