@@ -35,6 +35,20 @@ export default function ClientsPage() {
   // Fidélité paliers trimestriels (Bible §4.9) : CA du trimestre en cours par client
   const [trimCA, setTrimCA] = useState<Record<string, number>>({});
   const [palierIgnore, setPalierIgnore] = useState<Set<string>>(new Set());
+  // Ancien impayé (dette d'avant l'app) : créé comme un bon en attente → suit le système normal
+  const [impayeFor, setImpayeFor] = useState<Client | null>(null);
+  const [impMontant, setImpMontant] = useState(0);
+  const [impDate, setImpDate] = useState("");
+  function openAncienImpaye(c: Client) { setImpayeFor(c); setImpMontant(0); setImpDate(new Date().toISOString().slice(0, 10)); }
+  async function saveAncienImpaye() {
+    if (!impayeFor || impMontant <= 0) { alert("Montant requis"); return; }
+    const { error } = await supabase.from("sales").insert({
+      client_id: impayeFor.id, date: impDate || new Date().toISOString().slice(0, 10),
+      total: impMontant, montant_paye: 0, statut: "en_attente", notes: "Ancien impayé (avant l'app)",
+    });
+    if (error) { alert("Erreur : " + error.message); return; }
+    setImpayeFor(null); loadDebts();
+  }
 
   // Palier suggéré selon le CA trimestriel : jamais appliqué sans validation (c'est du prix)
   function palierPour(ca: number): number {
@@ -252,6 +266,9 @@ export default function ClientsPage() {
                 <p className="text-xs text-orange-600 font-medium">{t("pending")}: {debts[c.id].total.toFixed(0)} MAD</p>
               </div>
             )}
+            <button onClick={() => openAncienImpaye(c)} className="mt-2 text-[11px] text-slate-500 hover:text-slate-300 flex items-center gap-1">
+              <Plus size={11} /> Ancien impayé (avant l&apos;app)
+            </button>
             {/* Fidélité paliers trimestriels (Bible §4.9) — suggestion à valider, jamais automatique */}
             {(c.type === "garage" || c.type === "gros") && (() => {
               const ca = trimCA[c.id] ?? 0;
@@ -292,6 +309,30 @@ export default function ClientsPage() {
         ))}
       </div>
       {filtered.length === 0 && <p className="text-center text-slate-400 py-20">{t("noData")}</p>}
+
+      {/* Ancien impayé (dette d'avant l'app) */}
+      {impayeFor && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-sm">
+            <h3 className="font-semibold text-slate-100 mb-1">Ancien impayé — {impayeFor.nom}</h3>
+            <p className="text-xs text-slate-500 mb-4">Ce que ce garage te devait déjà <b>avant l&apos;app</b>. Il apparaîtra dans « À relancer », et tu le gères comme un impayé normal (relance, paiement).</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Montant dû (MAD)</label>
+                <input type="number" className="input" value={impMontant || ""} placeholder="0" onChange={e => setImpMontant(+e.target.value)} />
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Depuis quand (date de la dette)</label>
+                <input type="date" className="input" value={impDate} onChange={e => setImpDate(e.target.value)} />
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end mt-5">
+              <button onClick={() => setImpayeFor(null)} className="btn-secondary">{t("cancel")}</button>
+              <button onClick={saveAncienImpaye} className="btn-primary">{t("save")}</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

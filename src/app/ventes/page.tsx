@@ -732,6 +732,7 @@ export default function VentesPage() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {sales.map(s => {
+              const hasItems = (s.items ?? []).length > 0;
               const cost = (s.items ?? []).reduce((a, it) => a + it.quantite * (it.cout_unitaire ?? (it.product as Product | undefined)?.prix_achat ?? 0), 0);
               const benef = s.total - cost;
               return (
@@ -742,7 +743,9 @@ export default function VentesPage() {
                 <td className="px-4 py-3 font-semibold">{s.total.toFixed(2)} MAD</td>
                 <td className="px-4 py-3"><span className={badgeClass(s.statut)}>{t(s.statut === "paye" ? "paid" : s.statut === "partiel" ? "partial" : "pending")}</span></td>
                 <td className="px-4 py-3">
-                  {revealMargin.has(s.id) ? (
+                  {!hasItems ? (
+                    <span className="text-xs text-slate-500" title="Ancien impayé / bon sans détail">—</span>
+                  ) : revealMargin.has(s.id) ? (
                     <div className="text-xs leading-tight">
                       <div className="font-semibold text-emerald-400">+{benef.toFixed(0)} MAD</div>
                       <div className="text-orange-400">coût {cost.toFixed(0)}</div>
