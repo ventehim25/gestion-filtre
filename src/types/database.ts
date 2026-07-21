@@ -64,6 +64,7 @@ export type Fournisseur = {
   telephone: string | null;
   note: string | null;
   type: FournisseurType;
+  solde_depart?: number; // solde de départ (onboarding) : >0 = je lui dois, <0 = il me doit
 };
 
 export type Reception = {

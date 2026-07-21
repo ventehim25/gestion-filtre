@@ -31,7 +31,7 @@ export default function FournisseursPage() {
   // Formulaire fournisseur
   const [showSupplier, setShowSupplier] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Fournisseur | null>(null);
-  const [sForm, setSForm] = useState<{ nom: string; telephone: string; note: string; type: FournisseurType }>({ nom: "", telephone: "", note: "", type: "credit" });
+  const [sForm, setSForm] = useState<{ nom: string; telephone: string; note: string; type: FournisseurType; solde_depart: number }>({ nom: "", telephone: "", note: "", type: "credit", solde_depart: 0 });
 
   // Formulaire réception (marchandise prise)
   const [recFor, setRecFor] = useState<Fournisseur | null>(null);
@@ -116,7 +116,11 @@ export default function FournisseursPage() {
     for (const a of avances) m[a.fournisseur_id] = (m[a.fournisseur_id] ?? 0) + a.montant;
     return m;
   }, [avances]);
-  const soldeOf = (id: string) => (recByF[id] ?? 0) - (avByF[id] ?? 0);
+  // Solde de départ (onboarding) par fournisseur : >0 = je lui dois, <0 = il me doit
+  const departOf = (id: string) => fournisseurs.find(f => f.id === id)?.solde_depart ?? 0;
+  // Reste à payer = solde de départ + marchandise prise − avances versées.
+  // Négatif ⇒ le fournisseur ME doit.
+  const soldeOf = (id: string) => departOf(id) + (recByF[id] ?? 0) - (avByF[id] ?? 0);
   const isCapital = (f: Fournisseur) => (f.type ?? "credit") === "capital";
   // Capital dispo (type capital) = ventes attribuées − marchandise achetée
   const capitalOf = (id: string) => (attByF[id]?.ventes ?? 0) - (recByF[id] ?? 0);
@@ -158,13 +162,21 @@ export default function FournisseursPage() {
   const periodTxt = selectedMonth === "all" ? "cumul" : monthLabel(selectedMonth);
 
   // ---- Fournisseur CRUD ----
-  function openNewSupplier() { setEditingSupplier(null); setSForm({ nom: "", telephone: "", note: "", type: "credit" }); setShowSupplier(true); }
-  function openEditSupplier(f: Fournisseur) { setEditingSupplier(f); setSForm({ nom: f.nom, telephone: f.telephone ?? "", note: f.note ?? "", type: f.type ?? "credit" }); setShowSupplier(true); }
+  function openNewSupplier() { setEditingSupplier(null); setSForm({ nom: "", telephone: "", note: "", type: "credit", solde_depart: 0 }); setShowSupplier(true); }
+  function openEditSupplier(f: Fournisseur) { setEditingSupplier(f); setSForm({ nom: f.nom, telephone: f.telephone ?? "", note: f.note ?? "", type: f.type ?? "credit", solde_depart: f.solde_depart ?? 0 }); setShowSupplier(true); }
   async function saveSupplier() {
     if (!sForm.nom.trim()) { alert("Nom requis"); return; }
-    const payload = { nom: sForm.nom.trim(), telephone: sForm.telephone || null, note: sForm.note || null, type: sForm.type };
-    if (editingSupplier) await supabase.from("fournisseurs").update(payload).eq("id", editingSupplier.id);
-    else await supabase.from("fournisseurs").insert(payload);
+    const payload: Record<string, unknown> = { nom: sForm.nom.trim(), telephone: sForm.telephone || null, note: sForm.note || null, type: sForm.type, solde_depart: sForm.solde_depart || 0 };
+    const run = (p: Record<string, unknown>) =>
+      editingSupplier ? supabase.from("fournisseurs").update(p).eq("id", editingSupplier.id) : supabase.from("fournisseurs").insert(p);
+    let { error } = await run(payload);
+    // Repli si la colonne solde_depart n'est pas encore créée (SQL pas collé)
+    if (error && /solde_depart/i.test(error.message)) {
+      delete payload.solde_depart;
+      if (sForm.solde_depart) alert("Le « solde de départ » n'a pas pu être enregistré : colle d'abord le SQL supabase/fournisseur_solde_depart.sql, puis réessaie.");
+      ({ error } = await run(payload));
+    }
+    if (error) { alert("Erreur : " + error.message); return; }
     setShowSupplier(false); load();
   }
   async function removeSupplier(f: Fournisseur) {
@@ -277,10 +289,10 @@ export default function FournisseursPage() {
                     {f.note && <p className="text-xs text-slate-500 mt-1">{f.note}</p>}
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-[11px] text-slate-500">{cap ? "Capital disponible" : "Reste à payer"}</p>
+                    <p className="text-[11px] text-slate-500">{cap ? "Capital disponible" : solde < 0 ? "Il te doit" : "Reste à payer"}</p>
                     {cap
                       ? <p className="text-xl font-bold text-emerald-400">{money(capital)}</p>
-                      : <p className={`text-xl font-bold ${solde > 0 ? "text-red-400" : "text-emerald-400"}`}>{money(solde)}</p>}
+                      : <p className={`text-xl font-bold ${solde > 0 ? "text-red-400" : "text-emerald-400"}`}>{money(Math.abs(solde))}</p>}
                     <div className="flex gap-2 justify-end mt-1">
                       <button onClick={() => openEditSupplier(f)} className="text-blue-400 hover:text-blue-300"><Pencil size={14} /></button>
                       <button onClick={() => removeSupplier(f)} className="text-red-400 hover:text-red-300"><Trash2 size={14} /></button>
@@ -350,6 +362,15 @@ export default function FournisseursPage() {
                 <p className="text-[11px] text-slate-500 mt-1">Capital : ton argent qui tourne et grandit. Crédit : tu rembourses le coût, tu gardes le bénéfice.</p>
               </div>
               <div><label className="text-xs text-slate-400 mb-1 block">Téléphone</label><input className="input" value={sForm.telephone} onChange={e => setSForm({ ...sForm, telephone: e.target.value })} /></div>
+              {/* Solde de départ (onboarding depuis le cahier) */}
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Solde de départ (MAD)</label>
+                <input type="number" className="input" value={sForm.solde_depart || ""} placeholder="0"
+                  onChange={e => setSForm({ ...sForm, solde_depart: +e.target.value })} />
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Au démarrage : mets ce que <b>tu lui dois</b> déjà (ex. 800). S&apos;il <b>te doit</b>, mets un montant négatif (ex. -500). Laisse 0 si rien.
+                </p>
+              </div>
               <div><label className="text-xs text-slate-400 mb-1 block">Note</label><textarea className="input" rows={2} value={sForm.note} onChange={e => setSForm({ ...sForm, note: e.target.value })} /></div>
             </div>
             <div className="flex gap-2 justify-end mt-5">
@@ -411,7 +432,9 @@ export default function FournisseursPage() {
               <h3 className="font-semibold text-slate-100 flex items-center gap-2"><HandCoins size={18} className="text-emerald-400" /> Avance — {avFor.nom}</h3>
               <button onClick={() => setAvFor(null)} className="text-slate-400 hover:text-white"><X size={18} /></button>
             </div>
-            <p className="text-xs text-slate-400 mb-3">Reste à payer : <b className="text-red-400">{soldeOf(avFor.id).toFixed(0)} MAD</b></p>
+            {soldeOf(avFor.id) < 0
+              ? <p className="text-xs text-slate-400 mb-3">Il te doit : <b className="text-emerald-400">{Math.abs(soldeOf(avFor.id)).toFixed(0)} MAD</b></p>
+              : <p className="text-xs text-slate-400 mb-3">Reste à payer : <b className="text-red-400">{soldeOf(avFor.id).toFixed(0)} MAD</b></p>}
             <div className="space-y-3">
               <div><label className="text-xs text-slate-400 mb-1 block">Date</label><input type="date" className="input" value={avDate} onChange={e => setAvDate(e.target.value)} /></div>
               <div><label className="text-xs text-slate-400 mb-1 block">Montant versé (MAD)</label><input type="number" min={0} className="input" value={avMontant} onChange={e => setAvMontant(+e.target.value)} /></div>
