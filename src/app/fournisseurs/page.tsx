@@ -10,7 +10,8 @@ import {
   ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank,
 } from "lucide-react";
 
-type RecLine = { product_id: string; quantite: number; prix_achat: number; reference: string };
+type RecLine = { product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; reference: string };
+type VariantRow = { id: string; marque: string; reference: string; prix_achat: number | null };
 const todayStr = () => new Date().toISOString().split("T")[0];
 function waLink(tel: string) { return `https://wa.me/212${tel.replace(/\D/g, "").replace(/^0/, "")}`; }
 
@@ -19,6 +20,8 @@ export default function FournisseursPage() {
   const [receptions, setReceptions] = useState<Reception[]>([]);
   const [avances, setAvances] = useState<Avance[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  // Variantes de marque par produit (Flag, Mann…) pour la réception
+  const [variantsMap, setVariantsMap] = useState<Record<string, VariantRow[]>>({});
   const [salesAgg, setSalesAgg] = useState<{ date: string; cout: number; benef: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -64,6 +67,18 @@ export default function FournisseursPage() {
       if (data.length < 1000) break;
     }
     setProducts(all);
+
+    // Variantes de marque (équivalences avec une marque) par produit
+    const vmap: Record<string, VariantRow[]> = {};
+    for (let i = 0; i < 30; i++) {
+      const { data } = await supabase.from("equivalences").select("id, product_id, marque, reference, prix_achat").range(i * 1000, i * 1000 + 999);
+      if (!data || data.length === 0) break;
+      for (const e of data as { id: string; product_id: string; marque: string; reference: string; prix_achat: number | null }[]) {
+        (vmap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix_achat: e.prix_achat });
+      }
+      if (data.length < 1000) break;
+    }
+    setVariantsMap(vmap);
 
     // Portefeuille (depuis les ventes)
     const items: { date: string; items: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] }[] = [];
@@ -186,9 +201,21 @@ export default function FournisseursPage() {
   }
 
   // ---- Réception (marchandise prise) ----
-  function openReception(f: Fournisseur) { setRecFor(f); setRecDate(todayStr()); setRecLines([{ product_id: "", quantite: 1, prix_achat: 0, reference: "" }]); }
+  const emptyRecLine = (): RecLine => ({ product_id: "", equivalence_id: null, marque: "Filtron", quantite: 1, prix_achat: 0, reference: "" });
+  function openReception(f: Fournisseur) { setRecFor(f); setRecDate(todayStr()); setRecLines([emptyRecLine()]); }
   function setRecProduct(i: number, p: Product) {
-    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, prix_achat: p.prix_achat, reference: p.reference } : l));
+    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, reference: p.reference } : l));
+  }
+  // Choix de la marque d'une ligne : Filtron (produit principal) ou une variante (Flag, Mann…)
+  function setRecVariant(i: number, marque: string) {
+    setRecLines(prev => prev.map((l, j) => {
+      if (j !== i) return l;
+      const p = products.find(x => x.id === l.product_id);
+      if (!p) return l;
+      if (marque === "Filtron") return { ...l, equivalence_id: null, marque: "Filtron", reference: p.reference, prix_achat: p.prix_achat };
+      const v = (variantsMap[l.product_id] || []).find(x => x.marque === marque);
+      return v ? { ...l, equivalence_id: v.id, marque, reference: v.reference, prix_achat: v.prix_achat ?? p.prix_achat } : l;
+    }));
   }
   const recMontant = recLines.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
   async function saveReception() {
@@ -197,10 +224,13 @@ export default function FournisseursPage() {
     if (valid.length === 0) { alert("Ajoute au moins un produit"); return; }
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Action impossible hors-ligne."); return; }
     const montant = valid.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
-    const details = valid.map(l => `${l.reference}×${l.quantite}`).join(", ");
+    const details = valid.map(l => `${l.reference}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""}×${l.quantite}`).join(", ");
     await supabase.from("receptions").insert({ fournisseur_id: recFor.id, date: recDate, montant, details });
-    // Augmente le stock (decrement avec qté négative)
-    for (const l of valid) await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: -l.quantite });
+    // Augmente le stock — sur la variante de marque si choisie, sinon sur le produit principal
+    for (const l of valid) {
+      if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: -l.quantite });
+      else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: -l.quantite });
+    }
     setRecFor(null); load();
   }
 
@@ -401,15 +431,26 @@ export default function FournisseursPage() {
                 <span className="col-span-1"></span>
               </div>
               {recLines.map((l, i) => (
-                <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                  <div className="col-span-6"><ProductPicker products={products} value={l.product_id} onSelect={(p) => setRecProduct(i, p)} /></div>
-                  <input type="number" min={1} className="input col-span-2 text-center" value={l.quantite} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, quantite: Math.max(1, +e.target.value) } : x))} />
-                  <input type="number" min={0} step="0.01" className="input col-span-3 text-center" placeholder="prix" value={l.prix_achat || ""} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, prix_achat: Math.max(0, +e.target.value) } : x))} />
-                  <button onClick={() => setRecLines(prev => prev.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center"><Trash2 size={14} /></button>
+                <div key={i} className="border-b border-slate-800/40 pb-2">
+                  <div className="grid grid-cols-12 gap-2 items-center">
+                    <div className="col-span-6"><ProductPicker products={products} value={l.product_id} onSelect={(p) => setRecProduct(i, p)} /></div>
+                    <input type="number" min={1} className="input col-span-2 text-center" value={l.quantite} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, quantite: Math.max(1, +e.target.value) } : x))} />
+                    <input type="number" min={0} step="0.01" className="input col-span-3 text-center" placeholder="prix" value={l.prix_achat || ""} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, prix_achat: Math.max(0, +e.target.value) } : x))} />
+                    <button onClick={() => setRecLines(prev => prev.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center"><Trash2 size={14} /></button>
+                  </div>
+                  {/* Choix de la marque : le stock ira sur cette marque (Flag, Mann…) ou sur Filtron */}
+                  {l.product_id && (variantsMap[l.product_id]?.length ?? 0) > 0 && (
+                    <select className="input mt-1 py-1 text-xs" value={l.marque} onChange={e => setRecVariant(i, e.target.value)}>
+                      <option value="Filtron">{products.find(p => p.id === l.product_id)?.reference} · Filtron (principal)</option>
+                      {variantsMap[l.product_id].map(v => (
+                        <option key={v.id} value={v.marque}>{v.reference} · {v.marque}</option>
+                      ))}
+                    </select>
+                  )}
                 </div>
               ))}
-              <button onClick={() => setRecLines([...recLines, { product_id: "", quantite: 1, prix_achat: 0, reference: "" }])} className="btn-secondary text-xs flex items-center gap-1"><Plus size={12} /> Ajouter une ligne</button>
-              <p className="text-[11px] text-slate-500">Le prix d&apos;achat se remplit auto, mais tu peux le corriger selon le prix de ce fournisseur.</p>
+              <button onClick={() => setRecLines([...recLines, emptyRecLine()])} className="btn-secondary text-xs flex items-center gap-1"><Plus size={12} /> Ajouter une ligne</button>
+              <p className="text-[11px] text-slate-500">Choisis la marque sous chaque ligne (le stock ira sur la bonne marque). Marque absente ? Ajoute-la d&apos;abord dans Produits (variantes). Le prix d&apos;achat se remplit auto, corrige-le au besoin.</p>
             </div>
             <div className="bg-[var(--surface-2)] rounded-lg p-3 mb-4 flex items-center justify-between">
               <span className="text-sm text-slate-300">Coût total (ajouté à la dette)</span>
