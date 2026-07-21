@@ -321,6 +321,8 @@ export default function VentesPage() {
     const validLines = lines.filter(l => l.product_id && l.quantite > 0);
     if (!clientId || validLines.length === 0) { flash("Client et au moins un article requis"); return; }
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Modification impossible hors-ligne."); return; }
+    const sansSource = validLines.filter(l => !l.fournisseur_id).length;
+    if (sansSource > 0 && !confirm(`⚠️ ${sansSource} ligne(s) sans source (dinoun / filtropro). Enregistrer quand même ?`)) return;
     const saleTotal = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
     const montant = statut === "paye" ? saleTotal : montantPaye;
     try {
@@ -435,6 +437,9 @@ export default function VentesPage() {
     if (editingSale) { saveEdit(); return; }
     const validLines = lines.filter(l => l.product_id && l.quantite > 0);
     if (!clientId || validLines.length === 0) return;
+    // Rappel : une ligne sans source ne sera comptée sur aucun fournisseur (dinoun/filtropro)
+    const sansSource = validLines.filter(l => !l.fournisseur_id).length;
+    if (sansSource > 0 && !confirm(`⚠️ ${sansSource} ligne(s) sans source (dinoun / filtropro).\nCette marchandise ne sera comptée sur aucun fournisseur, et le camion « dinoun payé » ne la comptera pas.\n\nEnregistrer quand même ?`)) return;
     const client = clients.find(c => c.id === clientId);
     const brut = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
     // Avoir déduit du total (Bible §4.15)
@@ -647,8 +652,8 @@ export default function VentesPage() {
                     </select>
                   )}
                   {fournisseurs.length > 0 && (
-                    <select className="input mt-1 py-1 text-xs" value={l.fournisseur_id ?? ""} onChange={e => updateLine(i, "fournisseur_id", e.target.value)}>
-                      <option value="">Source : — (non attribué)</option>
+                    <select className={`input mt-1 py-1 text-xs ${!l.fournisseur_id ? "ring-1 ring-orange-500/70" : ""}`} value={l.fournisseur_id ?? ""} onChange={e => updateLine(i, "fournisseur_id", e.target.value)}>
+                      <option value="">⚠ Source : — (à choisir : dinoun / filtropro)</option>
                       {fournisseurs.map(f => <option key={f.id} value={f.id}>Source : {f.nom}{f.type === "capital" ? " (capital)" : ""}</option>)}
                     </select>
                   )}
