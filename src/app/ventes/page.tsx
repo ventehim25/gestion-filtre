@@ -348,14 +348,42 @@ export default function VentesPage() {
     load();
   }
 
-  // Coche « fournisseur (dinoun) payé » pour ce bon (roulement bon par bon)
+  // Coche « fournisseur (dinoun) payé » pour ce bon (roulement bon par bon).
+  // En cochant : crée un paiement (avance) au fournisseur crédit du bon → baisse ta dette.
+  // En décochant : annule ce paiement. Les avances liées portent le sale_id du bon.
   async function toggleFournisseurPaye(s: Sale & { client: Client }) {
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Impossible hors-ligne."); return; }
     const nv = !s.fournisseur_paye;
     const { error } = await supabase.from("sales").update({ fournisseur_paye: nv }).eq("id", s.id);
     if (error) { alert("Colle d'abord le SQL supabase/sale_fournisseur_paye.sql dans Supabase."); return; }
+    let montantTotal = 0;
+    try {
+      if (nv) {
+        // Coût de la marchandise crédit de ce bon, groupé par fournisseur → un paiement chacun
+        const { data } = await supabase.from("sale_items")
+          .select("quantite, cout_unitaire, fournisseur_id, fournisseur:fournisseurs(type, nom), product:products(prix_achat)")
+          .eq("sale_id", s.id);
+        const byF = new Map<string, { montant: number; nom: string }>();
+        for (const l of (data ?? []) as unknown as { quantite: number; cout_unitaire: number | null; fournisseur_id: string | null; fournisseur: { type: string; nom: string } | null; product: { prix_achat: number } | null }[]) {
+          if (!l.fournisseur_id || l.fournisseur?.type !== "credit") continue; // capital = déjà ton argent
+          const cout = l.quantite * (l.cout_unitaire ?? l.product?.prix_achat ?? 0);
+          const cur = byF.get(l.fournisseur_id) ?? { montant: 0, nom: l.fournisseur?.nom ?? "" };
+          cur.montant += cout;
+          byF.set(l.fournisseur_id, cur);
+        }
+        const rows = [...byF.entries()].filter(([, v]) => v.montant > 0).map(([fid, v]) => {
+          montantTotal += v.montant;
+          return { fournisseur_id: fid, date: new Date().toISOString().split("T")[0], montant: v.montant, note: `Bon ${s.client?.nom ?? ""} du ${s.date} (payé auto)`, sale_id: s.id };
+        });
+        if (rows.length) await supabase.from("avances").insert(rows);
+      } else {
+        await supabase.from("avances").delete().eq("sale_id", s.id);
+      }
+    } catch { /* avances.sale_id absent : le SQL n'est pas encore collé */ }
     setSales(prev => prev.map(x => x.id === s.id ? { ...x, fournisseur_paye: nv } : x));
-    flash(nv ? `${s.client?.nom ?? "Bon"} : dinoun payé ✓` : `${s.client?.nom ?? "Bon"} : dinoun non payé`);
+    flash(nv
+      ? (montantTotal > 0 ? `dinoun payé ✓ · −${montantTotal.toFixed(0)} sur ta dette` : "dinoun payé ✓")
+      : "dinoun non payé (paiement annulé)");
   }
 
   // Modification rapide du paiement uniquement
