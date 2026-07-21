@@ -338,6 +338,9 @@ export default function FournisseursPage() {
                     </>
                   ) : (
                     <>
+                      {departOf(f.id) !== 0 && (
+                        <span>Départ : <b className={departOf(f.id) < 0 ? "text-emerald-300" : "text-orange-300"}>{money(Math.abs(departOf(f.id)))} {departOf(f.id) < 0 ? "(il te doit)" : "(tu lui dois)"}</b></span>
+                      )}
                       <span>Pris ({periodTxt}) : <b className="text-slate-200">{money(recByFPeriod[f.id] ?? 0)}</b></span>
                       <span>Versé ({periodTxt}) : <b className="text-slate-200">{money(avByFPeriod[f.id] ?? 0)}</b></span>
                       <span>Bénéfice : <b className="text-emerald-300">{money(att.benef)}</b></span>
