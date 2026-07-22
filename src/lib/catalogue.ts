@@ -32,6 +32,36 @@ export type CatItem = {
   prixAvant?: number;  // prix barré si promo
 };
 
+// Catalogue PUBLIC (QR carte de visite) : articles dispo SANS prix. Les prix ne sont
+// même pas chargés → impossible de les lire depuis cette page. On ne montre que ce
+// qu'on a, pour que le client commande sur WhatsApp.
+export type PubItem = { reference: string; marque: string; categorie: string };
+export async function loadPublicCatalogueItems(): Promise<PubItem[]> {
+  type P = { id: string; reference: string; marque: string | null; categorie: string; stock: number };
+  const prods: P[] = [];
+  for (let i = 0; i < 20; i++) {
+    const { data } = await supabase.from("products")
+      .select("id, reference, marque, categorie, stock").range(i * 1000, i * 1000 + 999);
+    if (!data || data.length === 0) break;
+    prods.push(...(data as P[]));
+    if (data.length < 1000) break;
+  }
+  const catById = new Map(prods.map(p => [p.id, p.categorie]));
+  const items: PubItem[] = [];
+  for (const p of prods) if (p.stock > 0) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie });
+
+  type E = { product_id: string; marque: string; reference: string; stock: number };
+  for (let i = 0; i < 30; i++) {
+    const { data } = await supabase.from("equivalences").select("product_id, marque, reference, stock").range(i * 1000, i * 1000 + 999);
+    if (!data || data.length === 0) break;
+    for (const e of data as E[]) if (e.stock > 0) items.push({ reference: e.reference, marque: e.marque, categorie: catById.get(e.product_id) ?? "autre" });
+    if (data.length < 1000) break;
+  }
+  const order = (c: string) => { const i = CAT_ORDER.indexOf(c as ProductCategory); return i < 0 ? 99 : i; };
+  items.sort((a, b) => order(a.categorie) - order(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
+  return items;
+}
+
 // Tous les articles DISPONIBLES (stock > 0) avec un prix : produits Filtron + variantes de marque.
 export async function loadCatalogueItems(): Promise<CatItem[]> {
   // 1) Produits (paginés)

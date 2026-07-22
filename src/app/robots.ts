@@ -3,7 +3,7 @@ import type { MetadataRoute } from "next";
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [{ userAgent: "*", allow: ["/c/", "/c"], disallow: "/" }],
+    rules: [{ userAgent: "*", allow: ["/c/", "/c", "/catalogue"], disallow: "/" }],
     sitemap: "https://gestion-filtre.vercel.app/sitemap.xml",
   };
 }

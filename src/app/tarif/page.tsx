@@ -35,6 +35,10 @@ function TarifInner() {
       const next = { ...prev }; if (n === 0) delete next[k]; else next[k] = n; return next;
     });
   }
+  function setQtyDirect(i: CatItem, val: string) {
+    const n = Math.max(0, Math.floor(Number(val) || 0));
+    setCart(prev => { const k = keyOf(i); const next = { ...prev }; if (n === 0) delete next[k]; else next[k] = n; return next; });
+  }
 
   const cats = useMemo(() => {
     const present = new Set(items.map(i => i.categorie));
@@ -108,7 +112,9 @@ function TarifInner() {
           font-weight:800; font-size:12.5px; padding:9px 13px; cursor:pointer; font-family:inherit; white-space:nowrap; }
         .tarif .stepper{ flex:0 0 auto; display:flex; align-items:center; background:var(--ink2); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
         .tarif .stepper button{ width:34px; height:38px; background:transparent; border:0; color:var(--gold); font-size:19px; font-weight:800; cursor:pointer; font-family:inherit; }
-        .tarif .stepper span{ min-width:26px; text-align:center; font-weight:800; font-variant-numeric:tabular-nums; }
+        .tarif .stepper input{ width:40px; height:38px; text-align:center; background:transparent; border:0; color:var(--paper); font-weight:800; font-size:15px; font-family:inherit; -moz-appearance:textfield; }
+        .tarif .stepper input::-webkit-outer-spin-button,.tarif .stepper input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
+        .tarif .stepper input:focus{ outline:none; }
         .tarif .cta{ position:sticky; bottom:14px; margin-top:24px; display:flex; justify-content:center; }
         .tarif .cta button{ background:#25D366; color:#04310f; border:0; border-radius:999px; cursor:pointer;
           font-size:15px; font-weight:800; padding:13px 26px; box-shadow:0 12px 30px -10px rgba(37,211,102,.6); font-family:inherit; }
@@ -181,11 +187,11 @@ function TarifInner() {
                         {i.promo && <span className="promo">PROMO</span>}
                       </div>
                       {n === 0 ? (
-                        <button className="add" onClick={() => addQty(i, 1)}>+ Ajouter</button>
+                        <button className="add" onClick={() => addQty(i, 1)}>+ Panier</button>
                       ) : (
                         <div className="stepper">
                           <button onClick={() => addQty(i, -1)} aria-label="moins">−</button>
-                          <span>{n}</span>
+                          <input type="number" min={0} inputMode="numeric" value={n} onChange={e => setQtyDirect(i, e.target.value)} onFocus={e => e.target.select()} />
                           <button onClick={() => addQty(i, 1)} aria-label="plus">+</button>
                         </div>
                       )}

@@ -5,7 +5,7 @@
    - Images produits (Scene7 / Unsplash) : cache-first (photos dispo hors-ligne).
    - Écritures (POST/PATCH/DELETE) : réseau direct (échec si hors-ligne -> à gérer côté app).
 */
-const VERSION = "v6";
+const VERSION = "v7";
 const STATIC = "fp-static-" + VERSION;
 const DATA = "fp-data-" + VERSION;
 const IMG = "fp-img-" + VERSION;
@@ -29,7 +29,7 @@ self.addEventListener("fetch", (event) => {
   //     catalogue public /c/ (SEO), tarifs privés /tarif, sitemap, robots ---
   if (url.origin === self.location.origin &&
       (url.pathname === "/c" || url.pathname.startsWith("/c/") || url.pathname === "/tarif" ||
-       url.pathname === "/sitemap.xml" || url.pathname === "/robots.txt")) return;
+       url.pathname === "/catalogue" || url.pathname === "/sitemap.xml" || url.pathname === "/robots.txt")) return;
 
   // --- Données Supabase ---
   if (url.hostname.endsWith(".supabase.co")) {

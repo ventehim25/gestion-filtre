@@ -9,7 +9,7 @@ import InstallPrompt from "@/components/InstallPrompt";
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   // Pages client-facing (sans menu de gestion) : catalogue public /c/ et tarifs privés /tarif
-  const isPublic = pathname === "/c" || pathname.startsWith("/c/") || pathname === "/tarif";
+  const isPublic = pathname === "/c" || pathname.startsWith("/c/") || pathname === "/tarif" || pathname === "/catalogue";
   if (isPublic) return <main className="min-h-screen">{children}</main>;
   return (
     <>
