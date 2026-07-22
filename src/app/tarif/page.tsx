@@ -2,6 +2,7 @@
 export const dynamic = "force-dynamic";
 // Catalogue de prix PRIVÉ (envoyé aux garages). Ne s'ouvre qu'avec le bon lien (?k=...).
 // Toujours à jour : lit les produits en direct. Ne montre JAMAIS le prix d'achat.
+// Panier + quantités → message WhatsApp formaté « QTÉ RÉF » qui rentre dans /commandes.
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CatItem, CAT_FR, CAT_ORDER, TARIF_KEY, loadCatalogueItems } from "@/lib/catalogue";
@@ -20,11 +21,20 @@ function TarifInner() {
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<string>("");
+  const [cart, setCart] = useState<Record<string, number>>({});
 
   useEffect(() => {
     if (!ok) { setLoading(false); return; }
     loadCatalogueItems().then(list => { setItems(list); setLoading(false); });
   }, [ok]);
+
+  const keyOf = (i: CatItem) => `${i.reference}|${i.marque}`;
+  function addQty(i: CatItem, d: number) {
+    setCart(prev => {
+      const k = keyOf(i); const n = Math.max(0, (prev[k] ?? 0) + d);
+      const next = { ...prev }; if (n === 0) delete next[k]; else next[k] = n; return next;
+    });
+  }
 
   const cats = useMemo(() => {
     const present = new Set(items.map(i => i.categorie));
@@ -45,12 +55,20 @@ function TarifInner() {
     return CAT_ORDER.filter(c => m.has(c)).map(c => [c, m.get(c)!] as const);
   }, [filtered]);
 
-  function order(i: CatItem) {
-    const txt = `Salam 🙏 Je veux commander : ${i.reference}${i.marque && i.marque !== "Filtron" ? ` (${i.marque})` : ""}`;
-    window.open(`https://wa.me/${WA}?text=${encodeURIComponent(txt)}`, "_blank");
-  }
-  function orderList() {
-    window.open(`https://wa.me/${WA}?text=${encodeURIComponent("Salam 🙏 Je veux passer une commande :")}`, "_blank");
+  const cartItems = useMemo(() => items.filter(i => (cart[keyOf(i)] ?? 0) > 0), [items, cart]);
+  const cartCount = useMemo(() => Object.values(cart).reduce((s, n) => s + n, 0), [cart]);
+  const cartTotal = useMemo(() => cartItems.reduce((s, i) => s + i.prix * cart[keyOf(i)], 0), [cartItems, cart]);
+
+  function sendCart() {
+    if (cartItems.length === 0) {
+      window.open(`https://wa.me/${WA}?text=${encodeURIComponent("Salam 🙏 Je veux passer une commande :")}`, "_blank");
+      return;
+    }
+    // Lignes « QTÉ RÉF » → se collent directement dans la page Commandes garages
+    const lignes = ["Salam 🙏 *Commande FiltroPro* :"];
+    for (const i of cartItems) lignes.push(`${cart[keyOf(i)]} ${i.reference}`);
+    lignes.push("", `Total indicatif : ${cartTotal} MAD`);
+    window.open(`https://wa.me/${WA}?text=${encodeURIComponent(lignes.join("\n"))}`, "_blank");
   }
 
   return (
@@ -62,7 +80,7 @@ function TarifInner() {
             radial-gradient(120% 60% at 80% -10%, rgba(216,180,96,.10), transparent 55%),
             linear-gradient(160deg,#161219, #100e13 55%, #0b0a0e);
           color:var(--paper); font-family:"Helvetica Neue",Arial,system-ui,sans-serif; }
-        .tarif .wrap{ max-width:760px; margin:0 auto; padding:22px 16px 60px; }
+        .tarif .wrap{ max-width:760px; margin:0 auto; padding:22px 16px 40px; }
         .gold{ background:linear-gradient(135deg,#fff2c2,#f2d375 30%,#c99a2e 60%,#f4d97e); -webkit-background-clip:text; background-clip:text; color:transparent; }
         .tarif .head{ display:flex; align-items:center; gap:12px; }
         .tarif .head .logo{ width:44px; height:44px; flex:0 0 auto; }
@@ -86,12 +104,20 @@ function TarifInner() {
         .tarif .price .was{ font-size:11px; color:#8b8578; text-decoration:line-through; margin-right:6px; }
         .tarif .promo{ display:inline-block; margin-top:2px; font-size:9px; font-weight:800; letter-spacing:.06em;
           background:rgba(225,29,42,.18); color:#ff8a92; padding:1px 6px; border-radius:20px; }
-        .tarif .wa{ flex:0 0 auto; width:38px; height:38px; border-radius:10px; border:0; cursor:pointer;
-          background:#25D366; display:grid; place-items:center; }
-        .tarif .wa svg{ width:20px; height:20px; }
+        .tarif .add{ flex:0 0 auto; background:var(--gold); color:#231a06; border:0; border-radius:10px;
+          font-weight:800; font-size:12.5px; padding:9px 13px; cursor:pointer; font-family:inherit; white-space:nowrap; }
+        .tarif .stepper{ flex:0 0 auto; display:flex; align-items:center; background:var(--ink2); border:1px solid var(--line); border-radius:10px; overflow:hidden; }
+        .tarif .stepper button{ width:34px; height:38px; background:transparent; border:0; color:var(--gold); font-size:19px; font-weight:800; cursor:pointer; font-family:inherit; }
+        .tarif .stepper span{ min-width:26px; text-align:center; font-weight:800; font-variant-numeric:tabular-nums; }
         .tarif .cta{ position:sticky; bottom:14px; margin-top:24px; display:flex; justify-content:center; }
         .tarif .cta button{ background:#25D366; color:#04310f; border:0; border-radius:999px; cursor:pointer;
           font-size:15px; font-weight:800; padding:13px 26px; box-shadow:0 12px 30px -10px rgba(37,211,102,.6); font-family:inherit; }
+        .tarif .cartbar{ position:sticky; bottom:12px; z-index:6; margin-top:24px; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+          background:linear-gradient(#1b1720,#120f16); border:1px solid var(--line); border-radius:16px; padding:12px 14px; box-shadow:0 18px 44px -14px rgba(0,0,0,.75); }
+        .tarif .cartbar .info{ font-size:14px; }
+        .tarif .cartbar .info b{ color:var(--gold); }
+        .tarif .cartbar .send{ background:#25D366; color:#04310f; border:0; border-radius:999px; font-weight:800; padding:12px 20px; cursor:pointer; font-family:inherit; }
+        .tarif .cartbar .clear{ background:transparent; color:var(--muted); border:0; cursor:pointer; margin-right:6px; font-family:inherit; font-size:13px; }
         .tarif .empty{ text-align:center; color:var(--muted); padding:60px 20px; }
         .tarif .foot{ margin-top:30px; text-align:center; font-size:11px; color:#6f6a5f; line-height:1.7; }
         .tarif .gate{ min-height:100vh; display:grid; place-items:center; padding:24px; text-align:center; }
@@ -139,30 +165,49 @@ function TarifInner() {
             groups.map(([c, list]) => (
               <div key={c}>
                 <div className="cat">{CAT_FR[c]}</div>
-                {list.map((i, idx) => (
-                  <div className="item" key={c + idx}>
-                    <div>
-                      <div className="ref">{i.reference}</div>
-                      <div className="mk">{i.marque}</div>
-                    </div>
-                    <div className="price">
+                {list.map((i, idx) => {
+                  const n = cart[keyOf(i)] ?? 0;
+                  return (
+                    <div className="item" key={c + idx}>
                       <div>
-                        {i.promo && i.prixAvant && <span className="was">{i.prixAvant}</span>}
-                        <span className="now">{i.prix} MAD</span>
+                        <div className="ref">{i.reference}</div>
+                        <div className="mk">{i.marque}</div>
                       </div>
-                      {i.promo && <span className="promo">PROMO</span>}
+                      <div className="price">
+                        <div>
+                          {i.promo && i.prixAvant && <span className="was">{i.prixAvant}</span>}
+                          <span className="now">{i.prix} MAD</span>
+                        </div>
+                        {i.promo && <span className="promo">PROMO</span>}
+                      </div>
+                      {n === 0 ? (
+                        <button className="add" onClick={() => addQty(i, 1)}>+ Ajouter</button>
+                      ) : (
+                        <div className="stepper">
+                          <button onClick={() => addQty(i, -1)} aria-label="moins">−</button>
+                          <span>{n}</span>
+                          <button onClick={() => addQty(i, 1)} aria-label="plus">+</button>
+                        </div>
+                      )}
                     </div>
-                    <button className="wa" onClick={() => order(i)} aria-label="Commander sur WhatsApp">
-                      <svg viewBox="0 0 24 24" fill="#04310f"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm5.8 14.06c-.24.68-1.4 1.3-1.93 1.38-.5.07-1.12.1-1.8-.11-.42-.13-.95-.31-1.64-.6-2.88-1.24-4.76-4.14-4.9-4.33-.14-.19-1.17-1.56-1.17-2.97 0-1.41.74-2.1 1-2.39.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.42-.07.65.5.24.58.82 2 .89 2.14.07.14.12.31.02.5-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.72 1.18 1.54 1.91 1.06.95 1.95 1.24 2.23 1.38.28.14.44.12.6-.07.17-.19.69-.8.87-1.08.18-.28.36-.23.6-.14.24.09 1.55.73 1.82.86.28.14.46.21.53.32.07.12.07.67-.17 1.35z"/></svg>
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ))
           )}
 
-          {!loading && filtered.length > 0 && (
-            <div className="cta"><button onClick={orderList}>💬 Passer commande sur WhatsApp</button></div>
+          {!loading && (
+            cartCount > 0 ? (
+              <div className="cartbar">
+                <div className="info">🛒 {cartCount} article(s) · <b>{cartTotal} MAD</b></div>
+                <div>
+                  <button className="clear" onClick={() => setCart({})}>Vider</button>
+                  <button className="send" onClick={sendCart}>Envoyer la commande</button>
+                </div>
+              </div>
+            ) : filtered.length > 0 ? (
+              <div className="cta"><button onClick={sendCart}>💬 Commander sur WhatsApp</button></div>
+            ) : null
           )}
 
           <p className="foot">Prix susceptibles d'évoluer · sous réserve de disponibilité<br />FiltroPro · Pièces &amp; Filtres Auto · Maroc · 06 02 35 02 90</p>
