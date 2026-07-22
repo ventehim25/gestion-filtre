@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { CatItem, CAT_FR, CAT_ORDER, TARIF_KEY, loadCatalogueItems } from "@/lib/catalogue";
+import FilterImage from "@/components/FilterImage";
 
 const WA = "212602350290";
 
@@ -101,6 +102,7 @@ function TarifInner() {
         .tarif .chip.on{ background:var(--gold); color:#231a06; border-color:var(--gold); font-weight:700; }
         .tarif .cat{ margin:22px 0 8px; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); font-weight:700; }
         .tarif .item{ display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid rgba(255,255,255,.06); }
+        .tarif .thumb{ width:46px; height:46px; flex:0 0 auto; border-radius:9px; object-fit:contain; background:#fff; padding:3px; border:1px solid rgba(216,180,96,.25); cursor:zoom-in; }
         .tarif .ref{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:15px; font-weight:700; }
         .tarif .mk{ font-size:11px; color:var(--muted); }
         .tarif .price{ margin-left:auto; text-align:right; white-space:nowrap; }
@@ -175,6 +177,7 @@ function TarifInner() {
                   const n = cart[keyOf(i)] ?? 0;
                   return (
                     <div className="item" key={c + idx}>
+                      <FilterImage reference={i.reference} categorie={i.categorie} imageUrl={i.imageUrl ?? undefined} wid={110} className="thumb" />
                       <div>
                         <div className="ref">{i.reference}</div>
                         <div className="mk">{i.marque}</div>

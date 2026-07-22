@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 // qui se colle dans /commandes.
 import { useEffect, useMemo, useState } from "react";
 import { PubItem, CAT_FR, CAT_ORDER, loadPublicCatalogueItems } from "@/lib/catalogue";
+import FilterImage from "@/components/FilterImage";
 
 const WA = "212602350290";
 
@@ -69,6 +70,7 @@ export default function CataloguePublicPage() {
         .pub .chip.on{ background:var(--gold); color:#231a06; border-color:var(--gold); font-weight:700; }
         .pub .cat{ margin:22px 0 8px; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); font-weight:700; }
         .pub .item{ display:flex; align-items:center; gap:12px; padding:12px 4px; border-bottom:1px solid rgba(255,255,255,.06); }
+        .pub .thumb{ width:46px; height:46px; flex:0 0 auto; border-radius:9px; object-fit:contain; background:#fff; padding:3px; border:1px solid rgba(216,180,96,.25); cursor:zoom-in; }
         .pub .ref{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:15px; font-weight:700; }
         .pub .mk{ font-size:11px; color:var(--muted); }
         .pub .item .sp{ margin-left:auto; }
@@ -122,6 +124,7 @@ export default function CataloguePublicPage() {
                 const n = cart[keyOf(i)] ?? 0;
                 return (
                   <div className="item" key={c + idx}>
+                    <FilterImage reference={i.reference} categorie={i.categorie} imageUrl={i.imageUrl ?? undefined} wid={110} className="thumb" />
                     <div>
                       <div className="ref">{i.reference}</div>
                       <div className="mk">{i.marque}</div>

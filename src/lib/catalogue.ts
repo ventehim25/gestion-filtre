@@ -30,31 +30,33 @@ export type CatItem = {
   prix: number;        // prix de vente (promo si présente) — JAMAIS le prix d'achat
   promo: boolean;
   prixAvant?: number;  // prix barré si promo
+  imageUrl?: string | null;
 };
 
 // Catalogue PUBLIC (QR carte de visite) : articles dispo SANS prix. Les prix ne sont
 // même pas chargés → impossible de les lire depuis cette page. On ne montre que ce
 // qu'on a, pour que le client commande sur WhatsApp.
-export type PubItem = { reference: string; marque: string; categorie: string };
+export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null };
 export async function loadPublicCatalogueItems(): Promise<PubItem[]> {
-  type P = { id: string; reference: string; marque: string | null; categorie: string; stock: number };
+  type P = { id: string; reference: string; marque: string | null; categorie: string; stock: number; image_url: string | null };
   const prods: P[] = [];
   for (let i = 0; i < 20; i++) {
     const { data } = await supabase.from("products")
-      .select("id, reference, marque, categorie, stock").range(i * 1000, i * 1000 + 999);
+      .select("id, reference, marque, categorie, stock, image_url").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     prods.push(...(data as P[]));
     if (data.length < 1000) break;
   }
   const catById = new Map(prods.map(p => [p.id, p.categorie]));
+  const imgById = new Map(prods.map(p => [p.id, p.image_url]));
   const items: PubItem[] = [];
-  for (const p of prods) if (p.stock > 0) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie });
+  for (const p of prods) if (p.stock > 0) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie, imageUrl: p.image_url });
 
   type E = { product_id: string; marque: string; reference: string; stock: number };
   for (let i = 0; i < 30; i++) {
     const { data } = await supabase.from("equivalences").select("product_id, marque, reference, stock").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
-    for (const e of data as E[]) if (e.stock > 0) items.push({ reference: e.reference, marque: e.marque, categorie: catById.get(e.product_id) ?? "autre" });
+    for (const e of data as E[]) if (e.stock > 0) items.push({ reference: e.reference, marque: e.marque, categorie: catById.get(e.product_id) ?? "autre", imageUrl: imgById.get(e.product_id) ?? null });
     if (data.length < 1000) break;
   }
   const order = (c: string) => { const i = CAT_ORDER.indexOf(c as ProductCategory); return i < 0 ? 99 : i; };
@@ -65,17 +67,18 @@ export async function loadPublicCatalogueItems(): Promise<PubItem[]> {
 // Tous les articles DISPONIBLES (stock > 0) avec un prix : produits Filtron + variantes de marque.
 export async function loadCatalogueItems(): Promise<CatItem[]> {
   // 1) Produits (paginés)
-  type P = { id: string; reference: string; marque: string | null; categorie: string; prix_vente: number; prix_promo: number | null; stock: number };
+  type P = { id: string; reference: string; marque: string | null; categorie: string; prix_vente: number; prix_promo: number | null; stock: number; image_url: string | null };
   const prods: P[] = [];
   for (let i = 0; i < 20; i++) {
     const { data } = await supabase.from("products")
-      .select("id, reference, marque, categorie, prix_vente, prix_promo, stock")
+      .select("id, reference, marque, categorie, prix_vente, prix_promo, stock, image_url")
       .range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     prods.push(...(data as P[]));
     if (data.length < 1000) break;
   }
   const catById = new Map(prods.map(p => [p.id, p.categorie]));
+  const imgById = new Map(prods.map(p => [p.id, p.image_url]));
 
   const items: CatItem[] = [];
   for (const p of prods) {
@@ -84,7 +87,7 @@ export async function loadCatalogueItems(): Promise<CatItem[]> {
       items.push({
         reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie,
         prix: promo ? (p.prix_promo as number) : p.prix_vente, promo,
-        prixAvant: promo ? p.prix_vente : undefined,
+        prixAvant: promo ? p.prix_vente : undefined, imageUrl: p.image_url,
       });
     }
   }
@@ -100,7 +103,7 @@ export async function loadCatalogueItems(): Promise<CatItem[]> {
         items.push({
           reference: e.reference, marque: e.marque,
           categorie: catById.get(e.product_id) ?? "autre",
-          prix: e.prix, promo: false,
+          prix: e.prix, promo: false, imageUrl: imgById.get(e.product_id) ?? null,
         });
       }
     }
