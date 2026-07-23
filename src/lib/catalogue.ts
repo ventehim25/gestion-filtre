@@ -1,10 +1,9 @@
-// Catalogue de prix (privé, envoyé aux garages) — construit EN DIRECT depuis les produits
-// que le commerçant gère dans /produits. Change un prix / un stock → le catalogue change tout seul.
+// Catalogue de prix (privé, envoyé aux garages) + catalogue public (QR carte), construits
+// EN DIRECT depuis les produits gérés dans /produits. Change un prix / un stock → ça suit.
 import { supabase } from "./supabase";
 import { ProductCategory } from "@/types/database";
 
 // Clé du lien privé. Le catalogue de prix ne s'ouvre qu'avec ?k=<clé>.
-// Pour changer la clé : modifie cette valeur (partage ensuite le nouveau lien).
 export const TARIF_KEY = "garages2026";
 
 export const CAT_FR: Record<string, string> = {
@@ -17,101 +16,100 @@ export const CAT_FR: Record<string, string> = {
   autre: "Autres pièces",
 };
 
-// Ordre d'affichage des catégories
 export const CAT_ORDER: ProductCategory[] = [
   "filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle",
   "filtre_refroidissement", "huile_moteur", "autre",
 ];
 
-export type CatItem = {
-  reference: string;
-  marque: string;
-  categorie: string;
-  prix: number;        // prix de vente (promo si présente) — JAMAIS le prix d'achat
-  promo: boolean;
-  prixAvant?: number;  // prix barré si promo
-  imageUrl?: string | null;
-};
+const norm = (s: string) => s.toUpperCase().replace(/\s+/g, "");
+const catOrder = (c: string) => { const i = CAT_ORDER.indexOf(c as ProductCategory); return i < 0 ? 99 : i; };
 
-// Catalogue PUBLIC (QR carte de visite) : articles dispo SANS prix. Les prix ne sont
-// même pas chargés → impossible de les lire depuis cette page. On ne montre que ce
-// qu'on a, pour que le client commande sur WhatsApp.
-export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null };
-export async function loadPublicCatalogueItems(): Promise<PubItem[]> {
-  type P = { id: string; reference: string; marque: string | null; categorie: string; stock: number; image_url: string | null };
-  const prods: P[] = [];
+// aliases = toutes les références connues du MÊME produit (Filtron + Mann + Bosch + OE…),
+// pour qu'un garage retrouve ton filtre en tapant n'importe laquelle.
+export type CatItem = {
+  reference: string; marque: string; categorie: string;
+  prix: number; promo: boolean; prixAvant?: number;
+  imageUrl?: string | null; aliases?: string[];
+};
+export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null; aliases?: string[] };
+
+type ProdRow = { id: string; reference: string; marque: string | null; categorie: string; stock: number; image_url: string | null; prix_vente?: number; prix_promo?: number | null };
+type EqRow = { product_id: string; marque: string; reference: string; stock: number; prix?: number | null };
+
+async function loadProducts(withPrice: boolean): Promise<ProdRow[]> {
+  const cols = withPrice
+    ? "id, reference, marque, categorie, stock, image_url, prix_vente, prix_promo"
+    : "id, reference, marque, categorie, stock, image_url";
+  const rows: ProdRow[] = [];
   for (let i = 0; i < 20; i++) {
-    const { data } = await supabase.from("products")
-      .select("id, reference, marque, categorie, stock, image_url").range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("products").select(cols).range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
-    prods.push(...(data as P[]));
+    rows.push(...(data as unknown as ProdRow[]));
     if (data.length < 1000) break;
   }
+  return rows;
+}
+async function loadEquivs(withPrice: boolean): Promise<EqRow[]> {
+  const cols = withPrice ? "product_id, marque, reference, stock, prix" : "product_id, marque, reference, stock";
+  const rows: EqRow[] = [];
+  for (let i = 0; i < 30; i++) {
+    const { data } = await supabase.from("equivalences").select(cols).range(i * 1000, i * 1000 + 999);
+    if (!data || data.length === 0) break;
+    rows.push(...(data as unknown as EqRow[]));
+    if (data.length < 1000) break;
+  }
+  return rows;
+}
+
+// Toutes les références connues par produit (réf du produit + toutes ses équivalences)
+function buildAliases(prods: ProdRow[], eqs: EqRow[]): Map<string, string[]> {
+  const m = new Map<string, string[]>();
+  for (const p of prods) m.set(p.id, [norm(p.reference)]);
+  for (const e of eqs) { const a = m.get(e.product_id); if (a) a.push(norm(e.reference)); else m.set(e.product_id, [norm(e.reference)]); }
+  return m;
+}
+
+// ---- Catalogue PUBLIC (QR carte) : SANS prix ----
+export async function loadPublicCatalogueItems(): Promise<PubItem[]> {
+  const [prods, eqs] = await Promise.all([loadProducts(false), loadEquivs(false)]);
   const catById = new Map(prods.map(p => [p.id, p.categorie]));
   const imgById = new Map(prods.map(p => [p.id, p.image_url]));
-  const items: PubItem[] = [];
-  for (const p of prods) if (p.stock > 0) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie, imageUrl: p.image_url });
+  const aliases = buildAliases(prods, eqs);
 
-  type E = { product_id: string; marque: string; reference: string; stock: number };
-  for (let i = 0; i < 30; i++) {
-    const { data } = await supabase.from("equivalences").select("product_id, marque, reference, stock").range(i * 1000, i * 1000 + 999);
-    if (!data || data.length === 0) break;
-    for (const e of data as E[]) if (e.stock > 0) items.push({ reference: e.reference, marque: e.marque, categorie: catById.get(e.product_id) ?? "autre", imageUrl: imgById.get(e.product_id) ?? null });
-    if (data.length < 1000) break;
-  }
-  const order = (c: string) => { const i = CAT_ORDER.indexOf(c as ProductCategory); return i < 0 ? 99 : i; };
-  items.sort((a, b) => order(a.categorie) - order(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
+  const items: PubItem[] = [];
+  for (const p of prods) if (p.stock > 0) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie, imageUrl: p.image_url, aliases: aliases.get(p.id) });
+  for (const e of eqs) if (e.stock > 0) items.push({ reference: e.reference, marque: e.marque, categorie: catById.get(e.product_id) ?? "autre", imageUrl: imgById.get(e.product_id) ?? null, aliases: aliases.get(e.product_id) });
+
+  items.sort((a, b) => catOrder(a.categorie) - catOrder(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
   return items;
 }
 
-// Tous les articles DISPONIBLES (stock > 0) avec un prix : produits Filtron + variantes de marque.
+// ---- Catalogue de PRIX (privé) : avec prix de vente (jamais le prix d'achat) ----
 export async function loadCatalogueItems(): Promise<CatItem[]> {
-  // 1) Produits (paginés)
-  type P = { id: string; reference: string; marque: string | null; categorie: string; prix_vente: number; prix_promo: number | null; stock: number; image_url: string | null };
-  const prods: P[] = [];
-  for (let i = 0; i < 20; i++) {
-    const { data } = await supabase.from("products")
-      .select("id, reference, marque, categorie, prix_vente, prix_promo, stock, image_url")
-      .range(i * 1000, i * 1000 + 999);
-    if (!data || data.length === 0) break;
-    prods.push(...(data as P[]));
-    if (data.length < 1000) break;
-  }
+  const [prods, eqs] = await Promise.all([loadProducts(true), loadEquivs(true)]);
   const catById = new Map(prods.map(p => [p.id, p.categorie]));
   const imgById = new Map(prods.map(p => [p.id, p.image_url]));
+  const aliases = buildAliases(prods, eqs);
 
   const items: CatItem[] = [];
   for (const p of prods) {
-    if (p.stock > 0 && p.prix_vente > 0) {
+    if (p.stock > 0 && (p.prix_vente ?? 0) > 0) {
       const promo = p.prix_promo != null && p.prix_promo > 0;
       items.push({
         reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie,
-        prix: promo ? (p.prix_promo as number) : p.prix_vente, promo,
-        prixAvant: promo ? p.prix_vente : undefined, imageUrl: p.image_url,
+        prix: promo ? (p.prix_promo as number) : (p.prix_vente as number), promo,
+        prixAvant: promo ? p.prix_vente : undefined, imageUrl: p.image_url, aliases: aliases.get(p.id),
       });
     }
   }
-
-  // 2) Variantes de marque (paginées) — dispo avec un prix
-  type E = { product_id: string; marque: string; reference: string; prix: number | null; stock: number };
-  for (let i = 0; i < 30; i++) {
-    const { data } = await supabase.from("equivalences")
-      .select("product_id, marque, reference, prix, stock").range(i * 1000, i * 1000 + 999);
-    if (!data || data.length === 0) break;
-    for (const e of data as E[]) {
-      if (e.stock > 0 && e.prix != null && e.prix > 0) {
-        items.push({
-          reference: e.reference, marque: e.marque,
-          categorie: catById.get(e.product_id) ?? "autre",
-          prix: e.prix, promo: false, imageUrl: imgById.get(e.product_id) ?? null,
-        });
-      }
+  for (const e of eqs) {
+    if (e.stock > 0 && e.prix != null && e.prix > 0) {
+      items.push({
+        reference: e.reference, marque: e.marque, categorie: catById.get(e.product_id) ?? "autre",
+        prix: e.prix, promo: false, imageUrl: imgById.get(e.product_id) ?? null, aliases: aliases.get(e.product_id),
+      });
     }
-    if (data.length < 1000) break;
   }
-
-  // Tri : par catégorie (ordre défini) puis par référence
-  const order = (c: string) => { const i = CAT_ORDER.indexOf(c as ProductCategory); return i < 0 ? 99 : i; };
-  items.sort((a, b) => order(a.categorie) - order(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
+  items.sort((a, b) => catOrder(a.categorie) - catOrder(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
   return items;
 }

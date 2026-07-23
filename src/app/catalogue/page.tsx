@@ -30,7 +30,10 @@ export default function CataloguePublicPage() {
   const cats = useMemo(() => { const p = new Set(items.map(i => i.categorie)); return CAT_ORDER.filter(c => p.has(c)); }, [items]);
   const filtered = useMemo(() => {
     const s = q.trim().toUpperCase().replace(/\s+/g, "");
-    return items.filter(i => (!cat || i.categorie === cat) && (!s || i.reference.toUpperCase().replace(/\s+/g, "").includes(s) || i.marque.toUpperCase().includes(s)));
+    return items.filter(i => (!cat || i.categorie === cat) && (!s
+      || i.reference.toUpperCase().replace(/\s+/g, "").includes(s)
+      || i.marque.toUpperCase().includes(s)
+      || (i.aliases?.some(a => a.includes(s)) ?? false)));
   }, [items, q, cat]);
   const groups = useMemo(() => {
     const m = new Map<string, PubItem[]>();
