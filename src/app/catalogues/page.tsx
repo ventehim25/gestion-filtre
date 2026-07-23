@@ -93,14 +93,14 @@ export default function CataloguesPage() {
         .cat-h{ display:flex; align-items:baseline; justify-content:space-between; border-bottom:2px solid #c99a2e; padding-bottom:5px; margin-bottom:9px; }
         .cat-h .ct{ font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#a9791f; }
         .cat-h .cn{ font-size:10px; color:#b0a488; }
-        .grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:9px; }
-        .card{ border:1px solid #e8e2d4; border-radius:9px; padding:8px; break-inside:avoid; page-break-inside:avoid; }
-        .ph{ height:36mm; background:#fff; border:1px solid #f0ece2; border-radius:6px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-        .pimg{ max-width:96%; max-height:96%; object-fit:contain; }
-        .ref{ font-family:'Courier New',monospace; font-weight:700; font-size:12.5px; margin-top:7px; }
-        .mk{ font-size:10px; color:#8a8172; margin-top:1px; }
-        .pr{ font-weight:800; font-size:13.5px; margin-top:3px; }
-        .promo{ background:#fde2e4; color:#c81e2a; font-size:8px; font-weight:800; padding:1px 5px; border-radius:10px; margin-left:5px; vertical-align:middle; }
+        .grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:11px; }
+        .card{ background:#fbf8f1; border:1px solid #ddd3bd; border-radius:8px; padding:6px; break-inside:avoid; page-break-inside:avoid; box-shadow:0 1px 2px rgba(0,0,0,.05); }
+        .ph{ height:25mm; background:#fff; border:1px solid #ece5d5; border-radius:5px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+        .pimg{ max-width:94%; max-height:94%; object-fit:contain; }
+        .ref{ font-family:'Courier New',monospace; font-weight:700; font-size:10.5px; margin-top:5px; word-break:break-all; line-height:1.15; }
+        .mk{ font-size:8.5px; color:#8a8172; margin-top:1px; }
+        .pr{ font-weight:800; font-size:11px; margin-top:2px; }
+        .promo{ background:#fde2e4; color:#c81e2a; font-size:7px; font-weight:800; padding:1px 4px; border-radius:9px; margin-left:4px; vertical-align:middle; }
         .foot{ margin-top:22px; text-align:center; font-size:10px; color:#9a917f; line-height:1.7; border-top:1px solid #eee; padding-top:10px; }
         .bar{ text-align:center; margin:16px 0 4px; }
         .bar button{ padding:11px 22px; background:#c99a2e; color:#fff; border:0; border-radius:9px; cursor:pointer; font-weight:800; font-size:14px; }
