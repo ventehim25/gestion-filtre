@@ -6,8 +6,9 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle, Camera } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import { uploadProductPhoto } from "@/lib/photoUpload";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
@@ -29,7 +30,7 @@ const categoryKeys: Record<ProductCategory, keyof ReturnType<typeof useLang>["t"
   autre: "other",
 };
 
-const empty = { nom_fr: "", nom_ar: "", reference: "", marque: "Filtron", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0, code_barre: "" };
+const empty = { nom_fr: "", nom_ar: "", reference: "", marque: "Filtron", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0, code_barre: "", image_url: "" };
 
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe
 function refCompare(a: string, b: string) {
@@ -48,6 +49,7 @@ export default function ProduitsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(empty);
+  const [uploading, setUploading] = useState(false);
   const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number; code_barre?: string }[]>([]);
   const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
   const [showAutoEquivs, setShowAutoEquivs] = useState(false);
@@ -103,7 +105,7 @@ export default function ProduitsPage() {
 
   async function save() {
     let productId = editing?.id;
-    const payload = { ...form, prix_promo: form.prix_promo > 0 ? form.prix_promo : null };
+    const payload = { ...form, prix_promo: form.prix_promo > 0 ? form.prix_promo : null, image_url: form.image_url || null };
     if (editing) {
       await supabase.from("products").update(payload).eq("id", editing.id);
     } else {
@@ -131,6 +133,19 @@ export default function ProduitsPage() {
     load();
   }
 
+  // Photo prise avec l'appareil → compressée → uploadée → URL mise dans le produit
+  async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadProductPhoto(file, form.reference || "produit");
+      setForm(f => ({ ...f, image_url: url }));
+    } catch (err) {
+      alert("Échec de l'envoi de la photo.\nAs-tu collé le SQL supabase/storage_produits.sql dans Supabase ?\n\n" + (err instanceof Error ? err.message : ""));
+    } finally { setUploading(false); e.target.value = ""; }
+  }
+
   async function remove(id: string) {
     if (confirm(t("confirm") + " " + t("delete") + "?")) {
       await supabase.from("products").delete().eq("id", id);
@@ -147,7 +162,7 @@ export default function ProduitsPage() {
 
   async function startEdit(p: Product) {
     setEditing(p);
-    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, marque: p.marque ?? "Filtron", categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0, code_barre: p.code_barre ?? "" });
+    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, marque: p.marque ?? "Filtron", categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0, code_barre: p.code_barre ?? "", image_url: p.image_url ?? "" });
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
     setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined, prix_achat: e.prix_achat ?? undefined, stock: e.stock ?? 0, code_barre: e.code_barre ?? "" })) ?? []);
     setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
@@ -314,6 +329,20 @@ export default function ProduitsPage() {
                   <input className="input font-mono flex-1" placeholder="scanne ou tape le code" value={form.code_barre} onChange={e => setForm({ ...form, code_barre: e.target.value })} />
                   <button type="button" onClick={() => setScanTarget("product")} className="btn-secondary shrink-0 flex items-center gap-1.5"><Barcode size={16} /> Scanner</button>
                 </div>
+              </div>
+              {/* Photo du filtre (pour le catalogue) */}
+              <div className="col-span-2">
+                <label className="text-xs text-slate-500 mb-1 block">📷 Photo du filtre (catalogue)</label>
+                <div className="flex items-center gap-3">
+                  <FilterImage reference={form.reference || "?"} categorie={form.categorie} imageUrl={form.image_url || undefined} wid={160} zoom={false}
+                    className="h-16 w-16 rounded-lg object-contain bg-white p-1 border border-slate-300 shrink-0" />
+                  <label className={`btn-secondary text-sm cursor-pointer flex items-center gap-2 ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
+                    <Camera size={15} /> {uploading ? "Envoi…" : (form.image_url ? "Changer" : "Prendre / choisir")}
+                    <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhoto} />
+                  </label>
+                  {form.image_url && <button type="button" onClick={() => setForm(f => ({ ...f, image_url: "" }))} className="text-red-400 hover:text-red-600 text-sm">Retirer</button>}
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Prends la boîte en photo — elle s&apos;affichera à côté de la référence dans le catalogue.</p>
               </div>
             </div>
 
