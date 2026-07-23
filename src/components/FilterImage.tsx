@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { filterPhoto } from "@/lib/filterPhotos";
+import { cameraPlaceholder, logoPlaceholder } from "@/lib/filterPhotos";
 import { X } from "lucide-react";
 
 // "OP540/1" -> "OP_540.1"  (nom d'asset Scene7 Filtron / MANN+HUMMEL)
@@ -16,8 +16,8 @@ function bigger(src: string) {
 }
 
 export default function FilterImage({
-  reference, categorie, imageUrl, className, wid = 160, zoom = true,
-}: { reference: string; categorie: string; imageUrl?: string | null; className?: string; wid?: number; zoom?: boolean }) {
+  reference, categorie, imageUrl, className, wid = 160, zoom = true, placeholder = "camera",
+}: { reference: string; categorie: string; imageUrl?: string | null; className?: string; wid?: number; zoom?: boolean; placeholder?: "camera" | "logo" }) {
   const candidates = [
     ...(imageUrl ? [`${imageUrl}?qlt=82&wid=${wid}`] : []),
     s7(reference, "-1", wid),
@@ -25,7 +25,8 @@ export default function FilterImage({
     s7(reference, "-filter-with-box", wid),
     s7(reference, "-2", wid),
     s7(reference, "-3", wid),
-    filterPhoto(categorie, wid),
+    // Pas de vraie photo → logo (catalogues, côté client) ou appareil photo (gestion, ma vue)
+    placeholder === "logo" ? logoPlaceholder() : cameraPlaceholder(),
   ];
   const [i, setI] = useState(0);
   const [open, setOpen] = useState(false);

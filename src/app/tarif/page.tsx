@@ -178,7 +178,7 @@ function TarifInner() {
                   const n = cart[keyOf(i)] ?? 0;
                   return (
                     <div className="item" key={c + idx}>
-                      <FilterImage reference={i.reference} categorie={i.categorie} imageUrl={i.imageUrl ?? undefined} wid={110} className="thumb" />
+                      <FilterImage reference={i.reference} categorie={i.categorie} imageUrl={i.imageUrl ?? undefined} wid={110} className="thumb" placeholder="logo" />
                       <div>
                         <div className="ref">{i.reference}</div>
                         <div className="mk">{i.marque}</div>
