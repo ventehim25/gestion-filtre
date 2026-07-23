@@ -70,9 +70,25 @@ export default function CataloguesPage() {
           + `<div class="ref">${esc(i.reference)}</div><div class="mk">${esc(i.marque)}</div>`
           + `<div class="pr">${i.prix} MAD${i.promo ? ' <span class="promo">PROMO</span>' : ""}</div></div>`;
       };
-      const sections = CAT_ORDER.filter(c => byCat.has(c)).map(c =>
-        `<section class="cat"><div class="cat-h"><span class="ct">${CAT_FR[c]}</span><span class="cn">${byCat.get(c)!.length} réf.</span></div><div class="grid">${byCat.get(c)!.map(card).join("")}</div></section>`
-      ).join("") || `<p style="text-align:center;color:#999;padding:40px">Aucun article disponible.</p>`;
+      // Sous-groupes par PRÉFIXE de référence (OP, OE, AP, K…). Les préfixes avec peu
+      // d'articles sont réunis dans « Autres ».
+      const prefixOf = (r: string) => (r.toUpperCase().match(/^[A-Z]+/)?.[0]) ?? "#";
+      const subgroups = (list: typeof items) => {
+        const m = new Map<string, typeof items>();
+        for (const i of list) { const p = prefixOf(i.reference); const a = m.get(p) ?? []; a.push(i); m.set(p, a); }
+        const entries = [...m.entries()];
+        const named = entries.filter(([, l]) => l.length >= 3).sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+        const rest = entries.filter(([, l]) => l.length < 3).flatMap(([, l]) => l).sort((a, b) => a.reference.localeCompare(b.reference, undefined, { numeric: true }));
+        const out = named.map(([p, l]) => ({ label: p, items: l }));
+        if (rest.length) out.push({ label: "Autres", items: rest });
+        return out;
+      };
+      const sections = CAT_ORDER.filter(c => byCat.has(c)).map(c => {
+        const subs = subgroups(byCat.get(c)!).map(sg =>
+          `<div class="sub"><div class="sub-h">${sg.label} <span class="sub-n">${sg.items.length}</span></div><div class="grid">${sg.items.map(card).join("")}</div></div>`
+        ).join("");
+        return `<section class="cat"><div class="cat-h"><span class="ct">${CAT_FR[c]}</span><span class="cn">${byCat.get(c)!.length} réf.</span></div>${subs}</section>`;
+      }).join("") || `<p style="text-align:center;color:#999;padding:40px">Aucun article disponible.</p>`;
 
       const logo = `<svg class="logo" viewBox="0 0 48 48" fill="none"><defs><linearGradient id="lg" x1="6" y1="3" x2="42" y2="45" gradientUnits="userSpaceOnUse"><stop stop-color="#f43f5e"/><stop offset="0.6" stop-color="#dc2626"/><stop offset="1" stop-color="#7f1d1d"/></linearGradient></defs><path d="M24 2.5 41.55 12.75 V33.25 L24 43.5 6.45 33.25 V12.75 Z" fill="url(#lg)"/><g stroke="#fff" stroke-width="2.6" stroke-linecap="round" fill="none"><path d="M13 18 C 19.5 13.5, 28.5 13.5, 35 18"/><path d="M13 24 C 19.5 19.5, 28.5 19.5, 35 24"/><path d="M13 30 C 19.5 25.5, 28.5 25.5, 35 30"/></g><circle cx="35" cy="18" r="2.1" fill="#fff"/></svg>`;
 
@@ -93,6 +109,9 @@ export default function CataloguesPage() {
         .cat-h{ display:flex; align-items:baseline; justify-content:space-between; border-bottom:2px solid #c99a2e; padding-bottom:5px; margin-bottom:9px; }
         .cat-h .ct{ font-size:13px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:#a9791f; }
         .cat-h .cn{ font-size:10px; color:#b0a488; }
+        .sub{ margin:0 0 10px; }
+        .sub-h{ font-size:10px; font-weight:800; letter-spacing:.08em; color:#7a6a3c; background:#f3ead2; border:1px solid #e6d9b6; border-radius:6px; padding:3px 9px; display:inline-block; margin:9px 0 7px; break-after:avoid; }
+        .sub-n{ color:#b0a488; font-weight:600; margin-left:3px; }
         .grid{ display:grid; grid-template-columns:repeat(4,1fr); gap:11px; }
         .card{ background:#fbf8f1; border:1px solid #ddd3bd; border-radius:8px; padding:6px; break-inside:avoid; page-break-inside:avoid; box-shadow:0 1px 2px rgba(0,0,0,.05); }
         .ph{ height:25mm; background:#fff; border:1px solid #ece5d5; border-radius:5px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
