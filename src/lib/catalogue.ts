@@ -24,6 +24,22 @@ export const CAT_ORDER: ProductCategory[] = [
 const norm = (s: string) => s.toUpperCase().replace(/\s+/g, "");
 const catOrder = (c: string) => { const i = CAT_ORDER.indexOf(c as ProductCategory); return i < 0 ? 99 : i; };
 
+// Cache local (perf) : le catalogue re-télécharge tous les produits + équivalences à
+// chaque ouverture. On garde la dernière liste construite en localStorage pour un
+// affichage INSTANTANÉ (puis rafraîchissement réseau en arrière-plan côté page).
+const PUB_CACHE = "fp_cat_public_v1";
+const TARIF_CACHE = "fp_cat_tarif_v1";
+function readCache<T>(key: string): T | null {
+  if (typeof window === "undefined") return null;
+  try { const s = localStorage.getItem(key); return s ? (JSON.parse(s) as T) : null; } catch { return null; }
+}
+function writeCache(key: string, v: unknown) {
+  if (typeof window === "undefined") return;
+  try { localStorage.setItem(key, JSON.stringify(v)); } catch {}
+}
+export function cachedPublicItems(): PubItem[] | null { return readCache<PubItem[]>(PUB_CACHE); }
+export function cachedTarifItems(): CatItem[] | null { return readCache<CatItem[]>(TARIF_CACHE); }
+
 // aliases = toutes les références connues du MÊME produit (Filtron + Mann + Bosch + OE…),
 // pour qu'un garage retrouve ton filtre en tapant n'importe laquelle.
 export type CatItem = {
@@ -81,6 +97,7 @@ export async function loadPublicCatalogueItems(): Promise<PubItem[]> {
   for (const e of eqs) if (e.stock > 0) items.push({ reference: e.reference, marque: e.marque, categorie: catById.get(e.product_id) ?? "autre", imageUrl: imgById.get(e.product_id) ?? null, aliases: aliases.get(e.product_id) });
 
   items.sort((a, b) => catOrder(a.categorie) - catOrder(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
+  writeCache(PUB_CACHE, items);
   return items;
 }
 
@@ -111,5 +128,6 @@ export async function loadCatalogueItems(): Promise<CatItem[]> {
     }
   }
   items.sort((a, b) => catOrder(a.categorie) - catOrder(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
+  writeCache(TARIF_CACHE, items);
   return items;
 }

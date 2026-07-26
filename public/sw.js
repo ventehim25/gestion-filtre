@@ -5,7 +5,7 @@
    - Images produits (Scene7 / Unsplash) : cache-first (photos dispo hors-ligne).
    - Écritures (POST/PATCH/DELETE) : réseau direct (échec si hors-ligne -> à gérer côté app).
 */
-const VERSION = "v7";
+const VERSION = "v8";
 const STATIC = "fp-static-" + VERSION;
 const DATA = "fp-data-" + VERSION;
 const IMG = "fp-img-" + VERSION;
@@ -25,25 +25,36 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   const url = new URL(req.url);
 
-  // --- Pages client-facing toujours fraîches (jamais interceptées) :
-  //     catalogue public /c/ (SEO), tarifs privés /tarif, sitemap, robots ---
+  // --- Pages SEO toujours fraîches (jamais interceptées) : catalogue Google /c/,
+  //     sitemap, robots. (/catalogue et /tarif, eux, sont des pages « app » : on met
+  //     leur shell en cache comme le reste → ouverture instantanée et hors-ligne.) ---
   if (url.origin === self.location.origin &&
-      (url.pathname === "/c" || url.pathname.startsWith("/c/") || url.pathname === "/tarif" ||
-       url.pathname === "/catalogue" || url.pathname === "/sitemap.xml" || url.pathname === "/robots.txt")) return;
+      (url.pathname === "/c" || url.pathname.startsWith("/c/") ||
+       url.pathname === "/sitemap.xml" || url.pathname === "/robots.txt")) return;
 
-  // --- Données Supabase ---
+  // --- Données Supabase : network-first AVEC timeout court ---
+  //     Sur réseau lent (3G Maroc), attendre le réseau à chaque requête rend l'app
+  //     poussive. Ici : si le réseau ne répond pas sous ~2 s et qu'on a une copie en
+  //     cache, on sert le cache TOUT DE SUITE et on met à jour en arrière-plan.
+  //     Réseau rapide → données fraîches ; hors-ligne → instantané depuis le cache.
   if (url.hostname.endsWith(".supabase.co")) {
     if (req.method !== "GET") return; // écritures : laisser passer (réseau)
     event.respondWith((async () => {
       const cache = await caches.open(DATA);
-      try {
-        const res = await fetch(req);
+      const cached = await cache.match(req);
+      const net = fetch(req).then((res) => {
         if (res && res.ok) cache.put(req, res.clone());
         return res;
-      } catch {
-        const cached = await cache.match(req);
-        return cached || new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+      }).catch(() => null);
+      if (cached) {
+        const timeout = new Promise((r) => setTimeout(() => r(null), 2000));
+        const winner = await Promise.race([net, timeout]);
+        if (winner) return winner;          // réseau assez rapide (ou erreur rapide → null → on tombe plus bas)
+        event.waitUntil(net);               // réseau lent : on continue de rafraîchir le cache en fond
+        return cached;                      // et on sert le cache maintenant
       }
+      const res = await net;
+      return res || new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
     })());
     return;
   }

@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 // Panier + quantités → message WhatsApp formaté « QTÉ RÉF » qui rentre dans /commandes.
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CatItem, CAT_FR, CAT_ORDER, TARIF_KEY, loadCatalogueItems } from "@/lib/catalogue";
+import { CatItem, CAT_FR, CAT_ORDER, TARIF_KEY, loadCatalogueItems, cachedTarifItems } from "@/lib/catalogue";
 import FilterImage from "@/components/FilterImage";
 
 const WA = "212602350290";
@@ -26,7 +26,9 @@ function TarifInner() {
 
   useEffect(() => {
     if (!ok) { setLoading(false); return; }
-    loadCatalogueItems().then(list => { setItems(list); setLoading(false); });
+    const c = cachedTarifItems();           // affichage instantané depuis la dernière liste connue
+    if (c && c.length) { setItems(c); setLoading(false); }
+    loadCatalogueItems().then(list => { setItems(list); setLoading(false); }).catch(() => setLoading(false));
   }, [ok]);
 
   const keyOf = (i: CatItem) => `${i.reference}|${i.marque}`;

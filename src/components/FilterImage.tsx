@@ -1,6 +1,7 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cameraPlaceholder, logoPlaceholder } from "@/lib/filterPhotos";
+import { getImgIdx, setImgIdx } from "@/lib/imgMemo";
 import { X } from "lucide-react";
 
 // "OP540/1" -> "OP_540.1"  (nom d'asset Scene7 Filtron / MANN+HUMMEL)
@@ -28,9 +29,21 @@ export default function FilterImage({
     // Pas de vraie photo → logo (catalogues, côté client) ou appareil photo (gestion, ma vue)
     placeholder === "logo" ? logoPlaceholder() : cameraPlaceholder(),
   ];
+  // Clé mémo : dépend de la réf, de la présence d'une vraie photo et du nb de candidats.
+  const memoKey = `${reference.toUpperCase()}|${imageUrl ? 1 : 0}|${candidates.length}`;
+  const last = candidates.length - 1;
   const [i, setI] = useState(0);
   const [open, setOpen] = useState(false);
   const src = candidates[i];
+
+  // Après montage (côté client uniquement → pas de mismatch d'hydratation sur /c/) :
+  // sauter directement à la variante connue comme fonctionnelle (ou au placeholder
+  // si tout est connu comme échouant), au lieu de re-tester la cascade Scene7.
+  useEffect(() => {
+    const known = getImgIdx(memoKey);
+    if (known != null && known > 0 && known <= last) setI(known);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memoKey]);
 
   return (
     <>
@@ -40,7 +53,8 @@ export default function FilterImage({
         alt={reference}
         loading="lazy"
         className={`${className ?? ""} ${zoom ? "cursor-zoom-in" : ""}`}
-        onError={() => setI((p) => Math.min(p + 1, candidates.length - 1))}
+        onLoad={() => setImgIdx(memoKey, i)}
+        onError={() => setI((p) => { const n = Math.min(p + 1, last); if (n === last) setImgIdx(memoKey, n); return n; })}
         onClick={zoom ? () => setOpen(true) : undefined}
       />
       {open && (
