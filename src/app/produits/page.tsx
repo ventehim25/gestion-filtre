@@ -248,7 +248,12 @@ export default function ProduitsPage() {
     const matchCat = !catFilter || p.categorie === catFilter;
     const matchKind = !kindFilter || classifyKind(p.reference, vehMap[p.id]?.makes) === kindFilter;
     return matchSearch && matchRef && matchBrand && matchCat && matchKind;
-  }).sort((a, b) => refCompare(a.reference, b.reference));
+  }).sort((a, b) => {
+    // Disponibles en HAUT, ruptures en BAS (un produit est « dispo » si son stock
+    // principal ou l'une de ses variantes a du stock), puis tri par référence.
+    const dispo = (p: typeof a) => (p.stock > 0 || (equivMap[p.id] ?? []).some(e => e.stock > 0)) ? 0 : 1;
+    return dispo(a) - dispo(b) || refCompare(a.reference, b.reference);
+  });
 
   return (
     <div>
@@ -452,7 +457,9 @@ export default function ProduitsPage() {
             {filtered.map(p => {
               // Toutes les vraies marques (Flag, Mann, Wix…) s'affichent, même sans prix —
               // seuls les codes constructeur (OE) importés automatiquement restent masqués ici.
-              const variants = (equivMap[p.id] ?? []).filter(e => KNOWN_BRANDS.has(e.marque.trim().toLowerCase()));
+              const variants = (equivMap[p.id] ?? []).filter(e => KNOWN_BRANDS.has(e.marque.trim().toLowerCase()))
+                // Variantes disponibles en haut, ruptures en bas.
+                .sort((a, b) => (a.stock > 0 ? 0 : 1) - (b.stock > 0 ? 0 : 1) || refCompare(a.reference, b.reference));
               return (
               <Fragment key={p.id}>
               <tr className={p.stock <= p.stock_min ? "bg-red-50" : "hover:bg-slate-50"}>
