@@ -221,7 +221,7 @@ export default function ProduitsPage() {
   }
 
   // Marques de FILTRES (Filtron = produit principal, les autres = variantes équivalentes).
-  const BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram"];
+  const BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram", "Misfat", "Wunder"];
   // Marques reconnues (hors Filtron, + "OE") : toujours visibles dans les variantes, jamais
   // mélangées avec les codes constructeur (Citroën, Ford…) importés automatiquement.
   const KNOWN_BRANDS = new Set([...BRANDS.filter(b => b !== "Filtron"), "OE"].map(b => b.toLowerCase()));
