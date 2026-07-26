@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 // (envoyés aux garages via /tarif). Panier + quantités → commande WhatsApp « QTÉ RÉF »
 // qui se colle dans /commandes.
 import { useEffect, useMemo, useState } from "react";
-import { PubItem, CAT_FR, CAT_ORDER, loadPublicCatalogueItems, cachedPublicItems } from "@/lib/catalogue";
+import { PubItem, CAT_FR, CAT_ORDER, loadPublicCatalogueItems, enrichPublicAliases, cachedPublicItems } from "@/lib/catalogue";
 import FilterImage from "@/components/FilterImage";
 
 const WA = "212602350290";
@@ -19,7 +19,10 @@ export default function CataloguePublicPage() {
   useEffect(() => {
     const c = cachedPublicItems();          // affichage instantané depuis la dernière liste connue
     if (c && c.length) { setItems(c); setLoading(false); }
-    loadPublicCatalogueItems().then(list => { setItems(list); setLoading(false); }).catch(() => setLoading(false));
+    loadPublicCatalogueItems().then(list => {
+      setItems(list); setLoading(false);
+      enrichPublicAliases(list).then(setItems).catch(() => {}); // recherche multi-réfs en fond
+    }).catch(() => setLoading(false));
   }, []);
 
   const keyOf = (i: PubItem) => `${i.reference}|${i.marque}`;

@@ -45,31 +45,43 @@ export function cachedTarifItems(): CatItem[] | null { return readCache<CatItem[
 export type CatItem = {
   reference: string; marque: string; categorie: string;
   prix: number; promo: boolean; prixAvant?: number;
-  imageUrl?: string | null; aliases?: string[];
+  imageUrl?: string | null; aliases?: string[]; productId?: string;
 };
-export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null; aliases?: string[] };
+export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null; aliases?: string[]; productId?: string };
 
 type ProdRow = { id: string; reference: string; marque: string | null; categorie: string; stock: number; image_url: string | null; prix_vente?: number; prix_promo?: number | null };
-type EqRow = { product_id: string; marque: string; reference: string; stock: number; prix?: number | null };
+type ParentRow = { categorie: string | null; image_url: string | null; reference: string | null } | null;
+type EqRow = { product_id: string; marque: string; reference: string; stock: number; prix?: number | null; products?: ParentRow };
 
-async function loadProducts(withPrice: boolean): Promise<ProdRow[]> {
+// PERF — le catalogue n'affiche QUE les articles en stock (~120 lignes) alors que la
+// base contient 3200+ produits et 23000+ équivalences. On ne chargeait tout ça que pour
+// la recherche « par n'importe quelle référence équivalente ». Désormais :
+//   1) on charge UNIQUEMENT le stock (2 requêtes) → affichage immédiat ;
+//   2) les alias (recherche multi-réfs) sont enrichis ENSUITE, en fond, et seulement
+//      pour les produits affichés (equivalences filtrées par product_id).
+
+// Produits en stock (quelques centaines max → 1 page en général).
+async function stockProducts(withPrice: boolean): Promise<ProdRow[]> {
   const cols = withPrice
     ? "id, reference, marque, categorie, stock, image_url, prix_vente, prix_promo"
     : "id, reference, marque, categorie, stock, image_url";
   const rows: ProdRow[] = [];
-  for (let i = 0; i < 20; i++) {
-    const { data } = await supabase.from("products").select(cols).range(i * 1000, i * 1000 + 999);
+  for (let i = 0; i < 10; i++) {
+    const { data } = await supabase.from("products").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     rows.push(...(data as unknown as ProdRow[]));
     if (data.length < 1000) break;
   }
   return rows;
 }
-async function loadEquivs(withPrice: boolean): Promise<EqRow[]> {
-  const cols = withPrice ? "product_id, marque, reference, stock, prix" : "product_id, marque, reference, stock";
+// Variantes de marque en stock, avec les infos du produit parent (catégorie, photo, réf).
+async function stockEquivs(withPrice: boolean): Promise<EqRow[]> {
+  const cols = withPrice
+    ? "product_id, marque, reference, stock, prix, products(categorie, image_url, reference)"
+    : "product_id, marque, reference, stock, products(categorie, image_url, reference)";
   const rows: EqRow[] = [];
-  for (let i = 0; i < 30; i++) {
-    const { data } = await supabase.from("equivalences").select(cols).range(i * 1000, i * 1000 + 999);
+  for (let i = 0; i < 10; i++) {
+    const { data } = await supabase.from("equivalences").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     rows.push(...(data as unknown as EqRow[]));
     if (data.length < 1000) break;
@@ -77,57 +89,84 @@ async function loadEquivs(withPrice: boolean): Promise<EqRow[]> {
   return rows;
 }
 
-// Toutes les références connues par produit (réf du produit + toutes ses équivalences)
-function buildAliases(prods: ProdRow[], eqs: EqRow[]): Map<string, string[]> {
+// Alias = toutes les références connues des produits AFFICHÉS (pour retrouver le filtre
+// en tapant n'importe quelle marque). Requête ciblée par product_id, découpée par lots
+// pour ne pas dépasser la longueur d'URL.
+async function aliasesFor(productIds: string[]): Promise<Map<string, string[]>> {
+  const ids = [...new Set(productIds)];
   const m = new Map<string, string[]>();
-  for (const p of prods) m.set(p.id, [norm(p.reference)]);
-  for (const e of eqs) { const a = m.get(e.product_id); if (a) a.push(norm(e.reference)); else m.set(e.product_id, [norm(e.reference)]); }
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const { data } = await supabase.from("equivalences").select("product_id, reference").in("product_id", chunk);
+    for (const e of (data ?? []) as { product_id: string; reference: string }[]) {
+      const r = norm(e.reference); const a = m.get(e.product_id);
+      if (a) a.push(r); else m.set(e.product_id, [r]);
+    }
+  }
   return m;
+}
+function mergeAliases<T extends { productId?: string; aliases?: string[] }>(items: T[], m: Map<string, string[]>): T[] {
+  return items.map(i => {
+    const extra = i.productId ? m.get(i.productId) : undefined;
+    if (!extra) return i;
+    return { ...i, aliases: [...new Set([...(i.aliases ?? []), ...extra])] };
+  });
 }
 
 // ---- Catalogue PUBLIC (QR carte) : SANS prix ----
 export async function loadPublicCatalogueItems(): Promise<PubItem[]> {
-  const [prods, eqs] = await Promise.all([loadProducts(false), loadEquivs(false)]);
-  const catById = new Map(prods.map(p => [p.id, p.categorie]));
-  const imgById = new Map(prods.map(p => [p.id, p.image_url]));
-  const aliases = buildAliases(prods, eqs);
-
+  const [prods, eqs] = await Promise.all([stockProducts(false), stockEquivs(false)]);
   const items: PubItem[] = [];
-  for (const p of prods) if (p.stock > 0) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie, imageUrl: p.image_url, aliases: aliases.get(p.id) });
-  for (const e of eqs) if (e.stock > 0) items.push({ reference: e.reference, marque: e.marque, categorie: catById.get(e.product_id) ?? "autre", imageUrl: imgById.get(e.product_id) ?? null, aliases: aliases.get(e.product_id) });
-
+  for (const p of prods) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id });
+  for (const e of eqs) {
+    const parentRef = e.products?.reference ? [norm(e.products.reference)] : [];
+    items.push({ reference: e.reference, marque: e.marque, categorie: e.products?.categorie ?? "autre", imageUrl: e.products?.image_url ?? null, aliases: [norm(e.reference), ...parentRef], productId: e.product_id });
+  }
   items.sort((a, b) => catOrder(a.categorie) - catOrder(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
   writeCache(PUB_CACHE, items);
   return items;
 }
+// Enrichit la recherche (alias) en fond, sans bloquer l'affichage. Met aussi le cache à jour.
+export async function enrichPublicAliases(items: PubItem[]): Promise<PubItem[]> {
+  const pids = items.map(i => i.productId).filter((x): x is string => !!x);
+  if (pids.length === 0) return items;
+  const out = mergeAliases(items, await aliasesFor(pids));
+  writeCache(PUB_CACHE, out);
+  return out;
+}
 
 // ---- Catalogue de PRIX (privé) : avec prix de vente (jamais le prix d'achat) ----
 export async function loadCatalogueItems(): Promise<CatItem[]> {
-  const [prods, eqs] = await Promise.all([loadProducts(true), loadEquivs(true)]);
-  const catById = new Map(prods.map(p => [p.id, p.categorie]));
-  const imgById = new Map(prods.map(p => [p.id, p.image_url]));
-  const aliases = buildAliases(prods, eqs);
-
+  const [prods, eqs] = await Promise.all([stockProducts(true), stockEquivs(true)]);
   const items: CatItem[] = [];
   for (const p of prods) {
-    if (p.stock > 0 && (p.prix_vente ?? 0) > 0) {
+    if ((p.prix_vente ?? 0) > 0) {
       const promo = p.prix_promo != null && p.prix_promo > 0;
       items.push({
         reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie,
         prix: promo ? (p.prix_promo as number) : (p.prix_vente as number), promo,
-        prixAvant: promo ? p.prix_vente : undefined, imageUrl: p.image_url, aliases: aliases.get(p.id),
+        prixAvant: promo ? p.prix_vente : undefined, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id,
       });
     }
   }
   for (const e of eqs) {
-    if (e.stock > 0 && e.prix != null && e.prix > 0) {
+    if (e.prix != null && e.prix > 0) {
+      const parentRef = e.products?.reference ? [norm(e.products.reference)] : [];
       items.push({
-        reference: e.reference, marque: e.marque, categorie: catById.get(e.product_id) ?? "autre",
-        prix: e.prix, promo: false, imageUrl: imgById.get(e.product_id) ?? null, aliases: aliases.get(e.product_id),
+        reference: e.reference, marque: e.marque, categorie: e.products?.categorie ?? "autre",
+        prix: e.prix, promo: false, imageUrl: e.products?.image_url ?? null,
+        aliases: [norm(e.reference), ...parentRef], productId: e.product_id,
       });
     }
   }
   items.sort((a, b) => catOrder(a.categorie) - catOrder(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
   writeCache(TARIF_CACHE, items);
   return items;
+}
+export async function enrichTarifAliases(items: CatItem[]): Promise<CatItem[]> {
+  const pids = items.map(i => i.productId).filter((x): x is string => !!x);
+  if (pids.length === 0) return items;
+  const out = mergeAliases(items, await aliasesFor(pids));
+  writeCache(TARIF_CACHE, out);
+  return out;
 }
