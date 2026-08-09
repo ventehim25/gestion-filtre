@@ -90,67 +90,127 @@ export default function Dashboard() {
   useEffect(() => {
     setPendingOffline(getPending().length);
     async function load() {
-      const [r1, r2, r4] = await Promise.all([
-        supabase.from("clients").select("*", { count: "exact", head: true }),
-        supabase.from("products").select("*", { count: "exact", head: true }),
-        supabase.from("products").select("id").gt("stock", 0).lte("stock", 2),
+      // MOBILE — toutes les lectures indépendantes en PARALLÈLE (avant : ~7 balayages
+      // complets EN SÉRIE, chacun un aller-retour réseau empilé). Les impayés sont
+      // DÉRIVÉS des ventes déjà chargées (fini le scan en double) et les clients ne sont
+      // lus qu'UNE fois. Résultat : le temps de chargement = le plus lent, pas la somme.
+      type SaleRow = { total: number; montant_paye: number; statut: string; date: string; client_id: string };
+      type ItemRow = { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null };
+      type ClRow = { id: string; nom: string; telephone: string | null; derniere_relance?: string | null; derniere_relance_com?: string | null };
+      type LigneImp = { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null; fournisseur: { type: string } | null; sale: { id: string; client_id: string; total: number; montant_paye: number; fournisseur_paye: boolean } | null };
+      const todayMs = Date.now();
+
+      const loadSales = async (): Promise<{ rows: SaleRow[]; error: string | null }> => {
+        const rows: SaleRow[] = [];
+        for (let i = 0; i < 30; i++) {
+          const { data, error } = await supabase.from("sales").select("total, montant_paye, statut, date, client_id").range(i * 1000, i * 1000 + 999);
+          if (error) return { rows, error: error.message };
+          if (!data || data.length === 0) break;
+          rows.push(...(data as SaleRow[]));
+          if (data.length < 1000) break;
+        }
+        return { rows, error: null };
+      };
+      const loadItems = async (): Promise<ItemRow[]> => {
+        const rows: ItemRow[] = [];
+        for (let i = 0; i < 30; i++) {
+          const { data } = await supabase.from("sale_items").select("quantite, prix_unitaire, cout_unitaire, product:products(prix_achat)").range(i * 1000, i * 1000 + 999);
+          if (!data || data.length === 0) break;
+          rows.push(...(data as unknown as ItemRow[]));
+          if (data.length < 1000) break;
+        }
+        return rows;
+      };
+      const loadProductsStock = async (): Promise<{ stock: number; stock_min: number }[]> => {
+        const rows: { stock: number; stock_min: number }[] = [];
+        for (let i = 0; i < 20; i++) {
+          const { data } = await supabase.from("products").select("stock, stock_min").range(i * 1000, i * 1000 + 999);
+          if (!data || data.length === 0) break;
+          rows.push(...(data as { stock: number; stock_min: number }[]));
+          if (data.length < 1000) break;
+        }
+        return rows;
+      };
+      // Une SEULE lecture des clients (avant : deux). Repli si derniere_relance_com absente.
+      const loadClients = async (): Promise<ClRow[]> => {
+        const r = await supabase.from("clients").select("id, nom, telephone, derniere_relance, derniere_relance_com");
+        if (!r.error) return (r.data ?? []) as ClRow[];
+        const r2 = await supabase.from("clients").select("id, nom, telephone, derniere_relance");
+        return (r2.data ?? []) as ClRow[];
+      };
+      const loadUnpaidLignes = async (): Promise<LigneImp[]> => {
+        try {
+          const rows: LigneImp[] = [];
+          for (let i = 0; i < 30; i++) {
+            const { data } = await supabase.from("sale_items")
+              .select("quantite, prix_unitaire, cout_unitaire, product:products(prix_achat), fournisseur:fournisseurs(type), sale:sales!inner(id, client_id, total, montant_paye, fournisseur_paye)")
+              .in("sales.statut", ["en_attente", "partiel"]).range(i * 1000, i * 1000 + 999);
+            if (!data || data.length === 0) break;
+            rows.push(...(data as unknown as LigneImp[]));
+            if (data.length < 1000) break;
+          }
+          return rows;
+        } catch { return []; }
+      };
+      const loadDemande = async (): Promise<{ reference: string; count: number } | null> => {
+        try {
+          const since = new Date(todayMs - 30 * 86400000).toISOString();
+          const { data: dm, error } = await supabase.from("demandes_manquees").select("reference").eq("traite", false).gte("created_at", since).limit(1000);
+          if (error || !dm) return null;
+          const counts = new Map<string, number>();
+          for (const d of dm as { reference: string }[]) counts.set(d.reference, (counts.get(d.reference) ?? 0) + 1);
+          const hot = [...counts.entries()].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1])[0];
+          return hot ? { reference: hot[0], count: hot[1] } : null;
+        } catch { return null; }
+      };
+      const loadVidanges = async (): Promise<{ id: string; vehicule: string; nom: string; telephone: string | null }[]> => {
+        try {
+          const limite = new Date(todayMs + 7 * 86400000).toISOString().split("T")[0];
+          const { data: rv, error } = await supabase.from("rappels_vidange").select("id, vehicule, client:clients(nom, telephone)").eq("fait", false).lte("date_prevue", limite).limit(10);
+          if (error || !rv) return [];
+          return (rv as unknown as { id: string; vehicule: string; client: { nom: string; telephone: string | null } | null }[])
+            .map(r => ({ id: r.id, vehicule: r.vehicule, nom: r.client?.nom ?? "?", telephone: r.client?.telephone ?? null }));
+        } catch { return []; }
+      };
+
+      const [counts, salesRes, saleItems, lowList, clRows, promoRes, demandeHot, vidangesList, unpaidLignes] = await Promise.all([
+        Promise.all([
+          supabase.from("clients").select("*", { count: "exact", head: true }),
+          supabase.from("products").select("*", { count: "exact", head: true }),
+          supabase.from("products").select("id").gt("stock", 0).lte("stock", 2),
+        ]),
+        loadSales(), loadItems(), loadProductsStock(), loadClients(),
+        supabase.from("products").select("reference, prix_promo, prix_vente").not("prix_promo", "is", null).limit(3),
+        loadDemande(), loadVidanges(), loadUnpaidLignes(),
       ]);
+
+      const [r1, r2, r4] = counts;
       const errors = [r1.error, r2.error, r4.error].filter(Boolean);
       if (errors.length > 0) { setDbError(errors.map((e) => e?.message).join(" | ")); return; }
-      // Toutes les ventes (paginé — Supabase limite à 1000/requête). Sert au CA, au bénéfice,
-      // aux impayés ET au calcul « clients à réveiller » : tronquer silencieusement fausserait tout.
-      const sales: { total: number; montant_paye: number; statut: string; date: string; client_id: string }[] = [];
-      for (let i = 0; i < 30; i++) {
-        const { data, error } = await supabase.from("sales").select("total, montant_paye, statut, date, client_id").range(i * 1000, i * 1000 + 999);
-        if (error) { setDbError(error.message); return; }
-        if (!data || data.length === 0) break;
-        sales.push(...(data as typeof sales));
-        if (data.length < 1000) break;
-      }
+      if (salesRes.error) { setDbError(salesRes.error); return; }
+      const sales = salesRes.rows;
       const stockFaible = r4.data;
-      // Articles vendus paginés → coût marchandise & bénéfice exacts
-      const saleItems: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] = [];
-      for (let i = 0; i < 30; i++) {
-        const { data } = await supabase.from("sale_items").select("quantite, prix_unitaire, cout_unitaire, product:products(prix_achat)").range(i * 1000, i * 1000 + 999);
-        if (!data || data.length === 0) break;
-        saleItems.push(...(data as unknown as typeof saleItems));
-        if (data.length < 1000) break;
-      }
+
+      setPromos((promoRes.data ?? []) as { reference: string; prix_promo: number; prix_vente: number }[]);
+      setDemandeHot(demandeHot);
+      setVidanges(vidangesList);
+
+      // ----- Stats globales -----
       const totalVentes = sales.reduce((s, v) => s + v.total, 0);
       const coutMarchandise = saleItems.reduce((s, i) => s + i.quantite * (i.cout_unitaire ?? i.product?.prix_achat ?? 0), 0);
       const benefice = saleItems.reduce((s, i) => s + (i.prix_unitaire - (i.cout_unitaire ?? i.product?.prix_achat ?? 0)) * i.quantite, 0);
       const unpaid = sales.filter((s) => s.statut !== "paye").length;
       const todayStr = new Date().toISOString().split("T")[0];
-      const weekAgo = new Date(Date.now() - 6 * 86400000).toISOString().split("T")[0];
+      const weekAgo = new Date(todayMs - 6 * 86400000).toISOString().split("T")[0];
       const encaisseJour = sales.filter((s) => s.date === todayStr).reduce((a, s) => a + s.montant_paye, 0);
       const encaisseSemaine = sales.filter((s) => s.date >= weekAgo).reduce((a, s) => a + s.montant_paye, 0);
-
-      // Produits à recommander (stock <= seuil) — pagination
-      const lowList: { stock: number; stock_min: number }[] = [];
-      for (let i = 0; i < 20; i++) {
-        const { data } = await supabase.from("products").select("stock, stock_min").range(i * 1000, i * 1000 + 999);
-        if (!data || data.length === 0) break;
-        lowList.push(...(data as { stock: number; stock_min: number }[]));
-        if (data.length < 1000) break;
-      }
       const toRecommend = lowList.filter((p) => p.stock <= p.stock_min).length;
 
-      // Clients/garages à relancer : intervalle d'achat dépassé (réveil WhatsApp — Bible §4.14)
-      // derniere_relance_com peut ne pas exister tant que le SQL §4.14 n'est pas collé → repli sans la colonne
-      type ClRow = { id: string; nom: string; telephone: string | null; derniere_relance_com?: string | null };
-      let clRows: ClRow[] = [];
-      {
-        const r = await supabase.from("clients").select("id, nom, telephone, derniere_relance_com");
-        if (r.error) {
-          const r2 = await supabase.from("clients").select("id, nom, telephone");
-          clRows = (r2.data ?? []) as ClRow[];
-        } else clRows = (r.data ?? []) as ClRow[];
-      }
+      // ----- Clients/garages à réveiller (Bible §4.14) -----
       const cinfo0: Record<string, ClRow> = {};
       clRows.forEach(c => { cinfo0[c.id] = c; });
       const byClient: Record<string, string[]> = {};
       for (const s of sales) { if (s.client_id && s.date) (byClient[s.client_id] ??= []).push(s.date); }
-      const todayMs = Date.now();
       const snooze = new Date(todayMs - 30 * 86400000).toISOString().split("T")[0];
       const rel: { id: string; nom: string; telephone: string | null; days: number; freq: number }[] = [];
       for (const [cid, dates] of Object.entries(byClient)) {
@@ -169,47 +229,10 @@ export default function Dashboard() {
       rel.sort((a, b) => (b.days / b.freq) - (a.days / a.freq));
       setRelances(rel.slice(0, 6));
 
-      // Promos actives (max 3 dans les messages)
-      const { data: pr } = await supabase.from("products").select("reference, prix_promo, prix_vente").not("prix_promo", "is", null).limit(3);
-      setPromos((pr ?? []) as { reference: string; prix_promo: number; prix_vente: number }[]);
-
-      // Référence demandée ≥ 3× sur 30 j (registre « j'ai pas » — Bible §4.12)
-      try {
-        const since = new Date(todayMs - 30 * 86400000).toISOString();
-        const { data: dm, error: dmErr } = await supabase.from("demandes_manquees")
-          .select("reference").eq("traite", false).gte("created_at", since).limit(1000);
-        if (!dmErr && dm) {
-          const counts = new Map<string, number>();
-          for (const d of dm as { reference: string }[]) counts.set(d.reference, (counts.get(d.reference) ?? 0) + 1);
-          const hot = [...counts.entries()].filter(([, n]) => n >= 3).sort((a, b) => b[1] - a[1])[0];
-          setDemandeHot(hot ? { reference: hot[0], count: hot[1] } : null);
-        }
-      } catch { /* table absente */ }
-
-      // Vidanges dues sous 7 jours (Bible §4.10)
-      try {
-        const limite = new Date(todayMs + 7 * 86400000).toISOString().split("T")[0];
-        const { data: rv, error: rvErr } = await supabase.from("rappels_vidange")
-          .select("id, vehicule, client:clients(nom, telephone)").eq("fait", false).lte("date_prevue", limite).limit(10);
-        if (!rvErr && rv) {
-          setVidanges((rv as unknown as { id: string; vehicule: string; client: { nom: string; telephone: string | null } | null }[])
-            .map(r => ({ id: r.id, vehicule: r.vehicule, nom: r.client?.nom ?? "?", telephone: r.client?.telephone ?? null })));
-        }
-      } catch { /* table absente */ }
-
-      // Impayés à relancer (Bible §4.1) : solde dû par client, hors relances faites il y a < 7 j
-      const unpaidRows: { client_id: string; total: number; montant_paye: number; date: string }[] = [];
-      for (let i = 0; i < 20; i++) {
-        const { data } = await supabase.from("sales").select("client_id, total, montant_paye, date").in("statut", ["en_attente", "partiel"]).range(i * 1000, i * 1000 + 999);
-        if (!data || data.length === 0) break;
-        unpaidRows.push(...(data as typeof unpaidRows));
-        if (data.length < 1000) break;
-      }
-      const { data: clientsInfo } = await supabase.from("clients").select("id, nom, telephone, derniere_relance");
-      const cinfo: Record<string, { nom: string; telephone: string | null; derniere_relance: string | null }> = {};
-      (clientsInfo ?? []).forEach((c: { id: string; nom: string; telephone: string | null; derniere_relance: string | null }) => { cinfo[c.id] = c; });
+      // ----- Impayés à relancer (Bible §4.1) : DÉRIVÉS des ventes déjà chargées -----
       const debtMap: Record<string, { solde: number; oldest: string }> = {};
-      for (const r of unpaidRows) {
+      for (const r of sales) {
+        if (r.statut === "paye" || !r.client_id) continue;
         const cur = debtMap[r.client_id] ?? { solde: 0, oldest: r.date };
         cur.solde += r.total - r.montant_paye;
         if (r.date < cur.oldest) cur.oldest = r.date;
@@ -219,40 +242,23 @@ export default function Dashboard() {
       const imp: { id: string; nom: string; telephone: string | null; solde: number; days: number }[] = [];
       for (const [cid, d] of Object.entries(debtMap)) {
         if (d.solde <= 0) continue;
-        const info = cinfo[cid];
+        const info = cinfo0[cid];
         if (!info) continue;
         if (info.derniere_relance && info.derniere_relance >= cutoff) continue;
         const days = Math.round((todayMs - new Date(d.oldest).getTime()) / 86400000);
-        imp.push({ id: cid, nom: info.nom, telephone: info.telephone, solde: d.solde, days });
+        imp.push({ id: cid, nom: info.nom, telephone: info.telephone ?? null, solde: d.solde, days });
       }
       imp.sort((a, b) => b.days - a.days);
       setImpayes(imp.slice(0, 6));
 
-      // Détail de chaque impayé : ta marge, coût déjà couvert (source capital/filtropro OU
-      // bon marqué « dinoun payé »), coût encore à payer à dinoun. Prorata du reste dû.
-      try {
-        type L = {
-          quantite: number; prix_unitaire: number; cout_unitaire: number | null;
-          product: { prix_achat: number } | null; fournisseur: { type: string } | null;
-          sale: { id: string; client_id: string; total: number; montant_paye: number; fournisseur_paye: boolean } | null;
-        };
-        const lignes: L[] = [];
-        for (let i = 0; i < 30; i++) {
-          const { data } = await supabase.from("sale_items")
-            .select("quantite, prix_unitaire, cout_unitaire, product:products(prix_achat), fournisseur:fournisseurs(type), sale:sales!inner(id, client_id, total, montant_paye, fournisseur_paye)")
-            .in("sales.statut", ["en_attente", "partiel"]).range(i * 1000, i * 1000 + 999);
-          if (!data || data.length === 0) break;
-          lignes.push(...(data as unknown as L[]));
-          if (data.length < 1000) break;
-        }
-        // 1) agrège par vente (pour proratiser selon le reste dû), 2) puis par client
+      // ----- Détail de chaque impayé (marge, coût couvert capital/dinoun payé, à payer dinoun) -----
+      {
         const perSale = new Map<string, { client_id: string; total: number; paye: number; revenue: number; coutCouvert: number; coutAPayer: number }>();
-        for (const l of lignes) {
+        for (const l of unpaidLignes) {
           const s = l.sale; if (!s) continue;
           const cur = perSale.get(s.id) ?? { client_id: s.client_id, total: s.total, paye: s.montant_paye, revenue: 0, coutCouvert: 0, coutAPayer: 0 };
           const cout = l.quantite * (l.cout_unitaire ?? l.product?.prix_achat ?? 0);
           cur.revenue += l.quantite * l.prix_unitaire;
-          // Couvert si la marchandise vient de ton capital (filtropro), ou si tu as coché « dinoun payé »
           const couvert = l.fournisseur?.type === "capital" || s.fournisseur_paye === true;
           if (couvert) cur.coutCouvert += cout; else cur.coutAPayer += cout;
           perSale.set(s.id, cur);
@@ -268,7 +274,7 @@ export default function Dashboard() {
           detail[s.client_id] = d;
         }
         setImpayeDetail(detail);
-      } catch { /* pas de détail dispo */ }
+      }
 
       setStats({
         totalVentes, totalClients: r1.count ?? 0, totalProduits: r2.count ?? 0,
