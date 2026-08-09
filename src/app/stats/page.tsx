@@ -48,62 +48,41 @@ export default function StatsPage() {
 
   useEffect(() => {
     async function load() {
-      const [{ data: sales }, { data: items }] = await Promise.all([
-        supabase.from("sales").select("date, total, client:clients(ville)"),
-        supabase.from("sale_items").select("quantite, product:products(reference)"),
-      ]);
-
-      if (sales) {
-        const byMonth: Record<string, { total: number; count: number }> = {};
-        const byCity: Record<string, number> = {};
-
-        for (const s of sales) {
-          const mois = s.date?.slice(0, 7) ?? "";
-          if (!byMonth[mois]) byMonth[mois] = { total: 0, count: 0 };
-          byMonth[mois].total += s.total;
-          byMonth[mois].count += 1;
-          const ville = (s.client as { ville: string } | null)?.ville ?? "?";
-          byCity[ville] = (byCity[ville] ?? 0) + s.total;
-        }
-
-        setMonthly(
-          Object.entries(byMonth)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .slice(-6)
-            .map(([mois, v]) => ({ mois, ...v }))
-        );
-        setCities(
-          Object.entries(byCity)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 6)
-            .map(([ville, total]) => ({ ville, total }))
-        );
-      }
-
-      if (items) {
-        const byProduct: Record<string, number> = {};
-        for (const i of items) {
-          const ref = (i.product as { reference: string } | null)?.reference ?? "?";
-          byProduct[ref] = (byProduct[ref] ?? 0) + i.quantite;
-        }
-        setTopProducts(
-          Object.entries(byProduct)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 8)
-            .map(([nom, qty]) => ({ nom, qty }))
-        );
-      }
-
-      // ----- Coûts & bénéfices par jour / semaine / mois -----
-      const withItems: { date: string; total: number; items: { quantite: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] }[] = [];
-      for (let i = 0; i < 30; i++) {
+      // Un SEUL balayage paginé des ventes (avec leurs lignes) alimente le CA/mois, les
+      // villes, le top produits ET les coûts/bénéfices. Auparavant, le CA/mois, les villes
+      // et le top produits venaient de 2 requêtes NON paginées → tronquées à 1000 lignes
+      // (chiffres faux dès 1000 ventes / sale_items). Corrigé + 2 scans redondants supprimés.
+      const withItems: { date: string; total: number; client: { ville: string } | null; items: { quantite: number; cout_unitaire: number | null; product: { reference: string; prix_achat: number } | null }[] }[] = [];
+      for (let i = 0; i < 50; i++) {
         const { data } = await supabase.from("sales")
-          .select("date, total, items:sale_items(quantite, cout_unitaire, product:products(prix_achat))")
+          .select("date, total, client:clients(ville), items:sale_items(quantite, cout_unitaire, product:products(reference, prix_achat))")
           .range(i * 1000, i * 1000 + 999);
         if (!data || data.length === 0) break;
         withItems.push(...(data as unknown as typeof withItems));
         if (data.length < 1000) break;
       }
+
+      // CA par mois (6 derniers) + top villes
+      const byMonth: Record<string, { total: number; count: number }> = {};
+      const byCity: Record<string, number> = {};
+      for (const s of withItems) {
+        const mois = s.date?.slice(0, 7) ?? "";
+        if (!byMonth[mois]) byMonth[mois] = { total: 0, count: 0 };
+        byMonth[mois].total += s.total;
+        byMonth[mois].count += 1;
+        const ville = s.client?.ville ?? "?";
+        byCity[ville] = (byCity[ville] ?? 0) + s.total;
+      }
+      setMonthly(Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b)).slice(-6).map(([mois, v]) => ({ mois, ...v })));
+      setCities(Object.entries(byCity).sort(([, a], [, b]) => b - a).slice(0, 6).map(([ville, total]) => ({ ville, total })));
+
+      // Top produits (quantités vendues)
+      const byProduct: Record<string, number> = {};
+      for (const s of withItems) for (const it of (s.items ?? [])) {
+        const ref = it.product?.reference ?? "?";
+        byProduct[ref] = (byProduct[ref] ?? 0) + it.quantite;
+      }
+      setTopProducts(Object.entries(byProduct).sort(([, a], [, b]) => b - a).slice(0, 8).map(([nom, qty]) => ({ nom, qty })));
       const agg = (keyFn: (d: string) => string): Record<string, PnlRow> => {
         const m: Record<string, PnlRow> = {};
         for (const s of withItems) {

@@ -16,13 +16,20 @@ export default function RappelsPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: sales } = await supabase
-        .from("sales")
-        .select("*, client:clients(*)")
-        .in("statut", ["en_attente", "partiel"])
-        .order("date", { ascending: false });
-
-      if (!sales) return;
+      // Paginé : sans .range(), la liste des impayés serait tronquée à 1000 ventes.
+      const sales: (Sale & { client: Client | null })[] = [];
+      for (let i = 0; i < 30; i++) {
+        const { data } = await supabase
+          .from("sales")
+          .select("*, client:clients(*)")
+          .in("statut", ["en_attente", "partiel"])
+          .order("date", { ascending: false })
+          .range(i * 1000, i * 1000 + 999);
+        if (!data || data.length === 0) break;
+        sales.push(...(data as unknown as (Sale & { client: Client | null })[]));
+        if (data.length < 1000) break;
+      }
+      if (sales.length === 0) return;
 
       const map = new Map<string, UnpaidClient>();
       for (const s of sales) {
