@@ -60,25 +60,34 @@ export default function ProduitsPage() {
   const [equivMap, setEquivMap] = useState<Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]>>({});
 
   async function load() {
-    // Les 3 gros chargements en PARALLÈLE (avant : en série), chacun paginé en parallèle.
+    // Chargements en PARALLÈLE. IMPORTANT : sur 23 000+ équivalences, seules ~23 sont des
+    // variantes de MARQUE (affichées) ; les 23 000 autres sont des codes OE constructeur qui
+    // ne servent QU'À la recherche par référence. On charge donc d'abord les variantes de
+    // marque (affichage instantané), puis les codes OE EN FOND pour la recherche.
     type EqRow = { id: string; product_id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null };
     type VehRow = { product_id: string; makes: string[] | null; nb: number | null };
-    const [all, eqRows, vehRows] = await Promise.all([
+    const buildEqMap = (rows: EqRow[]) => {
+      const m: Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]> = {};
+      for (const e of rows) (m[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix, prix_achat: e.prix_achat, stock: e.stock ?? 0 });
+      return m;
+    };
+    const EQ_COLS = "id, product_id, marque, reference, prix, prix_achat, stock";
+    const [all, brandedEq, vehRows] = await Promise.all([
       loadAll<Product>("products", "*", { filter: q => q.order("nom_fr") }),
-      loadAll<EqRow>("equivalences", "id, product_id, marque, reference, prix, prix_achat, stock"),
+      loadAll<EqRow>("equivalences", EQ_COLS, { filter: q => q.in("marque", BRANDS) }),
       loadAll<VehRow>("product_vehicles", "*"),
     ]);
     setProducts(all);
-
-    // Variantes de marque (équivalences) par produit
-    const eqMap: Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]> = {};
-    for (const e of eqRows) (eqMap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix, prix_achat: e.prix_achat, stock: e.stock ?? 0 });
-    setEquivMap(eqMap);
+    setEquivMap(buildEqMap(brandedEq)); // affichage des variantes prêt tout de suite
 
     // Résumé véhicules (marques compatibles) par produit
     const map: Record<string, { makes: string[]; nb: number }> = {};
     for (const r of vehRows) map[r.product_id] = { makes: r.makes ?? [], nb: r.nb ?? 0 };
     setVehMap(map);
+
+    // Recherche par n'importe quelle référence (codes OE inclus) : enrichi EN FOND,
+    // non bloquant. L'affichage des variantes ne change pas (filtré aux marques connues).
+    loadAll<EqRow>("equivalences", EQ_COLS).then(full => setEquivMap(buildEqMap(full))).catch(() => {});
   }
 
   function vehSummary(p: Product) {

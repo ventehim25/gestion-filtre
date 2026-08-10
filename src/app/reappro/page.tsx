@@ -88,9 +88,13 @@ export default function ReapproPage() {
         { filter: q => q.gte("sales.date", since), countSelect: "sales!inner(date)" });
       setItems90(rows);
     })();
-    // Variantes de marque (stock par marque)
+    // Variantes de marque (stock par marque). On ne charge QUE les équivalences utiles
+    // ici (stock > 0 pour le dormant, prix renseigné pour le prédictif) : ~10 lignes au
+    // lieu de 23 000+ (les codes OE constructeur sans stock ni prix sont ignorés de toute
+    // façon par le dormant et le prédictif).
     (async () => {
-      setEquivs(await loadAll<EquivRow>("equivalences", "id, product_id, marque, reference, stock, prix_achat, prix"));
+      setEquivs(await loadAll<EquivRow>("equivalences", "id, product_id, marque, reference, stock, prix_achat, prix",
+        { filter: q => q.or("stock.gt.0,prix.not.is.null") }));
     })();
     supabase.from("fournisseurs").select("id, nom, telephone").then(({ data }) => setFours(data ?? []));
   }, []);
