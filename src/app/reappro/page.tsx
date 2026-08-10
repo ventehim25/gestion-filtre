@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
+import { loadAll } from "@/lib/pagedFetch";
 import { Product } from "@/types/database";
 import { MessageCircle, Printer, AlertTriangle, Check, Plus, Eye } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
@@ -76,42 +77,20 @@ export default function ReapproPage() {
 
   useEffect(() => {
     (async () => {
-      const all: Product[] = [];
-      for (let i = 0; i < 20; i++) {
-        const { data } = await supabase.from("products").select("*").range(i * 1000, i * 1000 + 999);
-        if (!data || data.length === 0) break;
-        all.push(...data);
-        if (data.length < 1000) break;
-      }
-      setProducts(all);
+      setProducts(await loadAll<Product>("products", "*"));
       setLoading(false);
     })();
     loadDemandes();
-    // Ventes des 90 derniers jours (paginé) — sert au dormant et au prédictif
+    // Ventes des 90 derniers jours (pages parallèles) — sert au dormant et au prédictif
     (async () => {
       const since = new Date(Date.now() - 90 * 86400000).toISOString().split("T")[0];
-      const rows: Item90[] = [];
-      for (let i = 0; i < 30; i++) {
-        const { data } = await supabase.from("sale_items")
-          .select("product_id, equivalence_id, quantite, fournisseur_id, sales!inner(date)")
-          .gte("sales.date", since).range(i * 1000, i * 1000 + 999);
-        if (!data || data.length === 0) break;
-        rows.push(...(data as unknown as Item90[]));
-        if (data.length < 1000) break;
-      }
+      const rows = await loadAll<Item90>("sale_items", "product_id, equivalence_id, quantite, fournisseur_id, sales!inner(date)",
+        { filter: q => q.gte("sales.date", since), countSelect: "sales!inner(date)" });
       setItems90(rows);
     })();
     // Variantes de marque (stock par marque)
     (async () => {
-      const rows: EquivRow[] = [];
-      for (let i = 0; i < 30; i++) {
-        const { data } = await supabase.from("equivalences")
-          .select("id, product_id, marque, reference, stock, prix_achat, prix").range(i * 1000, i * 1000 + 999);
-        if (!data || data.length === 0) break;
-        rows.push(...(data as EquivRow[]));
-        if (data.length < 1000) break;
-      }
-      setEquivs(rows);
+      setEquivs(await loadAll<EquivRow>("equivalences", "id, product_id, marque, reference, stock, prix_achat, prix"));
     })();
     supabase.from("fournisseurs").select("id, nom, telephone").then(({ data }) => setFours(data ?? []));
   }, []);

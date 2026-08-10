@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
+import { loadAll } from "@/lib/pagedFetch";
 import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/types/database";
 import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
 import ProductPicker from "@/components/ProductPicker";
@@ -77,23 +78,18 @@ export default function VentesPage() {
   }
 
   async function load() {
-    const [{ data: s }, { data: c }, { data: fr }] = await Promise.all([
-      supabase.from("sales").select("*, client:clients(*), items:sale_items(quantite, prix_unitaire, cout_unitaire, fournisseur_id, product:products(reference, prix_achat))").order("created_at", { ascending: false }),
+    // Tout en parallèle. Les ventes étaient chargées SANS pagination (tronquées à 1000) :
+    // désormais paginées en pages parallèles, comme les produits.
+    const salesSel = "*, client:clients(*), items:sale_items(quantite, prix_unitaire, cout_unitaire, fournisseur_id, product:products(reference, prix_achat))";
+    const [s, c, fr, all] = await Promise.all([
+      loadAll<Sale & { client: Client }>("sales", salesSel, { filter: q => q.order("created_at", { ascending: false }) }),
       supabase.from("clients").select("*").order("nom"),
       supabase.from("fournisseurs").select("*").order("nom"),
+      loadAll<Product>("products", "*", { filter: q => q.order("reference") }),
     ]);
-    setSales((s as unknown as (Sale & { client: Client })[]) ?? []);
-    setClients(c ?? []);
-    setFournisseurs((fr as Fournisseur[]) ?? []);
-
-    // Tous les produits (Supabase limite à 1000/requête → pagination)
-    const all: Product[] = [];
-    for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("products").select("*").order("reference").range(i * 1000, i * 1000 + 999);
-      if (!data || data.length === 0) break;
-      all.push(...data);
-      if (data.length < 1000) break;
-    }
+    setSales(s);
+    setClients(c.data ?? []);
+    setFournisseurs((fr.data as Fournisseur[]) ?? []);
     setProducts(all);
   }
 

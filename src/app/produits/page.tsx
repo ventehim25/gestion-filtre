@@ -5,6 +5,7 @@ import BarcodeScanner from "@/components/BarcodeScanner";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
+import { loadAll } from "@/lib/pagedFetch";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
 import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle, Camera } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
@@ -59,38 +60,24 @@ export default function ProduitsPage() {
   const [equivMap, setEquivMap] = useState<Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]>>({});
 
   async function load() {
-    // Pagination : récupère toutes les lignes (Supabase limite à 1000/requête)
-    const all: Product[] = [];
-    for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("products").select("*").order("nom_fr").range(i * 1000, i * 1000 + 999);
-      if (!data || data.length === 0) break;
-      all.push(...data);
-      if (data.length < 1000) break;
-    }
+    // Les 3 gros chargements en PARALLÈLE (avant : en série), chacun paginé en parallèle.
+    type EqRow = { id: string; product_id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null };
+    type VehRow = { product_id: string; makes: string[] | null; nb: number | null };
+    const [all, eqRows, vehRows] = await Promise.all([
+      loadAll<Product>("products", "*", { filter: q => q.order("nom_fr") }),
+      loadAll<EqRow>("equivalences", "id, product_id, marque, reference, prix, prix_achat, stock"),
+      loadAll<VehRow>("product_vehicles", "*"),
+    ]);
     setProducts(all);
 
     // Variantes de marque (équivalences) par produit
     const eqMap: Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]> = {};
-    for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("equivalences").select("id, product_id, marque, reference, prix, prix_achat, stock").range(i * 1000, i * 1000 + 999);
-      if (!data || data.length === 0) break;
-      data.forEach((e: { id: string; product_id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null }) => {
-        (eqMap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix, prix_achat: e.prix_achat, stock: e.stock ?? 0 });
-      });
-      if (data.length < 1000) break;
-    }
+    for (const e of eqRows) (eqMap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix, prix_achat: e.prix_achat, stock: e.stock ?? 0 });
     setEquivMap(eqMap);
 
     // Résumé véhicules (marques compatibles) par produit
     const map: Record<string, { makes: string[]; nb: number }> = {};
-    for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("product_vehicles").select("*").range(i * 1000, i * 1000 + 999);
-      if (!data || data.length === 0) break;
-      data.forEach((r: { product_id: string; makes: string[] | null; nb: number | null }) => {
-        map[r.product_id] = { makes: r.makes ?? [], nb: r.nb ?? 0 };
-      });
-      if (data.length < 1000) break;
-    }
+    for (const r of vehRows) map[r.product_id] = { makes: r.makes ?? [], nb: r.nb ?? 0 };
     setVehMap(map);
   }
 
