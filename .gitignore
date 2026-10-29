@@ -39,3 +39,7 @@ next-env.d.ts
 scripts/.catalog_imgs/
 scripts/.catalogue.html
 scripts/_preview_*.png
+
+# Outillage navigateur local (Playwright MCP)
+.playwright-mcp/
+.mcp.json
