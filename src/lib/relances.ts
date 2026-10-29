@@ -111,15 +111,25 @@ export async function loadImpayesRelance(days = 15, today = new Date().toISOStri
 }
 
 // --- Produits à recommander — pour la notif réappro du matin ---
-// IMPORTANT : la table products contient tout le catalogue Filtron (3000+ réfs, souvent
-// stock 0 / seuil 0). On ne compte donc QUE les produits où un seuil a été fixé
-// (stock_min > 0 = produits réellement stockés) et qui sont au/sous ce seuil.
+// IMPORTANT : products = tout le catalogue Filtron (3000+ réfs, stock 0 / seuil >0 par
+// défaut). Compter « stock <= seuil » brut donne 3000+ (absurde). On ne compte donc que
+// les produits qui SE VENDENT réellement (vendus sur 90 j) ET qui sont au/sous le seuil.
 export async function countReapproDue(): Promise<number> {
+  const since90 = addDays(new Date().toISOString().slice(0, 10), -90);
+  const sold = new Set<string>();
+  for (let i = 0; i < 30; i++) {
+    const { data } = await supabase.from("sale_items").select("product_id, sales!inner(date)").gte("sales.date", since90).range(i * 1000, i * 1000 + 999);
+    if (!data || data.length === 0) break;
+    for (const r of data as { product_id: string | null }[]) if (r.product_id) sold.add(r.product_id);
+    if (data.length < 1000) break;
+  }
+  if (sold.size === 0) return 0;
+
   let n = 0;
   for (let i = 0; i < 20; i++) {
-    const { data } = await supabase.from("products").select("stock, stock_min").gt("stock_min", 0).range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("products").select("id, stock, stock_min").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
-    for (const p of data as { stock: number; stock_min: number }[]) if (p.stock <= p.stock_min) n++;
+    for (const p of data as { id: string; stock: number; stock_min: number }[]) if (sold.has(p.id) && p.stock <= p.stock_min) n++;
     if (data.length < 1000) break;
   }
   return n;
