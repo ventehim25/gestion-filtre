@@ -109,3 +109,60 @@ export async function loadImpayesRelance(days = 15, today = new Date().toISOStri
   out.sort((a, b) => b.solde - a.solde); // plus gros solde d'abord
   return { clients: out, total };
 }
+
+// --- Produits à recommander (stock <= seuil) — pour la notif réappro du matin ---
+export async function countReapproDue(): Promise<number> {
+  let n = 0;
+  for (let i = 0; i < 20; i++) {
+    const { data } = await supabase.from("products").select("stock, stock_min").range(i * 1000, i * 1000 + 999);
+    if (!data || data.length === 0) break;
+    for (const p of data as { stock: number; stock_min: number }[]) if (p.stock <= p.stock_min) n++;
+    if (data.length < 1000) break;
+  }
+  return n;
+}
+
+// --- Clients endormis (Bible §4.14) — pour la notif « à réveiller » du matin ---
+// Même logique que la carte accueil : >=2 achats, écart dépassant leur rythme habituel,
+// pas réveillé depuis 30 j (clients.derniere_relance_com).
+export async function loadEndormis(today = new Date().toISOString().slice(0, 10)): Promise<{ id: string; nom: string }[]> {
+  type Cl = { id: string; nom: string; derniere_relance_com?: string | null };
+  const clients: Cl[] = [];
+  for (let i = 0; i < 10; i++) {
+    let res = await supabase.from("clients").select("id, nom, derniere_relance_com").range(i * 1000, i * 1000 + 999);
+    if (res.error) res = await supabase.from("clients").select("id, nom").range(i * 1000, i * 1000 + 999);
+    const data = res.data as Cl[] | null;
+    if (!data || data.length === 0) break;
+    clients.push(...data);
+    if (data.length < 1000) break;
+  }
+  const info = new Map(clients.map(c => [c.id, c]));
+
+  const byClient = new Map<string, string[]>();
+  for (let i = 0; i < 30; i++) {
+    const { data } = await supabase.from("sales").select("client_id, date").range(i * 1000, i * 1000 + 999);
+    if (!data || data.length === 0) break;
+    for (const s of data as { client_id: string | null; date: string | null }[]) {
+      if (!s.client_id || !s.date) continue;
+      const a = byClient.get(s.client_id) ?? []; a.push(s.date); byClient.set(s.client_id, a);
+    }
+    if (data.length < 1000) break;
+  }
+
+  const todayMs = new Date(today).getTime();
+  const snooze = addDays(today, -30);
+  const out: { id: string; nom: string }[] = [];
+  for (const [cid, dates] of byClient) {
+    if (dates.length < 2) continue;
+    const c = info.get(cid); if (!c) continue;
+    if (c.derniere_relance_com && c.derniere_relance_com >= snooze) continue;
+    const sorted = [...dates].sort();
+    const first = new Date(sorted[0]).getTime();
+    const last = new Date(sorted[sorted.length - 1]).getTime();
+    const freq = (last - first) / (86400000 * (sorted.length - 1));
+    if (!(freq > 0)) continue;
+    const daysSince = Math.round((todayMs - last) / 86400000);
+    if (daysSince > freq * 1.2 && daysSince >= 7) out.push({ id: cid, nom: c.nom });
+  }
+  return out;
+}

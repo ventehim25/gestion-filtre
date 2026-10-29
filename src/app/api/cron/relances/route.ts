@@ -4,7 +4,8 @@
 // Sécurisé par CRON_SECRET.
 import webpush from "web-push";
 import { supabase } from "@/lib/supabase";
-import { loadRelancesCatalogue, loadImpayesRelance } from "@/lib/relances";
+import { loadRelancesCatalogue, loadImpayesRelance, countReapproDue, loadEndormis } from "@/lib/relances";
+import { buildBilanHebdo } from "@/lib/bilan";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,45 +50,73 @@ export async function GET(req: Request) {
     return sent;
   }
 
-  // 1) Relance CATALOGUE
+  // Calculs (tous les matins)
   const cata = await loadRelancesCatalogue();
-  // 2) Relance IMPAYÉS (15 j)
   const imp = await loadImpayesRelance(15);
+  const reappro = await countReapproDue();
+  const endormis = await loadEndormis();
+  const isFriday = new Date().getUTCDay() === 5; // vendredi (≈ matin au Maroc)
 
-  if (list.length === 0) {
-    return Response.json({ ok: true, sent: 0, catalogue_due: cata.length, impayes_due: imp.clients.length, note: "aucun appareil abonné" });
-  }
+  const result: Record<string, number | boolean> = {
+    catalogue_due: cata.length, impayes_due: imp.clients.length, impayes_total: Math.round(imp.total),
+    reappro_due: reappro, endormis_due: endormis.length, vendredi: isFriday,
+  };
 
-  let sentCata = 0, sentImp = 0;
+  if (list.length === 0) return Response.json({ ok: true, sent: 0, ...result, note: "aucun appareil abonné" });
 
+  // 1) Relance CATALOGUE (15 j / 5 j)
   if (cata.length > 0) {
     const noms = cata.slice(0, 3).map(d => d.nom).join(", ");
-    sentCata = await sendToAll({
+    result.catalogue_sent = await sendToAll({
       title: "📋 Relance catalogue",
-      body: cata.length === 1
-        ? `1 client à relancer : ${noms}. Envoie-lui le catalogue 👉`
+      body: cata.length === 1 ? `1 client à relancer : ${noms}. Envoie-lui le catalogue 👉`
         : `${cata.length} clients à relancer (${noms}${cata.length > 3 ? "…" : ""}). Envoie le catalogue 👉`,
-      url: "/relances-catalogue",
-      tag: "relance-catalogue",
+      url: "/relances-catalogue", tag: "relance-catalogue",
     });
   }
 
+  // 2) Relance IMPAYÉS (15 j)
   if (imp.clients.length > 0) {
     const noms = imp.clients.slice(0, 3).map(d => d.nom).join(", ");
-    const total = Math.round(imp.total);
-    sentImp = await sendToAll({
+    result.impayes_sent = await sendToAll({
       title: "💰 Impayés à relancer",
-      body: imp.clients.length === 1
-        ? `1 impayé à relancer : ${noms} (${total} MAD). Rappelle-le 👉`
-        : `${imp.clients.length} impayés à relancer (${total} MAD au total). ${noms}${imp.clients.length > 3 ? "…" : ""} 👉`,
-      url: "/",
-      tag: "relance-impayes",
+      body: imp.clients.length === 1 ? `1 impayé à relancer : ${noms} (${Math.round(imp.total)} MAD). Rappelle-le 👉`
+        : `${imp.clients.length} impayés à relancer (${Math.round(imp.total)} MAD au total). ${noms}${imp.clients.length > 3 ? "…" : ""} 👉`,
+      url: "/", tag: "relance-impayes",
     });
   }
 
-  return Response.json({
-    ok: true,
-    catalogue_due: cata.length, catalogue_sent: sentCata,
-    impayes_due: imp.clients.length, impayes_total: Math.round(imp.total), impayes_sent: sentImp,
-  });
+  // 3) Réappro / ruptures (produits sous le seuil)
+  if (reappro > 0) {
+    result.reappro_sent = await sendToAll({
+      title: "📦 Réappro",
+      body: `${reappro} produit${reappro > 1 ? "s" : ""} à recommander (stock bas). Prépare ta commande 👉`,
+      url: "/reappro", tag: "reappro",
+    });
+  }
+
+  // 4) Clients endormis (à réveiller)
+  if (endormis.length > 0) {
+    const noms = endormis.slice(0, 3).map(d => d.nom).join(", ");
+    result.endormis_sent = await sendToAll({
+      title: "😴 Clients à réveiller",
+      body: `${endormis.length} client${endormis.length > 1 ? "s" : ""} endormi${endormis.length > 1 ? "s" : ""} (${noms}${endormis.length > 3 ? "…" : ""}). Réveille-les 👉`,
+      url: "/", tag: "endormis",
+    });
+  }
+
+  // 5) VENDREDI : bilan de la semaine + rappel arrivages
+  if (isFriday) {
+    try {
+      const bilan = await buildBilanHebdo();
+      result.bilan_sent = await sendToAll({ title: "📊 Bilan de la semaine", body: bilan, url: "/stats", tag: "bilan" });
+    } catch { /* bilan indispo */ }
+    result.arrivages_sent = await sendToAll({
+      title: "📣 Arrivages de la semaine",
+      body: "Vendredi ! Poste tes arrivages/promos en statut WhatsApp (bouton « 📣 Arrivages » sur l'accueil) 👉",
+      url: "/", tag: "arrivages",
+    });
+  }
+
+  return Response.json({ ok: true, ...result });
 }
