@@ -1,8 +1,10 @@
-// Cron quotidien (Vercel) : calcule les clients « à relancer » (cadence 15 j / 5 j) et
-// envoie UNE notification push à tous les appareils abonnés (toi). Sécurisé par CRON_SECRET.
+// Cron quotidien (Vercel) : envoie à tes appareils abonnés
+//   1) la relance CATALOGUE (cadence 15 j après vente / 5 j après relance sans vente) ;
+//   2) la relance IMPAYÉS (clients avec solde dû non relancés depuis 15 j).
+// Sécurisé par CRON_SECRET.
 import webpush from "web-push";
 import { supabase } from "@/lib/supabase";
-import { loadRelancesCatalogue } from "@/lib/relances";
+import { loadRelancesCatalogue, loadImpayesRelance } from "@/lib/relances";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,8 +20,7 @@ export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
   if (secret) {
     const auth = req.headers.get("authorization");
-    const url = new URL(req.url);
-    const keyParam = url.searchParams.get("key"); // repli pour test manuel
+    const keyParam = new URL(req.url).searchParams.get("key"); // repli pour test manuel
     if (auth !== `Bearer ${secret}` && keyParam !== secret) {
       return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
     }
@@ -29,38 +30,64 @@ export async function GET(req: Request) {
   if (!priv) return Response.json({ ok: false, error: "VAPID_PRIVATE_KEY manquante (à ajouter dans les variables Vercel)" }, { status: 500 });
   webpush.setVapidDetails("mailto:ventehim@gmail.com", VAPID_PUBLIC, priv);
 
-  // 1) Clients à relancer aujourd'hui
-  const dus = await loadRelancesCatalogue();
-  const n = dus.length;
-  if (n === 0) return Response.json({ ok: true, sent: 0, due: 0, note: "aucun client à relancer" });
-
-  // 2) Abonnements (tes appareils)
+  // Appareils abonnés (tes téléphones/PC)
   const { data: subs } = await supabase.from("push_subscriptions").select("endpoint, p256dh, auth");
   const list = (subs ?? []) as Sub[];
-  if (list.length === 0) return Response.json({ ok: true, sent: 0, due: n, note: "aucun appareil abonné" });
 
-  // 3) Message
-  const premiers = dus.slice(0, 3).map(d => d.nom).join(", ");
-  const payload = JSON.stringify({
-    title: "📋 Relance catalogue",
-    body: n === 1
-      ? `1 client à relancer : ${premiers}. Envoie-lui le catalogue 👉`
-      : `${n} clients à relancer (${premiers}${n > 3 ? "…" : ""}). Envoie-leur le catalogue 👉`,
-    url: "/relances-catalogue",
-    tag: "relance-catalogue",
+  // Envoie un message à tous les appareils + nettoie les abonnements expirés.
+  async function sendToAll(payload: object): Promise<number> {
+    let sent = 0;
+    await Promise.all(list.map(async (s) => {
+      try {
+        await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, JSON.stringify(payload));
+        sent++;
+      } catch (e: unknown) {
+        const code = (e as { statusCode?: number }).statusCode;
+        if (code === 404 || code === 410) await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
+      }
+    }));
+    return sent;
+  }
+
+  // 1) Relance CATALOGUE
+  const cata = await loadRelancesCatalogue();
+  // 2) Relance IMPAYÉS (15 j)
+  const imp = await loadImpayesRelance(15);
+
+  if (list.length === 0) {
+    return Response.json({ ok: true, sent: 0, catalogue_due: cata.length, impayes_due: imp.clients.length, note: "aucun appareil abonné" });
+  }
+
+  let sentCata = 0, sentImp = 0;
+
+  if (cata.length > 0) {
+    const noms = cata.slice(0, 3).map(d => d.nom).join(", ");
+    sentCata = await sendToAll({
+      title: "📋 Relance catalogue",
+      body: cata.length === 1
+        ? `1 client à relancer : ${noms}. Envoie-lui le catalogue 👉`
+        : `${cata.length} clients à relancer (${noms}${cata.length > 3 ? "…" : ""}). Envoie le catalogue 👉`,
+      url: "/relances-catalogue",
+      tag: "relance-catalogue",
+    });
+  }
+
+  if (imp.clients.length > 0) {
+    const noms = imp.clients.slice(0, 3).map(d => d.nom).join(", ");
+    const total = Math.round(imp.total);
+    sentImp = await sendToAll({
+      title: "💰 Impayés à relancer",
+      body: imp.clients.length === 1
+        ? `1 impayé à relancer : ${noms} (${total} MAD). Rappelle-le 👉`
+        : `${imp.clients.length} impayés à relancer (${total} MAD au total). ${noms}${imp.clients.length > 3 ? "…" : ""} 👉`,
+      url: "/",
+      tag: "relance-impayes",
+    });
+  }
+
+  return Response.json({
+    ok: true,
+    catalogue_due: cata.length, catalogue_sent: sentCata,
+    impayes_due: imp.clients.length, impayes_total: Math.round(imp.total), impayes_sent: sentImp,
   });
-
-  // 4) Envoi + nettoyage des abonnements expirés
-  let sent = 0;
-  await Promise.all(list.map(async (s) => {
-    try {
-      await webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, payload);
-      sent++;
-    } catch (e: unknown) {
-      const code = (e as { statusCode?: number }).statusCode;
-      if (code === 404 || code === 410) await supabase.from("push_subscriptions").delete().eq("endpoint", s.endpoint);
-    }
-  }));
-
-  return Response.json({ ok: true, due: n, sent });
 }

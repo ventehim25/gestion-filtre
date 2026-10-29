@@ -64,3 +64,48 @@ export async function loadRelancesCatalogue(today = new Date().toISOString().sli
   out.sort((a, b) => a.due.localeCompare(b.due)); // le plus en retard d'abord
   return out;
 }
+
+// --- Relances IMPAYÉS (cadence 15 jours) ---
+// Clients avec un solde dû > 0 qui n'ont pas été relancés (impayé) depuis >= `days` jours.
+// Réutilise la colonne clients.derniere_relance (déjà posée par §4.1, clients_segments.sql),
+// la même que la carte « À relancer » de l'accueil → relancer depuis l'accueil remet le compteur.
+export type ImpayeRelance = { id: string; nom: string; telephone: string | null; solde: number };
+
+export async function loadImpayesRelance(days = 15, today = new Date().toISOString().slice(0, 10)): Promise<{ clients: ImpayeRelance[]; total: number }> {
+  type Cl = { id: string; nom: string; telephone: string | null; derniere_relance?: string | null };
+  const clients: Cl[] = [];
+  for (let i = 0; i < 10; i++) {
+    let res = await supabase.from("clients").select("id, nom, telephone, derniere_relance").range(i * 1000, i * 1000 + 999);
+    if (res.error) res = await supabase.from("clients").select("id, nom, telephone").range(i * 1000, i * 1000 + 999);
+    const data = res.data as Cl[] | null;
+    if (!data || data.length === 0) break;
+    clients.push(...data);
+    if (data.length < 1000) break;
+  }
+  const info = new Map(clients.map(c => [c.id, c]));
+
+  const debt = new Map<string, number>();
+  for (let i = 0; i < 30; i++) {
+    const { data } = await supabase.from("sales").select("client_id, total, montant_paye, statut").range(i * 1000, i * 1000 + 999);
+    if (!data || data.length === 0) break;
+    for (const s of data as { client_id: string | null; total: number; montant_paye: number; statut: string }[]) {
+      if (!s.client_id || s.statut === "paye") continue;
+      debt.set(s.client_id, (debt.get(s.client_id) ?? 0) + (s.total - s.montant_paye));
+    }
+    if (data.length < 1000) break;
+  }
+
+  const cutoff = addDays(today, -days); // relancé avant cette date = dû
+  const out: ImpayeRelance[] = [];
+  let total = 0;
+  for (const [cid, solde] of debt) {
+    if (solde <= 0) continue;
+    const c = info.get(cid);
+    if (!c) continue;
+    if (c.derniere_relance && c.derniere_relance > cutoff) continue; // relancé il y a < 15 j → on laisse
+    out.push({ id: cid, nom: c.nom, telephone: c.telephone, solde });
+    total += solde;
+  }
+  out.sort((a, b) => b.solde - a.solde); // plus gros solde d'abord
+  return { clients: out, total };
+}
