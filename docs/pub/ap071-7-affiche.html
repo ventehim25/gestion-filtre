@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FiltroPro — AP071/7</title>
+<style>
+  :root {
+    --gold: #e2c56b;
+    --gold-bright: #f3dd96;
+    --bg-dark: #0b0c0f;
+    --bg-dark-2: #15171c;
+    --red: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    background: #000;
+    display: flex;
+    justify-content: center;
+  }
+  body {
+    width: 1080px;
+    height: 1920px;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: radial-gradient(ellipse at 50% 0%, var(--bg-dark-2) 0%, var(--bg-dark) 55%, #050506 100%);
+    color: #f5f1e6;
+    position: relative;
+    overflow: hidden;
+  }
+  .glow {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.35;
+  }
+  .glow.gold { width: 900px; height: 900px; background: var(--gold); top: -400px; left: 50%; transform: translateX(-50%); }
+  .glow.red { width: 600px; height: 600px; background: var(--red); bottom: -250px; right: -150px; opacity: 0.18; }
+
+  .frame { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; align-items: center; padding: 70px 60px 50px; }
+
+  .brand { display: flex; align-items: center; gap: 18px; margin-bottom: 40px; }
+  .brand-name { font-size: 44px; font-weight: 800; letter-spacing: 1px; color: var(--gold-bright); text-shadow: 0 0 20px rgba(226,197,107,0.4); }
+  .brand-sub { font-size: 20px; color: #a9a397; letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
+
+  .cat-badge {
+    margin-top: 6px;
+    padding: 10px 28px;
+    border: 1.5px solid var(--gold);
+    border-radius: 40px;
+    color: var(--gold-bright);
+    font-size: 26px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  .ref-block { text-align: center; margin-top: 50px; }
+  .ref-label { font-size: 28px; color: #c9c3b6; letter-spacing: 4px; text-transform: uppercase; margin-bottom: 10px; }
+  .ref-number {
+    font-size: 160px;
+    font-weight: 900;
+    color: #fff;
+    background: linear-gradient(180deg, #ffffff 0%, var(--gold-bright) 55%, var(--gold) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+    text-shadow: 0 10px 40px rgba(226,197,107,0.25);
+  }
+
+  .vehicules { margin-top: 30px; text-align: center; font-size: 34px; color: #e9e4d8; font-weight: 600; line-height: 1.4; }
+  .vehicules span { color: var(--gold-bright); }
+
+  .product-visual {
+    margin-top: 55px;
+    width: 560px;
+    height: 420px;
+    border-radius: 24px;
+    background: linear-gradient(145deg, #1c1e24 0%, #0d0e11 100%);
+    border: 1px solid rgba(226,197,107,0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 30px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+
+  .price-banner {
+    margin-top: 55px;
+    background: linear-gradient(90deg, var(--gold) 0%, var(--gold-bright) 50%, var(--gold) 100%);
+    color: #15130a;
+    padding: 28px 70px;
+    border-radius: 100px;
+    font-size: 58px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    box-shadow: 0 15px 40px rgba(226,197,107,0.35);
+  }
+  .price-banner .dh { font-size: 34px; font-weight: 700; margin-left: 10px; }
+
+  .tagline { margin-top: 36px; font-size: 30px; color: #cfcabd; text-align: center; max-width: 820px; line-height: 1.5; }
+  .tagline b { color: var(--gold-bright); }
+
+  .spacer { flex: 1; }
+
+  .cta {
+    width: 100%;
+    border-top: 1.5px solid rgba(226,197,107,0.3);
+    padding-top: 36px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+  .cta-row { display: flex; align-items: center; gap: 16px; font-size: 38px; font-weight: 700; color: #fff; }
+  .cta-row .icon-dot { width: 52px; height: 52px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; font-size: 28px; }
+  .cta-row.catalog .icon-dot { background: var(--gold); color: #15130a; }
+  .cta-sub { font-size: 26px; color: #a9a397; letter-spacing: 1px; }
+</style>
+</head>
+<body>
+  <div class="glow gold"></div>
+  <div class="glow red"></div>
+
+  <div class="frame">
+    <div class="brand">
+      <svg width="64" height="64" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="sapLogo" x1="6" y1="3" x2="42" y2="45" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#f43f5e" />
+            <stop offset="0.6" stop-color="#dc2626" />
+            <stop offset="1" stop-color="#7f1d1d" />
+          </linearGradient>
+        </defs>
+        <path d="M24 2.5 41.55 12.75 V33.25 L24 43.5 6.45 33.25 V12.75 Z" fill="url(#sapLogo)" stroke="#000" stroke-opacity="0.12" stroke-width="1" />
+        <g stroke="#ffffff" stroke-width="2.6" stroke-linecap="round" fill="none">
+          <path d="M13 18 C 19.5 13.5, 28.5 13.5, 35 18" />
+          <path d="M13 24 C 19.5 19.5, 28.5 19.5, 35 24" />
+          <path d="M13 30 C 19.5 25.5, 28.5 25.5, 35 30" />
+        </g>
+        <circle cx="35" cy="18" r="2.1" fill="#fff" />
+      </svg>
+      <div>
+        <div class="brand-name">FiltroPro</div>
+        <div class="brand-sub">Filtres &amp; pièces auto · Maroc</div>
+      </div>
+    </div>
+
+    <div class="cat-badge">Filtre à air · Filtron</div>
+
+    <div class="ref-block">
+      <div class="ref-label">Référence</div>
+      <div class="ref-number">AP071/7</div>
+    </div>
+
+    <div class="vehicules">
+      Compatible <span>Ford Focus III</span><br/>
+      &amp; <span>Fiesta V · VI · VII EcoBoost</span>
+    </div>
+
+    <div class="product-visual">
+      <svg width="320" height="260" viewBox="0 0 320 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="40" y="60" width="240" height="140" rx="14" fill="#2a2d33" stroke="#e2c56b" stroke-opacity="0.5" stroke-width="2"/>
+        <rect x="60" y="80" width="200" height="100" rx="8" fill="#15171c"/>
+        <g stroke="#e2c56b" stroke-width="3" stroke-linecap="round">
+          <line x1="80" y1="95" x2="80" y2="165"/>
+          <line x1="100" y1="95" x2="100" y2="165"/>
+          <line x1="120" y1="95" x2="120" y2="165"/>
+          <line x1="140" y1="95" x2="140" y2="165"/>
+          <line x1="160" y1="95" x2="160" y2="165"/>
+          <line x1="180" y1="95" x2="180" y2="165"/>
+          <line x1="200" y1="95" x2="200" y2="165"/>
+          <line x1="220" y1="95" x2="220" y2="165"/>
+          <line x1="240" y1="95" x2="240" y2="165"/>
+        </g>
+        <rect x="30" y="50" width="20" height="160" rx="6" fill="#dc2626"/>
+        <rect x="270" y="50" width="20" height="160" rx="6" fill="#dc2626"/>
+      </svg>
+    </div>
+
+    <div class="price-banner">22<span class="dh">DH</span></div>
+
+    <div class="tagline">Qualité <b>Filtron</b> garantie · livré partout au Maroc</div>
+
+    <div class="spacer"></div>
+
+    <div class="cta">
+      <div class="cta-row">
+        <div class="icon-dot">✆</div>
+        06 02 35 02 90
+      </div>
+      <div class="cta-row catalog">
+        <div class="icon-dot">🛒</div>
+        gestion-filtre.vercel.app/catalogue
+      </div>
+      <div class="cta-sub">COMMANDE SUR WHATSAPP</div>
+    </div>
+  </div>
+</body>
+</html>
