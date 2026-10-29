@@ -110,11 +110,14 @@ export async function loadImpayesRelance(days = 15, today = new Date().toISOStri
   return { clients: out, total };
 }
 
-// --- Produits à recommander (stock <= seuil) — pour la notif réappro du matin ---
+// --- Produits à recommander — pour la notif réappro du matin ---
+// IMPORTANT : la table products contient tout le catalogue Filtron (3000+ réfs, souvent
+// stock 0 / seuil 0). On ne compte donc QUE les produits où un seuil a été fixé
+// (stock_min > 0 = produits réellement stockés) et qui sont au/sous ce seuil.
 export async function countReapproDue(): Promise<number> {
   let n = 0;
   for (let i = 0; i < 20; i++) {
-    const { data } = await supabase.from("products").select("stock, stock_min").range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("products").select("stock, stock_min").gt("stock_min", 0).range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     for (const p of data as { stock: number; stock_min: number }[]) if (p.stock <= p.stock_min) n++;
     if (data.length < 1000) break;
