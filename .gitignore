@@ -43,3 +43,6 @@ scripts/_preview_*.png
 # Outillage navigateur local (Playwright MCP)
 .playwright-mcp/
 .mcp.json
+verif-*.png
+wa-*.png
+chatgpt.png
