@@ -48,3 +48,7 @@ wa-*.png
 chatgpt.png
 tarif.png
 *.yml
+
+# Prospects : contacts gardés en local (dépôt public)
+docs/prospects/osm/*.csv
+docs/prospects/osm/*.log
