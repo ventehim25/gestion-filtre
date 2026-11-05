@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/context/LangContext";
-import { LayoutDashboard, Package, Users, ShoppingCart, MapPin, Settings, Menu, X, AlertCircle, BarChart2, Car, Boxes, FileText, ClipboardList, Barcode, Truck } from "lucide-react";
+import { LayoutDashboard, Package, Users, ShoppingCart, MapPin, Settings, Menu, X, AlertCircle, BarChart2, Car, Boxes, FileText, ClipboardList, Barcode, Truck, Target } from "lucide-react";
 import Logo from "@/components/Logo";
 import clsx from "clsx";
 import { useState } from "react";
@@ -22,6 +22,7 @@ const navItems = [
   { href: "/rappels", icon: AlertCircle, key: "reminders" as const },
   { href: "/stats", icon: BarChart2, key: "stats" as const },
   { href: "/tournees", icon: MapPin, key: "tours" as const },
+  { href: "/prospects", icon: Target, key: "prospects" as const },
 ];
 
 export default function Sidebar() {

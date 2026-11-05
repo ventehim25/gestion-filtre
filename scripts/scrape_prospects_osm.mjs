@@ -7,8 +7,10 @@
 // Lancer : node scripts/scrape_prospects_osm.mjs
 // Sortie  : docs/prospects/osm/prospects_osm.csv (local, gitignoré) + RESUME.md
 // Quotidien : tâche Windows « FiltroPro-Prospection » -> scripts/prospects_quotidien.cmd (colonne premiere_vue = nouveaux)
-// Note    : Google Maps / DirectInfo / Charika ne sont PAS scrapés (CGU) — compléter à la main.
+// Note    : la page Google Maps n'est PAS scrapée (CGU) — Google passe par l'API officielle (scrape_prospects_gmaps.mjs).
+// Résultats + note d'intérêt /10 -> table `prospects` -> page /prospects.
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+import { scoreProspect, pushProspects } from "./prospect_score.mjs";
 
 const OVERPASS = "https://overpass-api.de/api/interpreter";
 const UA = "FiltroPro-prospection/1.0";
@@ -130,14 +132,24 @@ for (const seg of SEGMENTS) {
   await new Promise((r) => setTimeout(r, 5000)); // politesse envers le serveur public
 }
 
-// Tri : segment, puis ceux qui ont un contact en premier, puis ville
-const score = (r) => (r.telephone ? 2 : 0) + (r.email ? 1 : 0);
-rows.sort((a, b) => a.segment.localeCompare(b.segment) || score(b) - score(a) || a.ville.localeCompare(b.ville));
+// Note d'intérêt /10, puis tri par intérêt décroissant
+for (const r of rows) Object.assign(r, scoreProspect(r));
+rows.sort((a, b) => b.score - a.score || a.ville.localeCompare(b.ville));
 
 mkdirSync(OUT_DIR, { recursive: true });
 const cols = Object.keys(rows[0]);
 const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
 writeFileSync(CSV, "﻿" + [cols.join(";"), ...rows.map((r) => cols.map((c) => esc(r[c])).join(";"))].join("\n"));
+
+// Page /prospects (points sans nom ignorés : inexploitables)
+await pushProspects(rows.filter((r) => r.nom).map((r) => ({
+  id: "osm:" + r.source.split("openstreetmap.org/")[1], source: "osm", segment: r.segment,
+  nom: r.nom_ar ? `${r.nom} · ${r.nom_ar}` : r.nom, ville: r.ville, adresse: r.adresse || null,
+  telephone: r.telephone || null, whatsapp: r.whatsapp || null, email: r.email || null, email_type: r.email_type || null,
+  site: r.site || r.facebook || null, categorie: r.marque_reseau || null, horaires: r.horaires || null,
+  lat: r.lat ? +r.lat : null, lon: r.lon ? +r.lon : null, maps_url: r.maps, source_url: r.source,
+  score: r.score, score_detail: r.score_detail, premiere_vue: r.premiere_vue, derniere_vue: today,
+})));
 
 // Résumé par segment et par ville
 const bySeg = {};
