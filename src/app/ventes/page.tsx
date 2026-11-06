@@ -7,7 +7,8 @@ import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/types/database";
 import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
-import ProductPicker from "@/components/ProductPicker";
+import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
+import { FILTER_BRANDS } from "@/lib/brands";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { addPending, getPending, syncPending } from "@/lib/offlineSales";
 import { buildReceipt, sendWhatsApp } from "@/lib/whatsapp";
@@ -30,6 +31,8 @@ export default function VentesPage() {
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [crossSell, setCrossSell] = useState<Product[]>([]);
   // Variantes de marque par produit (Filtron + équivalences avec prix) → prix auto à la vente
+  // Réfs des variantes de marque (Wix, Flag…) pour la recherche d'article
+  const [brandVariants, setBrandVariants] = useState<PickerVariant[]>([]);
   const [variants, setVariants] = useState<Record<string, { marque: string; reference: string; prix: number; prix_achat: number; stock: number; equivalence_id: string | null }[]>>({});
   const [showForm, setShowForm] = useState(false);
   const [clientId, setClientId] = useState("");
@@ -87,6 +90,8 @@ export default function VentesPage() {
       supabase.from("fournisseurs").select("*").order("nom"),
       loadAll<Product>("products", "*", { filter: q => q.order("reference") }),
     ]);
+    loadAll<PickerVariant>("equivalences", "id, product_id, marque, reference", { filter: q => q.in("marque", FILTER_BRANDS).order("id") })
+      .then(setBrandVariants).catch(() => {});
     setSales(s);
     setClients(c.data ?? []);
     setFournisseurs((fr.data as Fournisseur[]) ?? []);
@@ -148,7 +153,7 @@ export default function VentesPage() {
 
   // Charge les variantes d'un produit (Filtron + équivalences enregistrées avec un prix)
   async function loadVariants(p: Product) {
-    if (variants[p.id]) return;
+    if (variants[p.id]) return variants[p.id];
     const { data } = await supabase.from("equivalences").select("id, marque, reference, prix, prix_achat, stock").eq("product_id", p.id);
     const list = [
       { marque: "Filtron", reference: p.reference, prix: p.prix_vente, prix_achat: p.prix_achat, stock: p.stock, equivalence_id: null as string | null },
@@ -157,6 +162,14 @@ export default function VentesPage() {
         .map(e => ({ marque: e.marque, reference: e.reference, prix: e.prix as number, prix_achat: e.prix_achat ?? 0, stock: e.stock ?? 0, equivalence_id: e.id })),
     ];
     setVariants(prev => ({ ...prev, [p.id]: list }));
+    return list;
+  }
+
+  // Filtre trouvé par la réf d'une marque (ex. WL7009 Wix) : ligne sur le produit + marque appliquée
+  async function setLineProductVariant(i: number, p: Product, marque: string) {
+    setLineProduct(i, p);
+    const v = (await loadVariants(p)).find(x => x.marque === marque);
+    if (v) setLines(prev => prev.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: withRemise(v.prix), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
   }
 
   // Applique une marque à une ligne : prix de vente auto + coût figé + libellé "réf (marque)"
@@ -636,7 +649,7 @@ export default function VentesPage() {
                 <div key={i} className="mb-2">
                   <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-5">
-                      <ProductPicker products={products} value={l.product_id} onSelect={(p) => setLineProduct(i, p)} />
+                      <ProductPicker products={products} variants={brandVariants} value={l.product_id} onSelect={(p, v) => v ? setLineProductVariant(i, p, v.marque) : setLineProduct(i, p)} />
                     </div>
                     <input type="number" className="input col-span-2" value={l.quantite} onChange={e => updateLine(i, "quantite", +e.target.value)} min={1} />
                     <input type="number" className="input col-span-3" value={l.prix_unitaire} onChange={e => updateLine(i, "prix_unitaire", +e.target.value)} />

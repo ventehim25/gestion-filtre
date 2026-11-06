@@ -217,6 +217,9 @@ export default function FournisseursPage() {
     }));
   }
   const recMontant = recLines.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
+  // Pour retrouver un filtre en tapant la réf d'une marque (WL7009 Wix → OE640/2, marque Wix choisie)
+  const pickerVariants = useMemo(() => Object.entries(variantsMap).flatMap(([product_id, vs]) =>
+    vs.map(v => ({ id: v.id, product_id, marque: v.marque, reference: v.reference }))), [variantsMap]);
   async function saveReception() {
     if (!recFor) return;
     const valid = recLines.filter(l => l.product_id && l.quantite > 0);
@@ -442,7 +445,7 @@ export default function FournisseursPage() {
               {recLines.map((l, i) => (
                 <div key={i} className="border-b border-slate-800/40 pb-2">
                   <div className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-11"><ProductPicker products={products} value={l.product_id} onSelect={(p) => setRecProduct(i, p)} /></div>
+                    <div className="col-span-11"><ProductPicker products={products} variants={pickerVariants} value={l.product_id} onSelect={(p, v) => { setRecProduct(i, p); if (v) setRecVariant(i, v.marque); }} /></div>
                     <button onClick={() => setRecLines(prev => prev.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center"><Trash2 size={14} /></button>
                   </div>
                   {/* Qté + prix sur une 2e ligne : lisible sur téléphone (grille avec libellés : .input est w-full) */}
