@@ -6,12 +6,13 @@ import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { FILTER_BRANDS } from "@/lib/brands";
 import { coutCreditParFournisseur, setBonRembourse } from "@/lib/dinoun";
+import { ajouterReception, getReceptionsAttente, syncReceptions } from "@/lib/offlineReceptions";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import {
   Plus, Truck, Phone, MessageCircle, Pencil, Trash2, X, PackagePlus, HandCoins,
-  ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank, ScanLine, ExternalLink,
+  ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank, ScanLine, ExternalLink, CloudOff, RefreshCw,
 } from "lucide-react";
 
 type RecLine = {
@@ -298,39 +299,20 @@ export default function FournisseursPage() {
     const valid = recLines.filter(l => l.product_id && l.quantite > 0);
     if (valid.length === 0) { alert("Ajoute au moins un produit"); return; }
     if (valid.some(l => l.marque === "__new__" && !l.nouvelleRef.trim())) { alert("Nouvelle marque : saisis la référence de la boîte (ex. HU 718/5 x)."); return; }
-    if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Action impossible hors-ligne."); return; }
     const montant = valid.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
     const libelle = (l: RecLine) => l.marque === "__new__" ? `${l.nouvelleRef.trim()} (${l.nouvelleMarque})` : `${l.reference}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""}`;
     const details = valid.map(l => `${libelle(l)}×${l.quantite}`).join(", ");
-    await supabase.from("receptions").insert({ fournisseur_id: recFor.id, date: recDate, montant, details });
-    // Augmente le stock — sur la variante de marque si choisie, sinon sur le produit principal —
-    // et enregistre prix + code-barres saisis sur la fiche (un champ laissé vide ne remplace pas l'ancien).
-    for (const l of valid) {
-      const code = l.code_barre.trim() ? { code_barre: l.code_barre.trim() } : {};
-      let eqId = l.equivalence_id;
-      if (l.marque === "__new__") {
-        // Nouvelle variante de marque créée ici (même réf de marque déjà là -> réutilisée)
-        const ref = l.nouvelleRef.trim();
-        const { data: ex } = await supabase.from("equivalences").select("id").eq("product_id", l.product_id).eq("marque", l.nouvelleMarque ?? "").ilike("reference", ref).limit(1);
-        eqId = ex?.[0]?.id ?? null;
-        if (!eqId) {
-          const { data: created, error } = await supabase.from("equivalences")
-            .insert({ product_id: l.product_id, marque: l.nouvelleMarque ?? "", reference: ref, prix: null, prix_achat: null, stock: 0 }).select("id").single();
-          if (error || !created) { alert(`Variante ${ref} non créée : ${error?.message ?? "erreur"}`); continue; }
-          eqId = created.id;
-        }
-      }
-      if (eqId) {
-        await supabase.rpc("decrement_equiv_stock", { e_id: eqId, qty: -l.quantite });
-        const upd = { ...(l.prix_achat > 0 && { prix_achat: l.prix_achat }), ...(l.prix_vente > 0 && { prix: l.prix_vente }), ...code };
-        if (Object.keys(upd).length) await supabase.from("equivalences").update(upd).eq("id", eqId);
-      } else {
-        await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: -l.quantite });
-        const upd = { ...(l.prix_achat > 0 && { prix_achat: l.prix_achat }), ...(l.prix_vente > 0 && { prix_vente: l.prix_vente }), ...code };
-        if (Object.keys(upd).length) await supabase.from("products").update(upd).eq("id", l.product_id);
-      }
-    }
-    setRecFor(null); load();
+    // Toujours via la file d'attente : marche hors-ligne et reprend proprement après une coupure
+    ajouterReception({
+      id: crypto.randomUUID(), fournisseur_id: recFor.id, date: recDate, montant, details, faites: 0, enregistree: false, detail: [],
+      lignes: valid.map(l => ({
+        product_id: l.product_id, equivalence_id: l.marque === "__new__" ? null : l.equivalence_id, quantite: l.quantite,
+        prix_achat: l.prix_achat, prix_vente: l.prix_vente, code_barre: l.code_barre,
+        nouvelleMarque: l.marque === "__new__" ? l.nouvelleMarque : null, nouvelleRef: l.nouvelleRef, libelle: libelle(l),
+      })),
+    });
+    setRecFor(null);
+    await envoyerReceptions();
   }
 
   // ---- Avance ----
@@ -342,9 +324,48 @@ export default function FournisseursPage() {
   }
 
   function histOf(id: string) {
-    const r = receptions.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "rec" as const, date: x.date, montant: x.montant, text: x.details ?? "Marchandise" }));
-    const a = avances.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "av" as const, date: x.date, montant: x.montant, text: x.note ?? "Avance" }));
+    const r = receptions.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "rec" as const, date: x.date, montant: x.montant, text: x.details ?? "Marchandise", rec: x, av: null }));
+    const a = avances.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "av" as const, date: x.date, montant: x.montant, text: x.note ?? "Avance", rec: null, av: x }));
     return [...r, ...a].sort((p, q) => q.date.localeCompare(p.date));
+  }
+
+  // ---- Réceptions en attente (hors-ligne / coupure) : envoi auto au retour du réseau ----
+  const [recAttente, setRecAttente] = useState(0);
+  const [recErreur, setRecErreur] = useState("");
+  async function envoyerReceptions() {
+    setRecAttente(getReceptionsAttente().length);
+    if (typeof navigator !== "undefined" && !navigator.onLine) return;
+    const { left, erreur } = await syncReceptions();
+    setRecAttente(left); setRecErreur(left ? erreur ?? "" : "");
+    load();
+  }
+  useEffect(() => {
+    if (getReceptionsAttente().length) envoyerReceptions();
+    const onOnline = () => envoyerReceptions();
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ---- Annulations (erreur de saisie) ----
+  async function annulerReception(r: Reception) {
+    const lignes = r.lignes ?? [];
+    const msg = lignes.length
+      ? `Annuler la réception du ${r.date} ?\n${r.details ?? ""}\n\n→ le stock de ces articles est retiré et ${r.montant.toFixed(0)} MAD sont enlevés de la dette.`
+      : `Annuler la réception du ${r.date} ?\n${r.details ?? ""}\n\n⚠ Réception sans détail enregistré : la dette sera corrigée (−${r.montant.toFixed(0)} MAD) mais le STOCK ne sera pas retiré (corrige-le dans Stock).`;
+    if (!confirm(msg)) return;
+    if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Annulation impossible hors-ligne."); return; }
+    for (const l of lignes) {
+      if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: l.quantite });
+      else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
+    }
+    await supabase.from("receptions").delete().eq("id", r.id);
+    load();
+  }
+  async function annulerAvance(a: Avance) {
+    if (a.sale_id) { alert("Ce paiement vient du camion d'un bon : annule-le depuis Ventes (bouton « Remboursé »)."); return; }
+    if (!confirm(`Annuler le paiement du ${a.date} (${a.montant.toFixed(0)} MAD) ? La dette remontera d'autant.`)) return;
+    await supabase.from("avances").delete().eq("id", a.id);
+    load();
   }
 
   return (
@@ -365,6 +386,15 @@ export default function FournisseursPage() {
           </button>
         </div>
       } />
+
+      {recAttente > 0 && (
+        <div className="card p-3 mb-4 flex items-center justify-between gap-3" style={{ borderColor: "rgba(234,179,8,0.4)" }}>
+          <span className="text-sm text-yellow-400 flex items-center gap-2">
+            <CloudOff size={16} /> {recAttente} réception(s) en attente d&apos;envoi{recErreur ? " (réseau)" : " — envoi dès le retour du réseau"}
+          </span>
+          <button onClick={envoyerReceptions} className="btn-secondary text-xs flex items-center gap-1"><RefreshCw size={14} /> Envoyer</button>
+        </div>
+      )}
 
       {/* Capital / Dette / Bénéfice */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -482,10 +512,14 @@ export default function FournisseursPage() {
                     {histOf(f.id).length === 0 ? (
                       <p className="text-xs text-slate-500 py-2">Aucun mouvement.</p>
                     ) : histOf(f.id).map((h, i) => (
-                      <div key={i} className="flex items-center justify-between text-xs py-1">
-                        <span className="text-slate-400">{h.date} · <span className="text-slate-300">{h.text}</span></span>
-                        <span className={h.type === "rec" ? "text-orange-300 font-medium" : "text-emerald-300 font-medium"}>
-                          {h.type === "rec" ? "+" : "−"}{money(h.montant)}
+                      <div key={i} className="flex items-center justify-between gap-2 text-xs py-1">
+                        <span className="text-slate-400 min-w-0">{h.date} · <span className="text-slate-300">{h.text}</span></span>
+                        <span className="flex items-center gap-2 shrink-0">
+                          <span className={h.type === "rec" ? "text-orange-300 font-medium" : "text-emerald-300 font-medium"}>
+                            {h.type === "rec" ? "+" : "−"}{money(h.montant)}
+                          </span>
+                          <button onClick={() => h.rec ? annulerReception(h.rec) : h.av && annulerAvance(h.av)}
+                            className="text-slate-500 hover:text-red-400" title={h.type === "rec" ? "Annuler cette réception" : "Annuler ce paiement"}><X size={13} /></button>
                         </span>
                       </div>
                     ))}

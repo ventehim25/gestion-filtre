@@ -24,7 +24,7 @@ export type Database = {
       applications: Table<Application, "id", [Fk<"product_id", "products">]>;
       garages: Table<Garage, "id" | "created_at" | "jour", [Fk<"client_id", "clients">]>;
       fournisseurs: Table<Fournisseur, "id" | "created_at">;
-      receptions: Table<Reception, "id" | "created_at", [Fk<"fournisseur_id", "fournisseurs">]>;
+      receptions: Table<Reception, "id" | "created_at" | "lignes", [Fk<"fournisseur_id", "fournisseurs">]>;
       avances: Table<Avance, "id" | "created_at", [Fk<"fournisseur_id", "fournisseurs">]>;
       rappels_vidange: Table<RappelVidange, "id" | "created_at" | "garage_id" | "fait", [Fk<"garage_id", "garages">, Fk<"client_id", "clients">]>;
       demandes_manquees: Table<DemandeManquee, "id" | "created_at" | "note" | "traite">;
@@ -89,7 +89,10 @@ export type Reception = {
   date: string;
   montant: number;
   details: string | null;
+  lignes?: ReceptionLigne[] | null; // détail pour annuler la réception (receptions_lignes.sql)
 };
+export type ReceptionLigne = { product_id: string; equivalence_id: string | null; quantite: number; ref: string };
+
 
 export type Avance = {
   id: string;
