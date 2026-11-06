@@ -1,13 +1,21 @@
 "use client";
 export const dynamic = "force-dynamic";
 import { useEffect, useState } from "react";
+import nextDynamic from "next/dynamic";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
+import { gmapsTo, parseLatLng } from "@/lib/tournee";
 import { Client, ClientType } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, Phone, MessageCircle, Eye } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Phone, MessageCircle, Eye, MapPin, LocateFixed, Map as MapIcon, X } from "lucide-react";
 
-const empty = { nom: "", telephone: "", ville: "", adresse: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0, parrain_id: "" };
+// Carte Leaflet : uniquement côté navigateur
+const LocationPicker = nextDynamic(() => import("@/components/LocationPicker"), {
+  ssr: false,
+  loading: () => <div className="w-full h-56 rounded-lg bg-[var(--surface-2)] flex items-center justify-center text-xs text-slate-500">Chargement de la carte…</div>,
+});
+
+const empty = { nom: "", telephone: "", ville: "", adresse: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0, parrain_id: "", latitude: null as number | null, longitude: null as number | null };
 
 const TYPE_LABELS: Record<ClientType, string> = { comptoir: "Comptoir", garage: "Garage", gros: "Gros" };
 
@@ -27,6 +35,10 @@ export default function ClientsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState(empty);
+  // Localisation exacte du local : GPS du téléphone, lien Google Maps collé, ou clic sur la carte
+  const [lienMaps, setLienMaps] = useState("");
+  const [geoMsg, setGeoMsg] = useState("");
+  const [showMap, setShowMap] = useState(false);
   // Marges (bénéfice + coût fournisseur) cumulées par client, révélées au clic
   const [margins, setMargins] = useState<Record<string, { benefice: number; cost: number }>>({});
   const [reveal, setReveal] = useState<Set<string>>(new Set());
@@ -139,9 +151,48 @@ export default function ClientsPage() {
       delete payload.parrain_id;
       ({ error } = await attempt(payload));
     }
+    if (error && /latitude|longitude/i.test(error.message)) {
+      alert("Localisation non enregistrée : colle supabase/clients_localisation.sql dans Supabase. Le reste de la fiche est enregistré.");
+      delete payload.latitude; delete payload.longitude;
+      ({ error } = await attempt(payload));
+    }
     if (error) { alert("Erreur : " + error.message); return; }
-    setShowForm(false); setEditing(null); setForm(empty);
+    closeForm();
     load();
+  }
+
+  function closeForm() {
+    setShowForm(false); setEditing(null); setForm(empty);
+    setLienMaps(""); setGeoMsg(""); setShowMap(false);
+  }
+
+  function setPosition(lat: number, lng: number) {
+    setForm(f => ({ ...f, latitude: +lat.toFixed(6), longitude: +lng.toFixed(6) }));
+  }
+
+  // GPS du téléphone : à faire DEVANT le local du client
+  function maPosition() {
+    if (!navigator.geolocation) { setGeoMsg("GPS indisponible sur cet appareil."); return; }
+    setGeoMsg("Recherche de la position…");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setPosition(pos.coords.latitude, pos.coords.longitude);
+        setGeoMsg(`Position enregistrée (précision ± ${Math.round(pos.coords.accuracy)} m)${pos.coords.accuracy > 50 ? " — imprécis : corrige sur la carte" : ""}`);
+        if (pos.coords.accuracy > 50) setShowMap(true);
+      },
+      (err) => setGeoMsg(err.code === 1 ? "Accès à la position refusé : autorise la localisation pour l'app." : "Position introuvable. Réessaie dehors ou utilise la carte."),
+      { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+    );
+  }
+
+  function collerLien(v: string) {
+    setLienMaps(v);
+    if (!v.trim()) return;
+    const p = parseLatLng(v);
+    if (p) { setPosition(p.lat, p.lng); setGeoMsg("Position lue depuis le lien."); }
+    else setGeoMsg(/goo\.gl|maps\.app/i.test(v)
+      ? "Lien court : ouvre-le dans Google Maps, puis copie le lien complet de la barre d'adresse (ou place le repère sur la carte)."
+      : "Coordonnées introuvables dans ce texte.");
   }
 
   async function remove(id: string) {
@@ -153,7 +204,8 @@ export default function ClientsPage() {
 
   function startEdit(c: Client) {
     setEditing(c);
-    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, adresse: c.adresse ?? "", notes: c.notes ?? "", solde_du: c.solde_du, type: c.type ?? "comptoir", remise_pct: c.remise_pct ?? 0, limite_credit: c.limite_credit ?? 0, parrain_id: c.parrain_id ?? "" });
+    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, adresse: c.adresse ?? "", notes: c.notes ?? "", solde_du: c.solde_du, type: c.type ?? "comptoir", remise_pct: c.remise_pct ?? 0, limite_credit: c.limite_credit ?? 0, parrain_id: c.parrain_id ?? "", latitude: c.latitude ?? null, longitude: c.longitude ?? null });
+    setLienMaps(""); setGeoMsg(""); setShowMap(false);
     setShowForm(true);
   }
 
@@ -185,12 +237,40 @@ export default function ClientsPage() {
 
       {showForm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-md">
+          <div className="card p-6 w-full max-w-md max-h-[92vh] overflow-y-auto">
             <h3 className="font-semibold text-slate-800 mb-4">{editing ? t("edit") : t("addClient")}</h3>
             <div className="space-y-3">
               <div><label className="text-xs text-slate-500 mb-1 block">{t("name")}</label><input className="input" value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("phone")}</label><input className="input" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("city")}</label><input className="input" value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} /></div>
+              <div><label className="text-xs text-slate-500 mb-1 block">Adresse</label><input className="input" value={form.adresse} placeholder="Quartier, rue, repère…" onChange={e => setForm({ ...form, adresse: e.target.value })} /></div>
+
+              {/* Localisation exacte du local */}
+              <div className="rounded-lg border border-slate-700 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-300 flex items-center gap-1.5"><MapPin size={14} className="text-red-400" /> Localisation exacte du local</span>
+                  {form.latitude != null && (
+                    <button onClick={() => { setForm(f => ({ ...f, latitude: null, longitude: null })); setGeoMsg(""); }} className="text-[11px] text-slate-500 hover:text-red-400 flex items-center gap-1"><X size={12} /> Effacer</button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button type="button" onClick={maPosition} className="btn-secondary flex items-center justify-center gap-1.5 text-xs"><LocateFixed size={14} /> Ma position actuelle</button>
+                  <button type="button" onClick={() => setShowMap(v => !v)} className="btn-secondary flex items-center justify-center gap-1.5 text-xs"><MapIcon size={14} /> {showMap ? "Masquer la carte" : "Choisir sur la carte"}</button>
+                </div>
+                <input className="input" value={lienMaps} onChange={e => collerLien(e.target.value)} placeholder="…ou colle un lien Google Maps / position WhatsApp" />
+                {showMap && (
+                  <>
+                    <LocationPicker value={form.latitude != null && form.longitude != null ? { lat: form.latitude, lng: form.longitude } : null} onChange={p => { setPosition(p.lat, p.lng); setGeoMsg("Position placée sur la carte."); }} />
+                    <p className="text-[11px] text-slate-500">Touche la carte pour placer le repère, puis fais-le glisser pour l&apos;ajuster.</p>
+                  </>
+                )}
+                {geoMsg && <p className="text-[11px] text-amber-400">{geoMsg}</p>}
+                {form.latitude != null && form.longitude != null ? (
+                  <a href={`https://www.google.com/maps?q=${form.latitude},${form.longitude}`} target="_blank" rel="noreferrer" className="text-[11px] text-blue-400 hover:underline block">
+                    📍 {form.latitude}, {form.longitude} — vérifier sur Google Maps
+                  </a>
+                ) : <p className="text-[11px] text-slate-500">Pas encore localisé.</p>}
+              </div>
               <div className="grid grid-cols-3 gap-2">
                 <div><label className="text-[11px] text-slate-500 mb-1 block">Type</label>
                   <select className="input" value={form.type} onChange={e => setForm({ ...form, type: e.target.value as ClientType })}>
@@ -216,7 +296,7 @@ export default function ClientsPage() {
               <div><label className="text-xs text-slate-500 mb-1 block">{t("notes")}</label><textarea className="input" rows={2} value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
             </div>
             <div className="flex gap-2 mt-4 justify-end">
-              <button onClick={() => setShowForm(false)} className="btn-secondary">{t("cancel")}</button>
+              <button onClick={closeForm} className="btn-secondary">{t("cancel")}</button>
               <button onClick={save} className="btn-primary">{t("save")}</button>
             </div>
           </div>
@@ -229,7 +309,13 @@ export default function ClientsPage() {
             <div className="flex items-start justify-between mb-2">
               <div>
                 <p className="font-semibold text-slate-800">{c.nom}</p>
-                <p className="text-sm text-slate-500">{c.ville}</p>
+                <p className="text-sm text-slate-500">{c.ville}{c.adresse ? ` · ${c.adresse}` : ""}</p>
+                {c.latitude != null && c.longitude != null && (
+                  <a href={gmapsTo({ lat: c.latitude, lng: c.longitude })} target="_blank" rel="noreferrer"
+                    className="mt-1 inline-flex items-center gap-1 text-xs text-red-400 hover:underline">
+                    <MapPin size={12} /> Y aller
+                  </a>
+                )}
               </div>
               <div className="flex gap-2">
                 <button onClick={() => startEdit(c)} className="text-blue-500 hover:text-blue-700"><Pencil size={15} /></button>

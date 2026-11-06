@@ -159,3 +159,24 @@ export function gmapsRoute(garages: Garage[], base: LatLng = KENITRA): string {
   const waypoints = garages.map((g) => `${g.latitude},${g.longitude}`).join("|");
   return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&waypoints=${encodeURIComponent(waypoints)}&travelmode=driving`;
 }
+
+// Coordonnées depuis un lien Google Maps (partage WhatsApp, fiche, itinéraire) ou « 35.75, -5.83 ».
+// Les liens courts (maps.app.goo.gl) ne contiennent pas les coordonnées -> null.
+export function parseLatLng(text: string): LatLng | null {
+  let s = text.trim();
+  try { s = decodeURIComponent(s); } catch { /* texte non encodé */ }
+  const patterns = [
+    /!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/,                                     // fiche d'un lieu (position exacte)
+    /[?&](?:q|query|ll|destination|daddr)=(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)/, // partage de position / itinéraire
+    /@(-?\d+\.\d+),(-?\d+\.\d+)/,                                          // centre de la carte
+    /^(-?\d{1,2}\.\d+)\s*[,; ]\s*(-?\d{1,3}\.\d+)$/,                        // coordonnées brutes
+  ];
+  for (const re of patterns) {
+    const m = s.match(re);
+    if (m) {
+      const lat = +m[1], lng = +m[2];
+      if (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng };
+    }
+  }
+  return null;
+}
