@@ -415,7 +415,7 @@ export default function StockPage() {
       )}
 
       {/* Scanner caméra */}
-      {camOpen && <BarcodeScanner onScan={handleScan} onClose={() => setCamOpen(false)} />}
+      {camOpen && <BarcodeScanner onScan={handleScan} onClose={() => setCamOpen(false)} hint="Visez le code-barres de la boîte. +1 au stock à chaque lecture." />}
 
       {/* Association d'un code inconnu */}
       {linkCode && (
