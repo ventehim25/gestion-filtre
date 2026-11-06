@@ -17,13 +17,14 @@ export default function ServiceWorkerRegister() {
       const onVisible = () => { if (document.visibilityState === "visible") check(); };
       document.addEventListener("visibilitychange", onVisible);
 
-      // Quand une nouvelle version est installée (et qu'une version tournait déjà),
-      // on l'active et on recharge automatiquement.
+      // Quand une nouvelle version est ACTIVÉE (et qu'une version tournait déjà), on recharge.
+      // (Recharger dès « installed » laissait l'ancienne version servir la page rechargée.)
       reg.addEventListener("updatefound", () => {
         const nw = reg.installing;
         if (!nw) return;
+        const hadController = !!navigator.serviceWorker.controller;
         nw.addEventListener("statechange", () => {
-          if (nw.state === "installed" && navigator.serviceWorker.controller && !reloaded) {
+          if (nw.state === "activated" && hadController && !reloaded) {
             reloaded = true;
             window.location.reload();
           }

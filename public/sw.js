@@ -5,7 +5,7 @@
    - Images produits (Scene7 / Unsplash) : cache-first (photos dispo hors-ligne).
    - Écritures (POST/PATCH/DELETE) : réseau direct (échec si hors-ligne -> à gérer côté app).
 */
-const VERSION = "v15";
+const VERSION = "v16";
 const STATIC = "fp-static-" + VERSION;
 const DATA = "fp-data-" + VERSION;
 const IMG = "fp-img-" + VERSION;
@@ -120,7 +120,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // --- App (même origine, GET) : stale-while-revalidate ---
+  // --- App (même origine, GET) ---
+  //     Pages (navigation) : réseau d'abord, cache si le réseau ne répond pas sous 3 s ou hors-ligne
+  //     -> une mise à jour déployée s'affiche dès la 1re ouverture (avant : 2-3 rechargements).
+  //     Fichiers /_next/static (noms versionnés) et autres : stale-while-revalidate.
   if (url.origin === self.location.origin && req.method === "GET") {
     event.respondWith((async () => {
       const cache = await caches.open(STATIC);
@@ -129,6 +132,12 @@ self.addEventListener("fetch", (event) => {
         if (res && res.ok) cache.put(req, res.clone());
         return res;
       }).catch(() => null);
+      if (cached && req.mode === "navigate") {
+        const winner = await Promise.race([fetching, new Promise((r) => setTimeout(() => r(null), 3000))]);
+        if (winner) return winner;
+        event.waitUntil(fetching);
+        return cached;
+      }
       if (cached) { event.waitUntil(fetching); return cached; }
       const res = await fetching;
       if (res) return res;
