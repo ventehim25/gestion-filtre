@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import { loadAll } from "@/lib/pagedFetch";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
 import {
@@ -10,8 +11,8 @@ import {
   ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank,
 } from "lucide-react";
 
-type RecLine = { product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; reference: string };
-type VariantRow = { id: string; marque: string; reference: string; prix_achat: number | null };
+type RecLine = { product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; prix_vente: number; reference: string };
+type VariantRow = { id: string; marque: string; reference: string; prix_achat: number | null; prix: number | null };
 const todayStr = () => new Date().toISOString().split("T")[0];
 function waLink(tel: string) { return `https://wa.me/212${tel.replace(/\D/g, "").replace(/^0/, "")}`; }
 
@@ -69,15 +70,10 @@ export default function FournisseursPage() {
     setProducts(all);
 
     // Variantes de marque (équivalences avec une marque) par produit
+    // (pages chargées en parallèle : 23 000 lignes en série prenaient ~15 s sur mobile)
     const vmap: Record<string, VariantRow[]> = {};
-    for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("equivalences").select("id, product_id, marque, reference, prix_achat").range(i * 1000, i * 1000 + 999);
-      if (!data || data.length === 0) break;
-      for (const e of data as { id: string; product_id: string; marque: string; reference: string; prix_achat: number | null }[]) {
-        (vmap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix_achat: e.prix_achat });
-      }
-      if (data.length < 1000) break;
-    }
+    const eqs = await loadAll<VariantRow & { product_id: string }>("equivalences", "id, product_id, marque, reference, prix_achat, prix", { filter: (q) => q.order("id") });
+    for (const e of eqs) (vmap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix_achat: e.prix_achat, prix: e.prix });
     setVariantsMap(vmap);
 
     // Portefeuille (depuis les ventes)
@@ -201,10 +197,10 @@ export default function FournisseursPage() {
   }
 
   // ---- Réception (marchandise prise) ----
-  const emptyRecLine = (): RecLine => ({ product_id: "", equivalence_id: null, marque: "Filtron", quantite: 1, prix_achat: 0, reference: "" });
+  const emptyRecLine = (): RecLine => ({ product_id: "", equivalence_id: null, marque: "Filtron", quantite: 1, prix_achat: 0, prix_vente: 0, reference: "" });
   function openReception(f: Fournisseur) { setRecFor(f); setRecDate(todayStr()); setRecLines([emptyRecLine()]); }
   function setRecProduct(i: number, p: Product) {
-    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, reference: p.reference } : l));
+    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, prix_vente: p.prix_vente, reference: p.reference } : l));
   }
   // Choix de la marque d'une ligne : Filtron (produit principal) ou une variante (Flag, Mann…)
   function setRecVariant(i: number, marque: string) {
@@ -212,9 +208,9 @@ export default function FournisseursPage() {
       if (j !== i) return l;
       const p = products.find(x => x.id === l.product_id);
       if (!p) return l;
-      if (marque === "Filtron") return { ...l, equivalence_id: null, marque: "Filtron", reference: p.reference, prix_achat: p.prix_achat };
+      if (marque === "Filtron") return { ...l, equivalence_id: null, marque: "Filtron", reference: p.reference, prix_achat: p.prix_achat, prix_vente: p.prix_vente };
       const v = (variantsMap[l.product_id] || []).find(x => x.marque === marque);
-      return v ? { ...l, equivalence_id: v.id, marque, reference: v.reference, prix_achat: v.prix_achat ?? p.prix_achat } : l;
+      return v ? { ...l, equivalence_id: v.id, marque, reference: v.reference, prix_achat: v.prix_achat ?? p.prix_achat, prix_vente: v.prix ?? p.prix_vente } : l;
     }));
   }
   const recMontant = recLines.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
@@ -226,10 +222,18 @@ export default function FournisseursPage() {
     const montant = valid.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
     const details = valid.map(l => `${l.reference}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""}×${l.quantite}`).join(", ");
     await supabase.from("receptions").insert({ fournisseur_id: recFor.id, date: recDate, montant, details });
-    // Augmente le stock — sur la variante de marque si choisie, sinon sur le produit principal
+    // Augmente le stock — sur la variante de marque si choisie, sinon sur le produit principal —
+    // et enregistre les prix saisis sur la fiche (un prix laissé vide/0 ne remplace pas l'ancien).
     for (const l of valid) {
-      if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: -l.quantite });
-      else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: -l.quantite });
+      if (l.equivalence_id) {
+        await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: -l.quantite });
+        const upd = { ...(l.prix_achat > 0 && { prix_achat: l.prix_achat }), ...(l.prix_vente > 0 && { prix: l.prix_vente }) };
+        if (Object.keys(upd).length) await supabase.from("equivalences").update(upd).eq("id", l.equivalence_id);
+      } else {
+        await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: -l.quantite });
+        const upd = { ...(l.prix_achat > 0 && { prix_achat: l.prix_achat }), ...(l.prix_vente > 0 && { prix_vente: l.prix_vente }) };
+        if (Object.keys(upd).length) await supabase.from("products").update(upd).eq("id", l.product_id);
+      }
     }
     setRecFor(null); load();
   }
@@ -428,19 +432,32 @@ export default function FournisseursPage() {
             </div>
             <div className="space-y-2 mb-2">
               <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-slate-500">
-                <span className="col-span-6">Produit</span>
-                <span className="col-span-2 text-center">Qté</span>
-                <span className="col-span-3 text-center">Prix achat (u.)</span>
+                <span className="col-span-11">Produit</span>
                 <span className="col-span-1"></span>
               </div>
               {recLines.map((l, i) => (
                 <div key={i} className="border-b border-slate-800/40 pb-2">
                   <div className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-6"><ProductPicker products={products} value={l.product_id} onSelect={(p) => setRecProduct(i, p)} /></div>
-                    <input type="number" min={1} className="input col-span-2 text-center" value={l.quantite} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, quantite: Math.max(1, +e.target.value) } : x))} />
-                    <input type="number" min={0} step="0.01" className="input col-span-3 text-center" placeholder="prix" value={l.prix_achat || ""} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, prix_achat: Math.max(0, +e.target.value) } : x))} />
+                    <div className="col-span-11"><ProductPicker products={products} value={l.product_id} onSelect={(p) => setRecProduct(i, p)} /></div>
                     <button onClick={() => setRecLines(prev => prev.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center"><Trash2 size={14} /></button>
                   </div>
+                  {/* Qté + prix sur une 2e ligne : lisible sur téléphone (grille avec libellés : .input est w-full) */}
+                  <div className="grid grid-cols-3 gap-2 mt-1">
+                    <label className="text-[10px] uppercase text-slate-500">Qté
+                      <input type="number" min={1} className="input mt-0.5 text-center" value={l.quantite} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, quantite: Math.max(1, +e.target.value) } : x))} />
+                    </label>
+                    <label className="text-[10px] uppercase text-slate-500">Prix achat (u.)
+                      <input type="number" min={0} step="0.01" className="input mt-0.5 text-center" placeholder="achat" value={l.prix_achat || ""} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, prix_achat: Math.max(0, +e.target.value) } : x))} />
+                    </label>
+                    <label className="text-[10px] uppercase text-slate-500">Prix vente (u.)
+                      <input type="number" min={0} step="0.01" className={`input mt-0.5 text-center ${l.prix_vente > 0 && l.prix_vente <= l.prix_achat ? "ring-2 ring-red-500/70" : ""}`} placeholder="vente" value={l.prix_vente || ""} onChange={e => setRecLines(prev => prev.map((x, j) => j === i ? { ...x, prix_vente: Math.max(0, +e.target.value) } : x))} />
+                    </label>
+                  </div>
+                  {l.prix_vente > 0 && l.prix_achat > 0 && (
+                    <p className={`text-[10px] mt-0.5 ${l.prix_vente <= l.prix_achat ? "text-red-400" : "text-emerald-400"}`}>
+                      Marge : {(l.prix_vente - l.prix_achat).toFixed(2)} MAD/u ({Math.round(((l.prix_vente - l.prix_achat) / l.prix_achat) * 100)} %)
+                    </p>
+                  )}
                   {/* Choix de la marque : le stock ira sur cette marque (Flag, Mann…) ou sur Filtron */}
                   {l.product_id && (variantsMap[l.product_id]?.length ?? 0) > 0 && (
                     <select className="input mt-1 py-1 text-xs" value={l.marque} onChange={e => setRecVariant(i, e.target.value)}>
@@ -459,7 +476,7 @@ export default function FournisseursPage() {
               <span className="text-sm text-slate-300">Coût total (ajouté à la dette)</span>
               <span className="text-lg font-bold text-orange-400">{recMontant.toFixed(2)} MAD</span>
             </div>
-            <p className="text-[11px] text-slate-500 mb-3">Le stock des produits sera augmenté automatiquement.</p>
+            <p className="text-[11px] text-slate-500 mb-3">Le stock augmente automatiquement et les prix saisis (achat/vente) sont enregistrés sur la fiche du filtre → il apparaît dans le catalogue.</p>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setRecFor(null)} className="btn-secondary">Annuler</button>
               <button onClick={saveReception} className="btn-primary">Enregistrer</button>

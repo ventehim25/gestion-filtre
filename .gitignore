@@ -52,3 +52,6 @@ tarif.png
 # Prospects : contacts gardés en local (dépôt public)
 docs/prospects/*/*.csv
 docs/prospects/*/*.log
+
+# Sauvegardes de données (prix d achat = confidentiel, dépôt public)
+backups/
