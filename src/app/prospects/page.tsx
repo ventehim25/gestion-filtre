@@ -7,14 +7,14 @@ import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { sendWhatsApp } from "@/lib/whatsapp";
-import { ChevronDown, ChevronUp, Phone, MessageCircle, Mail, Globe, MapPin, ExternalLink, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronUp, Phone, MessageCircle, Mail, Globe, MapPin, ExternalLink, RefreshCw, UserPlus } from "lucide-react";
 
 type Prospect = {
   id: string; source: string; segment: string; nom: string | null; ville: string | null; adresse: string | null;
   telephone: string | null; whatsapp: string | null; email: string | null; email_type: string | null; site: string | null;
   categorie: string | null; note_google: number | null; nb_avis: number | null; horaires: string | null;
   maps_url: string | null; source_url: string | null; score: number; score_detail: string | null;
-  statut_prospection: string; premiere_vue: string; derniere_vue: string;
+  statut_prospection: string; premiere_vue: string; derniere_vue: string; lat: number | null; lon: number | null;
 };
 
 const PAGE = 50;
@@ -94,6 +94,31 @@ export default function ProspectsPage() {
   async function setSuivi(p: Prospect, v: string) {
     setList((prev) => prev.map((x) => (x.id === p.id ? { ...x, statut_prospection: v } : x)));
     await supabase.from("prospects").update({ statut_prospection: v }).eq("id", p.id);
+  }
+
+  // Prospect devenu client : fiche client pré-remplie (téléphone, ville, adresse, GPS) en un tap
+  const [clientMsg, setClientMsg] = useState<Record<string, string>>({});
+  async function creerClient(p: Prospect) {
+    const tel = (p.telephone ?? "").split("/")[0].trim();
+    const fin = tel.replace(/\D/g, "").slice(-9);
+    if (fin.length === 9) {
+      const { data } = await supabase.from("clients").select("id, nom, telephone").ilike("telephone", `%${fin.slice(-4)}%`).limit(50);
+      const dup = (data ?? []).find((c) => (c.telephone ?? "").replace(/\D/g, "").endsWith(fin));
+      if (dup) {
+        setClientMsg((m) => ({ ...m, [p.id]: `Déjà client : « ${dup.nom} » a ce numéro.` }));
+        await setSuivi(p, "client");
+        return;
+      }
+    }
+    const type = p.segment.startsWith("Magasin pièces") ? "gros" : /Garage|Poids lourds|Pneus/.test(p.segment) ? "garage" : "comptoir";
+    const { error } = await supabase.from("clients").insert({
+      nom: (p.nom ?? "").split(" · ")[0] || "(sans nom)", telephone: tel || null, ville: p.ville ?? "",
+      adresse: p.adresse, notes: `Venu de la prospection (${p.segment}).`, solde_du: 0, type,
+      latitude: p.lat, longitude: p.lon,
+    });
+    if (error) { setClientMsg((m) => ({ ...m, [p.id]: "Erreur : " + error.message })); return; }
+    await setSuivi(p, "client");
+    setClientMsg((m) => ({ ...m, [p.id]: "✓ Fiche client créée (voir Clients)." }));
   }
 
   function whatsapp(p: Prospect) {
@@ -212,8 +237,12 @@ export default function ProspectsPage() {
                             {Object.entries(STATUTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                           </select>
                         </label>
+                        {!clientMsg[p.id] && (
+                          <button onClick={() => creerClient(p)} className="btn-secondary flex items-center justify-center gap-2 text-xs"><UserPlus size={14} /> Devenu client : créer sa fiche</button>
+                        )}
                         {p.source_url && <a href={p.source_url} target="_blank" rel="noreferrer" className="text-xs text-slate-500 flex items-center gap-1 pb-2"><ExternalLink size={12} /> Fiche source</a>}
                       </div>
+                      {clientMsg[p.id] && <p className="text-xs text-amber-400">{clientMsg[p.id]}</p>}
                     </div>
                   )}
                 </div>

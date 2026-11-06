@@ -141,7 +141,23 @@ export default function ClientsPage() {
     setDebts(map);
   }
 
-  useEffect(() => { load(); loadMargins(); loadDebts(); loadTrimCA(); }, []);
+  useEffect(() => { load(); loadMargins(); loadDebts(); loadTrimCA(); loadTournee(); }, []);
+
+  // Clients déjà sur la carte des tournées (garage lié par client_id)
+  const [enTournee, setEnTournee] = useState<Set<string>>(new Set());
+  async function loadTournee() {
+    const { data } = await supabase.from("garages").select("client_id").not("client_id", "is", null);
+    setEnTournee(new Set((data ?? []).map(g => g.client_id as string)));
+  }
+  async function ajouterTournee(c: Client) {
+    if (c.latitude == null || c.longitude == null) return;
+    const { error } = await supabase.from("garages").insert({
+      nom: c.nom, telephone: c.telephone, ville: c.ville, region: null, latitude: c.latitude, longitude: c.longitude,
+      statut: "a_livrer", note: [c.quartier, c.adresse].filter(Boolean).join(" · ") || null, refs_demandees: null, photo_url: null, client_id: c.id,
+    });
+    if (error) { alert("Erreur : " + error.message); return; }
+    setEnTournee(prev => new Set(prev).add(c.id));
+  }
 
   async function save() {
     // parrain_id "" → null ; si la colonne n'existe pas encore (SQL Bible §4.15 pas collé), on réessaie sans
@@ -340,10 +356,17 @@ export default function ClientsPage() {
                 <p className="font-semibold text-slate-800">{c.nom}</p>
                 <p className="text-sm text-slate-500">{c.ville}{c.quartier ? ` · ${c.quartier}` : ""}{c.adresse ? ` · ${c.adresse}` : ""}</p>
                 {c.latitude != null && c.longitude != null && (
-                  <a href={gmapsTo({ lat: c.latitude, lng: c.longitude })} target="_blank" rel="noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 text-xs text-red-400 hover:underline">
-                    <MapPin size={12} /> Y aller
-                  </a>
+                  <div className="mt-1 flex items-center gap-3">
+                    <a href={gmapsTo({ lat: c.latitude, lng: c.longitude })} target="_blank" rel="noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-red-400 hover:underline">
+                      <MapPin size={12} /> Y aller
+                    </a>
+                    {enTournee.has(c.id) ? (
+                      <a href="/tournees" className="text-xs text-green-400 hover:underline">✓ Dans la tournée</a>
+                    ) : (
+                      <button onClick={() => ajouterTournee(c)} className="text-xs text-slate-400 hover:text-white">+ Ajouter à la tournée</button>
+                    )}
+                  </div>
                 )}
               </div>
               <div className="flex gap-2">
