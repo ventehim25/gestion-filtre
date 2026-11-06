@@ -7,6 +7,7 @@ import { useLang } from "@/context/LangContext";
 import type { TranslationKey } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
+import { FILTER_BRANDS } from "@/lib/brands";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
 import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle, Camera } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
@@ -218,7 +219,7 @@ export default function ProduitsPage() {
   }
 
   // Marques de FILTRES (Filtron = produit principal, les autres = variantes équivalentes).
-  const BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram", "Misfat", "Wunder"];
+  const BRANDS = FILTER_BRANDS;
   // Marques reconnues (hors Filtron, + "OE") : toujours visibles dans les variantes, jamais
   // mélangées avec les codes constructeur (Citroën, Ford…) importés automatiquement.
   const KNOWN_BRANDS = new Set([...BRANDS.filter(b => b !== "Filtron"), "OE"].map(b => b.toLowerCase()));

@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
+import { FILTER_BRANDS } from "@/lib/brands";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
 import {
@@ -48,8 +49,25 @@ export default function FournisseursPage() {
   const [avMontant, setAvMontant] = useState(0);
   const [avNote, setAvNote] = useState("");
 
+  // Sélecteur de la réception (produits + variantes de MARQUE, pas les ~23 000 codes OE) :
+  // chargé en arrière-plan pour ne pas bloquer l'affichage des soldes sur réseau lent.
+  async function loadPicker() {
+    try {
+      const [all, eqs] = await Promise.all([
+        loadAll<Product>("products", "*", { filter: (q) => q.order("reference") }),
+        loadAll<VariantRow & { product_id: string }>("equivalences", "id, product_id, marque, reference, prix_achat, prix", { filter: (q) => q.in("marque", FILTER_BRANDS).order("id") }),
+      ]);
+      const vmap: Record<string, VariantRow[]> = {};
+      for (const e of eqs) (vmap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix_achat: e.prix_achat, prix: e.prix });
+      setProducts(all);
+      setVariantsMap(vmap);
+    } catch { /* réseau coupé : réessayé au prochain chargement */ }
+  }
+
   async function load() {
     setLoading(true);
+    loadPicker();
+    try {
     const [{ data: f }, { data: r }, { data: a }] = await Promise.all([
       supabase.from("fournisseurs").select("*").order("nom"),
       supabase.from("receptions").select("*").order("date", { ascending: false }),
@@ -58,23 +76,6 @@ export default function FournisseursPage() {
     setFournisseurs((f as Fournisseur[]) ?? []);
     setReceptions((r as Reception[]) ?? []);
     setAvances((a as Avance[]) ?? []);
-
-    // Produits (pour le sélecteur)
-    const all: Product[] = [];
-    for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("products").select("*").order("reference").range(i * 1000, i * 1000 + 999);
-      if (!data || data.length === 0) break;
-      all.push(...(data as unknown as Product[]));
-      if (data.length < 1000) break;
-    }
-    setProducts(all);
-
-    // Variantes de marque (équivalences avec une marque) par produit
-    // (pages chargées en parallèle : 23 000 lignes en série prenaient ~15 s sur mobile)
-    const vmap: Record<string, VariantRow[]> = {};
-    const eqs = await loadAll<VariantRow & { product_id: string }>("equivalences", "id, product_id, marque, reference, prix_achat, prix", { filter: (q) => q.order("id") });
-    for (const e of eqs) (vmap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix_achat: e.prix_achat, prix: e.prix });
-    setVariantsMap(vmap);
 
     // Portefeuille (depuis les ventes)
     const items: { date: string; items: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] }[] = [];
@@ -113,7 +114,9 @@ export default function FournisseursPage() {
       att[l.fournisseur_id] = cur;
     }
     setAttByF(att);
-    setLoading(false);
+    } finally {
+      setLoading(false);
+    }
   }
   useEffect(() => { load(); }, []);
 
@@ -431,6 +434,7 @@ export default function FournisseursPage() {
               <input type="date" className="input w-44" value={recDate} onChange={e => setRecDate(e.target.value)} />
             </div>
             <div className="space-y-2 mb-2">
+              {products.length === 0 && <p className="text-xs text-amber-400">Chargement des produits… (quelques secondes sur réseau lent)</p>}
               <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-slate-500">
                 <span className="col-span-11">Produit</span>
                 <span className="col-span-1"></span>
