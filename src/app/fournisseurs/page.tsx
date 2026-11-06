@@ -7,13 +7,17 @@ import { loadAll } from "@/lib/pagedFetch";
 import { FILTER_BRANDS } from "@/lib/brands";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
+import BarcodeScanner from "@/components/BarcodeScanner";
 import {
   Plus, Truck, Phone, MessageCircle, Pencil, Trash2, X, PackagePlus, HandCoins,
-  ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank,
+  ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank, ScanLine, ExternalLink,
 } from "lucide-react";
 
-type RecLine = { product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; prix_vente: number; reference: string };
-type VariantRow = { id: string; marque: string; reference: string; prix_achat: number | null; prix: number | null };
+type RecLine = {
+  product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; prix_vente: number; reference: string;
+  code_barre: string; nouvelleMarque: string | null; nouvelleRef: string; // marque === "__new__" : variante créée à l'enregistrement
+};
+type VariantRow = { id: string; marque: string; reference: string; prix_achat: number | null; prix: number | null; code_barre: string | null };
 const todayStr = () => new Date().toISOString().split("T")[0];
 function waLink(tel: string) { return `https://wa.me/212${tel.replace(/\D/g, "").replace(/^0/, "")}`; }
 
@@ -55,10 +59,10 @@ export default function FournisseursPage() {
     try {
       const [all, eqs] = await Promise.all([
         loadAll<Product>("products", "*", { filter: (q) => q.order("reference") }),
-        loadAll<VariantRow & { product_id: string }>("equivalences", "id, product_id, marque, reference, prix_achat, prix", { filter: (q) => q.in("marque", FILTER_BRANDS).order("id") }),
+        loadAll<VariantRow & { product_id: string }>("equivalences", "id, product_id, marque, reference, prix_achat, prix, code_barre", { filter: (q) => q.in("marque", FILTER_BRANDS).order("id") }),
       ]);
       const vmap: Record<string, VariantRow[]> = {};
-      for (const e of eqs) (vmap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix_achat: e.prix_achat, prix: e.prix });
+      for (const e of eqs) (vmap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix_achat: e.prix_achat, prix: e.prix, code_barre: e.code_barre });
       setProducts(all);
       setVariantsMap(vmap);
     } catch { /* réseau coupé : réessayé au prochain chargement */ }
@@ -200,22 +204,68 @@ export default function FournisseursPage() {
   }
 
   // ---- Réception (marchandise prise) ----
-  const emptyRecLine = (): RecLine => ({ product_id: "", equivalence_id: null, marque: "Filtron", quantite: 1, prix_achat: 0, prix_vente: 0, reference: "" });
-  function openReception(f: Fournisseur) { setRecFor(f); setRecDate(todayStr()); setRecLines([emptyRecLine()]); }
+  const emptyRecLine = (): RecLine => ({ product_id: "", equivalence_id: null, marque: "Filtron", quantite: 1, prix_achat: 0, prix_vente: 0, reference: "", code_barre: "", nouvelleMarque: null, nouvelleRef: "" });
+  function openReception(f: Fournisseur) { setRecFor(f); setRecDate(todayStr()); setRecLines([emptyRecLine()]); setScanMsg(""); }
   function setRecProduct(i: number, p: Product) {
-    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, prix_vente: p.prix_vente, reference: p.reference } : l));
+    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, prix_vente: p.prix_vente, reference: p.reference, code_barre: l.code_barre || p.code_barre || "", nouvelleMarque: null, nouvelleRef: "" } : l));
   }
-  // Choix de la marque d'une ligne : Filtron (produit principal) ou une variante (Flag, Mann…)
+  // Choix de la marque d'une ligne : Filtron (produit principal), une variante existante (Flag, Mann…)
+  // ou « __new__ » = nouvelle marque créée à l'enregistrement (plus besoin de passer par Produits)
   function setRecVariant(i: number, marque: string) {
     setRecLines(prev => prev.map((l, j) => {
       if (j !== i) return l;
       const p = products.find(x => x.id === l.product_id);
       if (!p) return l;
-      if (marque === "Filtron") return { ...l, equivalence_id: null, marque: "Filtron", reference: p.reference, prix_achat: p.prix_achat, prix_vente: p.prix_vente };
+      // Un code scanné/saisi à la main (inconnu) suit la ligne ; un code déjà connu suit sa marque
+      const connus = new Set([p.code_barre, ...(variantsMap[l.product_id] ?? []).map(x => x.code_barre)].filter(Boolean));
+      const garde = l.code_barre && !connus.has(l.code_barre) ? l.code_barre : null;
+      if (marque === "__new__") return { ...l, equivalence_id: null, marque: "__new__", nouvelleMarque: FILTER_BRANDS[1], nouvelleRef: "", code_barre: garde ?? "" };
+      if (marque === "Filtron") return { ...l, equivalence_id: null, marque: "Filtron", reference: p.reference, prix_achat: p.prix_achat, prix_vente: p.prix_vente, code_barre: garde ?? p.code_barre ?? "", nouvelleMarque: null };
       const v = (variantsMap[l.product_id] || []).find(x => x.marque === marque);
-      return v ? { ...l, equivalence_id: v.id, marque, reference: v.reference, prix_achat: v.prix_achat ?? p.prix_achat, prix_vente: v.prix ?? p.prix_vente } : l;
+      return v ? { ...l, equivalence_id: v.id, marque, reference: v.reference, prix_achat: v.prix_achat ?? p.prix_achat, prix_vente: v.prix ?? p.prix_vente, code_barre: garde ?? v.code_barre ?? "", nouvelleMarque: null } : l;
     }));
   }
+  const patchLine = (i: number, patch: Partial<RecLine>) => setRecLines(prev => prev.map((l, j) => j === i ? { ...l, ...patch } : l));
+
+  // Scan d'une boîte : code connu -> ligne du bon filtre/marque (+1 si déjà là) ; inconnu -> ligne à compléter
+  const [scanTarget, setScanTarget] = useState<null | "boite" | number>(null);
+  const [scanMsg, setScanMsg] = useState("");
+  function onRecScan(raw: string) {
+    const code = raw.trim();
+    if (!code) return;
+    if (typeof scanTarget === "number") { patchLine(scanTarget, { code_barre: code }); setScanTarget(null); return; }
+    let found: { p: Product; v?: VariantRow } | null = null;
+    const p0 = products.find(p => p.code_barre === code);
+    if (p0) found = { p: p0 };
+    else for (const [pid, vs] of Object.entries(variantsMap)) {
+      const v = vs.find(x => x.code_barre === code);
+      const p = v && products.find(x => x.id === pid);
+      if (v && p) { found = { p, v }; break; }
+    }
+    const nonVide = (l: RecLine) => !!(l.product_id || l.code_barre); // retire la ligne vide de départ
+    if (!found) {
+      setScanMsg(`Code ${code} inconnu : choisis le filtre de cette boîte sur la ligne ajoutée (le code sera enregistré).`);
+      setRecLines(prev => [...prev.filter(nonVide), { ...emptyRecLine(), code_barre: code }]);
+      return;
+    }
+    const { p, v } = found;
+    const meme = (l: RecLine) => l.product_id === p.id && l.equivalence_id === (v?.id ?? null);
+    setScanMsg(`✓ ${v ? `${v.reference} (${v.marque})` : p.reference}${recLines.some(meme) ? " +1" : " ajouté"}`);
+    setRecLines(prev => {
+      const lines = prev.filter(nonVide);
+      if (lines.some(meme)) return lines.map(l => meme(l) ? { ...l, quantite: l.quantite + 1 } : l);
+      return [...lines, {
+        ...emptyRecLine(), product_id: p.id, code_barre: code, reference: v?.reference ?? p.reference,
+        equivalence_id: v?.id ?? null, marque: v?.marque ?? "Filtron",
+        prix_achat: v?.prix_achat ?? p.prix_achat, prix_vente: v?.prix ?? p.prix_vente,
+      }];
+    });
+  }
+
+  // Catalogues officiels (même groupe que Filtron) : équivalent Mann / Wix d'une réf Filtron
+  const crossUrl = (marque: "Mann" | "Wix", ref: string) => marque === "Mann"
+    ? `https://www.mann-filter.com/fr-fr/catalogue/resultats-de-la-recherche.html?mode=crossReference&displayView=Grid&crossReference=${encodeURIComponent(ref)}`
+    : `https://www.wixfilters.com/fr-mea/catalog/results.html?mode=crossReference&displayView=Grid&crossReference=${encodeURIComponent(ref)}`;
   const recMontant = recLines.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
   // Pour retrouver un filtre en tapant la réf d'une marque (WL7009 Wix → OE640/2, marque Wix choisie)
   const pickerVariants = useMemo(() => Object.entries(variantsMap).flatMap(([product_id, vs]) =>
@@ -224,20 +274,36 @@ export default function FournisseursPage() {
     if (!recFor) return;
     const valid = recLines.filter(l => l.product_id && l.quantite > 0);
     if (valid.length === 0) { alert("Ajoute au moins un produit"); return; }
+    if (valid.some(l => l.marque === "__new__" && !l.nouvelleRef.trim())) { alert("Nouvelle marque : saisis la référence de la boîte (ex. HU 718/5 x)."); return; }
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Action impossible hors-ligne."); return; }
     const montant = valid.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
-    const details = valid.map(l => `${l.reference}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""}×${l.quantite}`).join(", ");
+    const libelle = (l: RecLine) => l.marque === "__new__" ? `${l.nouvelleRef.trim()} (${l.nouvelleMarque})` : `${l.reference}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""}`;
+    const details = valid.map(l => `${libelle(l)}×${l.quantite}`).join(", ");
     await supabase.from("receptions").insert({ fournisseur_id: recFor.id, date: recDate, montant, details });
     // Augmente le stock — sur la variante de marque si choisie, sinon sur le produit principal —
-    // et enregistre les prix saisis sur la fiche (un prix laissé vide/0 ne remplace pas l'ancien).
+    // et enregistre prix + code-barres saisis sur la fiche (un champ laissé vide ne remplace pas l'ancien).
     for (const l of valid) {
-      if (l.equivalence_id) {
-        await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: -l.quantite });
-        const upd = { ...(l.prix_achat > 0 && { prix_achat: l.prix_achat }), ...(l.prix_vente > 0 && { prix: l.prix_vente }) };
-        if (Object.keys(upd).length) await supabase.from("equivalences").update(upd).eq("id", l.equivalence_id);
+      const code = l.code_barre.trim() ? { code_barre: l.code_barre.trim() } : {};
+      let eqId = l.equivalence_id;
+      if (l.marque === "__new__") {
+        // Nouvelle variante de marque créée ici (même réf de marque déjà là -> réutilisée)
+        const ref = l.nouvelleRef.trim();
+        const { data: ex } = await supabase.from("equivalences").select("id").eq("product_id", l.product_id).eq("marque", l.nouvelleMarque ?? "").ilike("reference", ref).limit(1);
+        eqId = ex?.[0]?.id ?? null;
+        if (!eqId) {
+          const { data: created, error } = await supabase.from("equivalences")
+            .insert({ product_id: l.product_id, marque: l.nouvelleMarque ?? "", reference: ref, prix: null, prix_achat: null, stock: 0 }).select("id").single();
+          if (error || !created) { alert(`Variante ${ref} non créée : ${error?.message ?? "erreur"}`); continue; }
+          eqId = created.id;
+        }
+      }
+      if (eqId) {
+        await supabase.rpc("decrement_equiv_stock", { e_id: eqId, qty: -l.quantite });
+        const upd = { ...(l.prix_achat > 0 && { prix_achat: l.prix_achat }), ...(l.prix_vente > 0 && { prix: l.prix_vente }), ...code };
+        if (Object.keys(upd).length) await supabase.from("equivalences").update(upd).eq("id", eqId);
       } else {
         await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: -l.quantite });
-        const upd = { ...(l.prix_achat > 0 && { prix_achat: l.prix_achat }), ...(l.prix_vente > 0 && { prix_vente: l.prix_vente }) };
+        const upd = { ...(l.prix_achat > 0 && { prix_achat: l.prix_achat }), ...(l.prix_vente > 0 && { prix_vente: l.prix_vente }), ...code };
         if (Object.keys(upd).length) await supabase.from("products").update(upd).eq("id", l.product_id);
       }
     }
@@ -424,6 +490,14 @@ export default function FournisseursPage() {
         </div>
       )}
 
+      {scanTarget !== null && (
+        // au-dessus de la fenêtre de réception (même z-50)
+        <div className="relative z-[70]">
+          <BarcodeScanner onScan={onRecScan} onClose={() => setScanTarget(null)}
+            hint={scanTarget === "boite" ? "Scanne chaque boîte : +1 à chaque lecture. Ferme quand tu as fini." : "Vise le code-barres de la boîte de cette ligne."} />
+        </div>
+      )}
+
       {/* Modal réception */}
       {recFor && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto">
@@ -436,6 +510,12 @@ export default function FournisseursPage() {
               <label className="text-xs text-slate-400 mb-1 block">Date</label>
               <input type="date" className="input w-44" value={recDate} onChange={e => setRecDate(e.target.value)} />
             </div>
+            {/* Scan des boîtes : chaque boîte scannée ajoute sa ligne (ou +1) */}
+            <button onClick={() => { setScanMsg(""); setScanTarget("boite"); }} disabled={products.length === 0}
+              className="w-full mb-2 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-50">
+              <ScanLine size={16} /> Scanner les boîtes
+            </button>
+            {scanMsg && <p className="text-xs text-amber-400 mb-2">{scanMsg}</p>}
             <div className="space-y-2 mb-2">
               {products.length === 0 && <p className="text-xs text-amber-400">Chargement des produits… (quelques secondes sur réseau lent)</p>}
               <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-slate-500">
@@ -465,19 +545,48 @@ export default function FournisseursPage() {
                       Marge : {(l.prix_vente - l.prix_achat).toFixed(2)} MAD/u ({Math.round(((l.prix_vente - l.prix_achat) / l.prix_achat) * 100)} %)
                     </p>
                   )}
-                  {/* Choix de la marque : le stock ira sur cette marque (Flag, Mann…) ou sur Filtron */}
-                  {l.product_id && (variantsMap[l.product_id]?.length ?? 0) > 0 && (
+                  {/* Choix de la marque : le stock ira sur cette marque (Flag, Mann…) ou sur Filtron ; ou nouvelle marque */}
+                  {l.product_id && (
                     <select className="input mt-1 py-1 text-xs" value={l.marque} onChange={e => setRecVariant(i, e.target.value)}>
                       <option value="Filtron">{products.find(p => p.id === l.product_id)?.reference} · Filtron (principal)</option>
-                      {variantsMap[l.product_id].map(v => (
+                      {(variantsMap[l.product_id] ?? []).map(v => (
                         <option key={v.id} value={v.marque}>{v.reference} · {v.marque}</option>
                       ))}
+                      <option value="__new__">+ Autre marque (Mann, Wix, Mahle, Purflux…)</option>
                     </select>
+                  )}
+                  {l.marque === "__new__" && (
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <label className="text-[10px] uppercase text-slate-500">Marque
+                        <select className="input mt-0.5 py-1 text-xs" value={l.nouvelleMarque ?? ""} onChange={e => patchLine(i, { nouvelleMarque: e.target.value })}>
+                          {FILTER_BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
+                        </select>
+                      </label>
+                      <label className="text-[10px] uppercase text-slate-500">Réf. sur la boîte
+                        <input className="input mt-0.5 py-1 text-xs font-mono" placeholder="ex. HU 718/5 x" value={l.nouvelleRef} onChange={e => patchLine(i, { nouvelleRef: e.target.value })} />
+                      </label>
+                    </div>
+                  )}
+                  {l.product_id && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <input className="input py-1 text-xs font-mono" placeholder="Code-barres de la boîte" value={l.code_barre} onChange={e => patchLine(i, { code_barre: e.target.value })} />
+                      <button type="button" onClick={() => setScanTarget(i)} className="btn-secondary px-2.5 py-1.5 shrink-0" aria-label="Scanner le code-barres"><ScanLine size={14} /></button>
+                    </div>
+                  )}
+                  {/* Équivalents officiels (catalogues du groupe Filtron) */}
+                  {l.product_id && (
+                    <div className="flex gap-3 mt-1 text-[11px]">
+                      {(["Mann", "Wix"] as const).map(m => (
+                        <a key={m} href={crossUrl(m, products.find(p => p.id === l.product_id)?.reference ?? "")} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline flex items-center gap-1">
+                          <ExternalLink size={11} /> Équivalent {m}
+                        </a>
+                      ))}
+                    </div>
                   )}
                 </div>
               ))}
               <button onClick={() => setRecLines([...recLines, emptyRecLine()])} className="btn-secondary text-xs flex items-center gap-1"><Plus size={12} /> Ajouter une ligne</button>
-              <p className="text-[11px] text-slate-500">Choisis la marque sous chaque ligne (le stock ira sur la bonne marque). Marque absente ? Ajoute-la d&apos;abord dans Produits (variantes). Le prix d&apos;achat se remplit auto, corrige-le au besoin.</p>
+              <p className="text-[11px] text-slate-500">Tape la réf. (Filtron, Wix, Flag…) ou scanne la boîte. Marque absente : « + Autre marque » sous la ligne, elle est créée à l&apos;enregistrement. Le code-barres scanné est mémorisé : la prochaine fois, la boîte est reconnue toute seule.</p>
             </div>
             <div className="bg-[var(--surface-2)] rounded-lg p-3 mb-4 flex items-center justify-between">
               <span className="text-sm text-slate-300">Coût total (ajouté à la dette)</span>
