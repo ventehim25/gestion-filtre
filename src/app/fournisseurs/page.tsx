@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { FILTER_BRANDS } from "@/lib/brands";
+import { coutCreditParFournisseur, setBonRembourse } from "@/lib/dinoun";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -17,6 +18,7 @@ type RecLine = {
   product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; prix_vente: number; reference: string;
   code_barre: string; nouvelleMarque: string | null; nouvelleRef: string; // marque === "__new__" : variante créée à l'enregistrement
 };
+type BonARembourser = { id: string; date: string; client: string; cout: number };
 type VariantRow = { id: string; marque: string; reference: string; prix_achat: number | null; prix: number | null; code_barre: string | null };
 const todayStr = () => new Date().toISOString().split("T")[0];
 function waLink(tel: string) { return `https://wa.me/212${tel.replace(/\D/g, "").replace(/^0/, "")}`; }
@@ -28,6 +30,16 @@ export default function FournisseursPage() {
   const [products, setProducts] = useState<Product[]>([]);
   // Variantes de marque par produit (Flag, Mann…) pour la réception
   const [variantsMap, setVariantsMap] = useState<Record<string, VariantRow[]>>({});
+  // Bons vendus avec de la marchandise crédit, pas encore remboursés (par fournisseur)
+  const [bonsARemb, setBonsARemb] = useState<Record<string, BonARembourser[]>>({});
+  const [bonsOuverts, setBonsOuverts] = useState<string | null>(null);
+  async function rembourserBon(f: Fournisseur, b: BonARembourser) {
+    if (!confirm(`As-tu vraiment remis ${b.cout.toFixed(0)} MAD à ${f.nom} pour le bon ${b.client} du ${b.date} ?`)) return;
+    const creditIds = new Set(fournisseurs.filter(x => (x.type ?? "credit") === "credit").map(x => x.id));
+    const r = await setBonRembourse({ id: b.id, date: b.date, clientNom: b.client }, true, creditIds);
+    if (!r.ok) { alert(r.error); return; }
+    load();
+  }
   const [salesAgg, setSalesAgg] = useState<{ date: string; cout: number; benef: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -80,6 +92,17 @@ export default function FournisseursPage() {
     setFournisseurs((f as Fournisseur[]) ?? []);
     setReceptions((r as Reception[]) ?? []);
     setAvances((a as Avance[]) ?? []);
+
+    // Bons pas encore remboursés au fournisseur crédit (camion), avec leur coût crédit
+    const creditIds = new Set(((f as Fournisseur[]) ?? []).filter(x => (x.type ?? "credit") === "credit").map(x => x.id));
+    type BonRow = { id: string; date: string; client: { nom: string } | null; items: Parameters<typeof coutCreditParFournisseur>[0] };
+    const bons = await loadAll<BonRow>("sales", "id, date, client:clients(nom), items:sale_items(quantite, cout_unitaire, fournisseur_id, product:products(prix_achat))",
+      { filter: (q) => q.or("fournisseur_paye.is.null,fournisseur_paye.eq.false").order("date") }).catch(() => [] as BonRow[]);
+    const aRemb: Record<string, BonARembourser[]> = {};
+    for (const b of bons) for (const [fid, cout] of coutCreditParFournisseur(b.items ?? [], creditIds)) {
+      if (cout > 0) (aRemb[fid] ??= []).push({ id: b.id, date: b.date, client: b.client?.nom ?? "", cout });
+    }
+    setBonsARemb(aRemb);
 
     // Portefeuille (depuis les ventes)
     const items: { date: string; items: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] }[] = [];
@@ -423,6 +446,28 @@ export default function FournisseursPage() {
                     </>
                   )}
                 </div>
+
+                {/* Bons vendus avec sa marchandise, pas encore remboursés (camion) */}
+                {!cap && (bonsARemb[f.id]?.length ?? 0) > 0 && (
+                  <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/5">
+                    <button onClick={() => setBonsOuverts(bonsOuverts === f.id ? null : f.id)} className="w-full px-3 py-2 flex items-center justify-between text-xs text-red-300">
+                      <span className="flex items-center gap-1.5"><Truck size={13} /> Bons à rembourser : {bonsARemb[f.id].length}</span>
+                      <span className="font-semibold">{money(bonsARemb[f.id].reduce((s, b) => s + b.cout, 0))} {bonsOuverts === f.id ? "▴" : "▾"}</span>
+                    </button>
+                    {bonsOuverts === f.id && (
+                      <div className="border-t border-red-500/20 divide-y divide-slate-800">
+                        {bonsARemb[f.id].map(b => (
+                          <div key={b.id} className="px-3 py-2 flex items-center justify-between gap-2 text-xs">
+                            <span className="text-slate-300 min-w-0 truncate">{b.date.slice(5).split("-").reverse().join("/")} · {b.client || "—"}</span>
+                            <button onClick={() => rembourserBon(f, b)} className="shrink-0 rounded-full bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 font-medium">
+                              Rembourser {money(b.cout)}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button onClick={() => openReception(f)} className="flex items-center gap-1.5 text-xs bg-orange-500/15 text-orange-300 px-3 py-1.5 rounded-lg hover:bg-orange-500/25"><PackagePlus size={14} /> Marchandise prise</button>

@@ -9,6 +9,7 @@ import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/type
 import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import { FILTER_BRANDS } from "@/lib/brands";
+import { coutCreditParFournisseur, setBonRembourse } from "@/lib/dinoun";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { addPending, getPending, syncPending } from "@/lib/offlineSales";
 import { buildReceipt, sendWhatsApp } from "@/lib/whatsapp";
@@ -383,40 +384,18 @@ export default function VentesPage() {
   // Coche « fournisseur (dinoun) payé » pour ce bon (roulement bon par bon).
   // En cochant : crée un paiement (avance) au fournisseur crédit du bon → baisse ta dette.
   // En décochant : annule ce paiement. Les avances liées portent le sale_id du bon.
-  async function toggleFournisseurPaye(s: Sale & { client: Client }) {
-    if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Impossible hors-ligne."); return; }
+  async function toggleFournisseurPaye(s: Sale & { client: Client }, cout: number) {
     const nv = !s.fournisseur_paye;
-    const { error } = await supabase.from("sales").update({ fournisseur_paye: nv }).eq("id", s.id);
-    if (error) { alert("Colle d'abord le SQL supabase/sale_fournisseur_paye.sql dans Supabase."); return; }
-    let montantTotal = 0;
-    try {
-      if (nv) {
-        // Coût de la marchandise crédit de ce bon, groupé par fournisseur → un paiement chacun
-        const { data } = await supabase.from("sale_items")
-          .select("quantite, cout_unitaire, fournisseur_id, fournisseur:fournisseurs(type, nom), product:products(prix_achat)")
-          .eq("sale_id", s.id);
-        const byF = new Map<string, { montant: number; nom: string }>();
-        for (const l of (data ?? []) as unknown as { quantite: number; cout_unitaire: number | null; fournisseur_id: string | null; fournisseur: { type: string; nom: string } | null; product: { prix_achat: number } | null }[]) {
-          if (!l.fournisseur_id || l.fournisseur?.type !== "credit") continue; // capital = déjà ton argent
-          const cout = l.quantite * (l.cout_unitaire ?? l.product?.prix_achat ?? 0);
-          const cur = byF.get(l.fournisseur_id) ?? { montant: 0, nom: l.fournisseur?.nom ?? "" };
-          cur.montant += cout;
-          byF.set(l.fournisseur_id, cur);
-        }
-        const rows = [...byF.entries()].filter(([, v]) => v.montant > 0).map(([fid, v]) => {
-          montantTotal += v.montant;
-          return { fournisseur_id: fid, date: new Date().toISOString().split("T")[0], montant: v.montant, note: `Bon ${s.client?.nom ?? ""} du ${s.date} (payé auto)`, sale_id: s.id };
-        });
-        if (rows.length) await supabase.from("avances").insert(rows);
-      } else {
-        await supabase.from("avances").delete().eq("sale_id", s.id);
-      }
-    } catch { /* avances.sale_id absent : le SQL n'est pas encore collé */ }
+    const nom = fournisseurs.find(f => f.type === "credit")?.nom ?? "dinoun";
+    if (!confirm(nv
+      ? `As-tu vraiment remis ${cout.toFixed(0)} MAD à ${nom} pour ce bon (${s.client?.nom ?? ""}, ${s.date}) ?`
+      : `Annuler le remboursement de ce bon ? La dette ${nom} remontera de ${cout.toFixed(0)} MAD.`)) return;
+    const r = await setBonRembourse({ id: s.id, date: s.date, clientNom: s.client?.nom }, nv, creditIds);
+    if (!r.ok) { alert(r.error); return; }
     setSales(prev => prev.map(x => x.id === s.id ? { ...x, fournisseur_paye: nv } : x));
-    flash(nv
-      ? (montantTotal > 0 ? `dinoun payé ✓ · −${montantTotal.toFixed(0)} sur ta dette` : "dinoun payé ✓")
-      : "dinoun non payé (paiement annulé)");
+    flash(nv ? `${nom} remboursé ✓ · −${r.montant.toFixed(0)} sur ta dette` : `Remboursement ${nom} annulé`);
   }
+  const creditIds = new Set(fournisseurs.filter(f => f.type === "credit").map(f => f.id));
 
   // Supprimer une vente : rend le stock (sauf commande préparée qui n'avait pas décrémenté)
   // et supprime le bon (les paiements dinoun liés partent en cascade via avances.sale_id).
@@ -814,6 +793,8 @@ export default function VentesPage() {
               const hasItems = (s.items ?? []).length > 0;
               const cost = (s.items ?? []).reduce((a, it) => a + it.quantite * (it.cout_unitaire ?? (it.product as Product | undefined)?.prix_achat ?? 0), 0);
               const benef = s.total - cost;
+              // Coût dû à dinoun pour ce bon (marchandise crédit) : 0 = bon payé avec ton argent
+              const coutDinoun = [...coutCreditParFournisseur(s.items ?? [], creditIds).values()].reduce((a, b) => a + b, 0);
               return (
               <tr key={s.id} className="hover:bg-slate-50">
                 <td className="px-4 py-3 text-slate-600">{s.date}</td>
@@ -837,7 +818,14 @@ export default function VentesPage() {
                 </td>
               <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => toggleFournisseurPaye(s)} className={s.fournisseur_paye ? "text-emerald-500 hover:text-emerald-400" : "text-slate-500 hover:text-slate-300"} title={s.fournisseur_paye ? "Fournisseur (dinoun) payé pour ce bon ✓ — clique pour annuler" : "Marquer : j'ai payé le fournisseur (dinoun) pour ce bon"}><Truck size={16} /></button>
+                  {/* Remboursement dinoun du bon : indépendant du paiement du client */}
+                  {coutDinoun > 0 && (
+                    <button onClick={() => toggleFournisseurPaye(s, coutDinoun)}
+                      className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${s.fournisseur_paye ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-300 hover:bg-red-500/25"}`}
+                      title={s.fournisseur_paye ? "Remboursé à dinoun — clique pour annuler" : "Rembourser dinoun pour ce bon"}>
+                      <Truck size={13} /> {s.fournisseur_paye ? "Remboursé" : `Rembourser ${coutDinoun.toFixed(0)}`}
+                    </button>
+                  )}
                   <button onClick={() => openPayEdit(s)} className="text-amber-500 hover:text-amber-400" title="Modifier le paiement"><Wallet size={16} /></button>
                   <button onClick={() => openEditSale(s)} className="text-blue-400 hover:text-blue-300" title="Modifier la vente"><Pencil size={15} /></button>
                   <button onClick={() => whatsForSale(s)} className="text-green-500 hover:text-green-400" title="Envoyer la fiche sur WhatsApp"><MessageCircle size={16} /></button>
