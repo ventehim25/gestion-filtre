@@ -108,7 +108,14 @@ export default function VentesPage() {
         const { left } = await syncPending(supabase);
         setPendingCount(left);
       }
-      load();
+      await load();
+      // /ventes?client=<id> (prospect qui passe commande) : ouvre une vente pour ce client
+      const pre = new URLSearchParams(window.location.search).get("client");
+      if (pre) {
+        openNew();
+        setClientId(pre);
+        window.history.replaceState(null, "", "/ventes");
+      }
     })();
     const onOnline = async () => { const { left } = await syncPending(supabase); setPendingCount(left); if (left === 0) load(); };
     window.addEventListener("online", onOnline);

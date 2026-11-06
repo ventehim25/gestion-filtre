@@ -96,29 +96,35 @@ export default function ProspectsPage() {
     await supabase.from("prospects").update({ statut_prospection: v }).eq("id", p.id);
   }
 
-  // Prospect devenu client : fiche client pré-remplie (téléphone, ville, adresse, GPS) en un tap
+  // Un prospect ne devient client QUE quand il passe commande : la fiche est créée à ce moment
+  // (origine « prospection », séparée des clients pris sur le terrain) et la vente s'ouvre pour lui.
   const [clientMsg, setClientMsg] = useState<Record<string, string>>({});
-  async function creerClient(p: Prospect) {
+  async function passeCommande(p: Prospect) {
     const tel = (p.telephone ?? "").split("/")[0].trim();
     const fin = tel.replace(/\D/g, "").slice(-9);
+    let clientId: string | null = null;
     if (fin.length === 9) {
       const { data } = await supabase.from("clients").select("id, nom, telephone").ilike("telephone", `%${fin.slice(-4)}%`).limit(50);
-      const dup = (data ?? []).find((c) => (c.telephone ?? "").replace(/\D/g, "").endsWith(fin));
-      if (dup) {
-        setClientMsg((m) => ({ ...m, [p.id]: `Déjà client : « ${dup.nom} » a ce numéro.` }));
-        await setSuivi(p, "client");
+      clientId = (data ?? []).find((c) => (c.telephone ?? "").replace(/\D/g, "").endsWith(fin))?.id ?? null; // déjà client : pas de doublon
+    }
+    if (!clientId) {
+      const type = p.segment.startsWith("Magasin pièces") ? "gros" : /Garage|Poids lourds|Pneus/.test(p.segment) ? "garage" : "comptoir";
+      const { data, error } = await supabase.from("clients").insert({
+        nom: (p.nom ?? "").split(" · ")[0] || "(sans nom)", telephone: tel || null, ville: p.ville ?? "",
+        adresse: p.adresse, notes: `Venu de la prospection (${p.segment}).`, solde_du: 0, type,
+        latitude: p.lat, longitude: p.lon, origine: "prospection",
+      }).select("id").single();
+      if (error || !data) {
+        const msg = error && /origine/i.test(error.message)
+          ? "Colonne « origine » absente : colle supabase/clients_origine.sql dans Supabase, puis réessaie."
+          : "Erreur : " + (error?.message ?? "fiche non créée");
+        setClientMsg((m) => ({ ...m, [p.id]: msg }));
         return;
       }
+      clientId = data.id;
     }
-    const type = p.segment.startsWith("Magasin pièces") ? "gros" : /Garage|Poids lourds|Pneus/.test(p.segment) ? "garage" : "comptoir";
-    const { error } = await supabase.from("clients").insert({
-      nom: (p.nom ?? "").split(" · ")[0] || "(sans nom)", telephone: tel || null, ville: p.ville ?? "",
-      adresse: p.adresse, notes: `Venu de la prospection (${p.segment}).`, solde_du: 0, type,
-      latitude: p.lat, longitude: p.lon,
-    });
-    if (error) { setClientMsg((m) => ({ ...m, [p.id]: "Erreur : " + error.message })); return; }
     await setSuivi(p, "client");
-    setClientMsg((m) => ({ ...m, [p.id]: "✓ Fiche client créée (voir Clients)." }));
+    window.location.href = `/ventes?client=${clientId}`;
   }
 
   function whatsapp(p: Prospect) {
@@ -237,9 +243,7 @@ export default function ProspectsPage() {
                             {Object.entries(STATUTS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                           </select>
                         </label>
-                        {!clientMsg[p.id] && (
-                          <button onClick={() => creerClient(p)} className="btn-secondary flex items-center justify-center gap-2 text-xs"><UserPlus size={14} /> Devenu client : créer sa fiche</button>
-                        )}
+                        <button onClick={() => passeCommande(p)} className="btn-secondary flex items-center justify-center gap-2 text-xs"><UserPlus size={14} /> A passé commande → créer la vente</button>
                         {p.source_url && <a href={p.source_url} target="_blank" rel="noreferrer" className="text-xs text-slate-500 flex items-center gap-1 pb-2"><ExternalLink size={12} /> Fiche source</a>}
                       </div>
                       {clientMsg[p.id] && <p className="text-xs text-amber-400">{clientMsg[p.id]}</p>}

@@ -32,6 +32,8 @@ export default function ClientsPage() {
   const { t } = useLang();
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState("");
+  // Clients pris sur le terrain vs venus de la prospection (créés à leur 1re commande) : jamais mélangés
+  const [origineF, setOrigineF] = useState<"terrain" | "prospection">("terrain");
   const [villeF, setVilleF] = useState("");
   const [quartierF, setQuartierF] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -242,13 +244,16 @@ export default function ClientsPage() {
   const quartiersDe = (ville: string) => uniques(clients.filter(c => key(c.ville) === key(ville)).map(c => c.quartier));
 
   const q = key(search);
+  const origine = (c: Client) => c.origine ?? "terrain";
+  const nbProspection = clients.filter(c => origine(c) === "prospection").length;
   const filtered = clients.filter(c =>
+    origine(c) === origineF &&
     (!villeF || key(c.ville) === key(villeF)) &&
     (!quartierF || key(c.quartier) === key(quartierF)) &&
     (!q || [c.nom, c.ville, c.quartier, c.telephone].some(v => key(v).includes(q)))
   );
 
-  const cities = uniques(clients.map(c => c.ville));
+  const cities = uniques(clients.filter(c => origine(c) === origineF).map(c => c.ville));
   const quartiersFiltre = villeF ? quartiersDe(villeF) : [];
 
   return (
@@ -258,6 +263,15 @@ export default function ClientsPage() {
           <Plus size={16} /> {t("addClient")}
         </button>
       } />
+
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {([["terrain", "🤝 Mes clients (terrain)", clients.length - nbProspection], ["prospection", "🎯 Venus de la prospection", nbProspection]] as const).map(([k, label, n]) => (
+          <button key={k} onClick={() => { setOrigineF(k); setVilleF(""); setQuartierF(""); }}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${origineF === k ? "bg-red-600 text-white" : "btn-secondary"}`}>
+            {label} · {n}
+          </button>
+        ))}
+      </div>
 
       {/* Grille (et non flex + largeurs) : .input est w-full */}
       <div className="card p-4 mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -345,6 +359,13 @@ export default function ClientsPage() {
               <button onClick={save} className="btn-primary">{t("save")}</button>
             </div>
           </div>
+        </div>
+      )}
+
+      {origineF === "prospection" && filtered.length === 0 && (
+        <div className="card p-8 text-center text-sm text-slate-500">
+          Aucun client venu de la prospection pour l&apos;instant.<br />
+          Dans <a href="/prospects" className="text-blue-400 hover:underline">Prospects</a>, ouvre un prospect qui commande et touche « A passé commande → créer la vente » : sa fiche arrive ici.
         </div>
       )}
 
