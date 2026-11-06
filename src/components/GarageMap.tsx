@@ -7,7 +7,7 @@ import { STATUT_INFO, KENITRA, type LatLng } from "@/lib/tournee";
 
 type Props = {
   garages: Garage[];
-  base?: LatLng;
+  base?: LatLng & { nom?: string };
   routeLine?: LatLng[];           // polyligne du circuit affiché
   orderMap?: Record<string, number>; // id garage -> numéro d'ordre (badge)
   adding?: boolean;               // mode "clic = ajouter un point"

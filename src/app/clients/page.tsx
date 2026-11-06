@@ -133,7 +133,7 @@ export default function ClientsPage() {
     // parrain_id "" → null ; si la colonne n'existe pas encore (SQL Bible §4.15 pas collé), on réessaie sans
     const payload: Record<string, unknown> = { ...form, parrain_id: form.parrain_id || null };
     const attempt = (p: Record<string, unknown>) =>
-      editing ? supabase.from("clients").update(p).eq("id", editing.id) : supabase.from("clients").insert(p);
+      editing ? supabase.from("clients").update(p as Partial<Client>).eq("id", editing.id) : supabase.from("clients").insert(p as Omit<Client, "id" | "created_at">);
     let { error } = await attempt(payload);
     if (error && /parrain/i.test(error.message)) {
       delete payload.parrain_id;

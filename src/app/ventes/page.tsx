@@ -838,7 +838,7 @@ export default function VentesPage() {
                 <div>
                   <label className="text-xs text-slate-500 mb-1 block">Montant payé (MAD)</label>
                   <input type="number" className="input" value={payMontant} onChange={e => setPayMontant(+e.target.value)} />
-                  <p className="text-xs text-orange-400 mt-1">Reste : {(payEdit.total - (payStatut === "paye" ? payEdit.total : payMontant)).toFixed(2)} MAD</p>
+                  <p className="text-xs text-orange-400 mt-1">Reste : {(payEdit.total - payMontant).toFixed(2)} MAD</p>
                 </div>
               )}
             </div>

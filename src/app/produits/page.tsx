@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from "react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
+import type { TranslationKey } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
@@ -21,7 +22,7 @@ const CATEGORIES: ProductCategory[] = [
   "filtre_habitacle", "filtre_refroidissement", "huile_moteur", "autre",
 ];
 
-const categoryKeys: Record<ProductCategory, keyof ReturnType<typeof useLang>["t"] extends (k: infer K) => string ? K : never> = {
+const categoryKeys: Record<ProductCategory, TranslationKey> = {
   filtre_huile: "filterOil",
   filtre_air: "filterAir",
   filtre_carburant: "filterFuel",

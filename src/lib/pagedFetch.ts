@@ -23,10 +23,11 @@ export async function loadAll<T>(
   const concurrency = opts?.concurrency ?? 6;
   const applyFilter = opts?.filter ?? ((q: any) => q);
 
-  const page = (n: number) => (applyFilter(supabase.from(table).select(select)) as Q).range(n * pageSize, n * pageSize + pageSize - 1);
+  const db = supabase as any; // nom de table dynamique : hors du typage strict
+  const page = (n: number) => (applyFilter(db.from(table).select(select)) as Q).range(n * pageSize, n * pageSize + pageSize - 1);
 
   const { count } = await applyFilter(
-    supabase.from(table).select(opts?.countSelect ?? "*", { count: "exact", head: true }),
+    db.from(table).select(opts?.countSelect ?? "*", { count: "exact", head: true }),
   );
   const known = Math.max(1, Math.ceil((count ?? 0) / pageSize));
 

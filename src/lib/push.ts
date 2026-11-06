@@ -7,11 +7,11 @@ const VAPID_PUBLIC =
   process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ||
   "BIC2aOpq0fySBst-Ot3xxgZdhzaNwM1uANOGo3HLk6iWDuSbtsujoJ0ZaldUr_3HrLexh1rucaQCeZpBb5J4hBk";
 
-function urlBase64ToUint8Array(base64: string): Uint8Array {
+function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
   const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
   const raw = atob(b64);
-  const arr = new Uint8Array(raw.length);
+  const arr = new Uint8Array(new ArrayBuffer(raw.length));
   for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
   return arr;
 }
@@ -49,10 +49,11 @@ export async function enablePush(): Promise<{ ok: boolean; error?: string }> {
       });
     }
     const json = sub.toJSON() as { endpoint?: string; keys?: { p256dh: string; auth: string } };
+    if (!json.keys) return { ok: false, error: "Abonnement push incomplet (clés manquantes). Réessaie." };
     const { error } = await supabase.from("push_subscriptions").upsert({
       endpoint: sub.endpoint,
-      p256dh: json.keys?.p256dh,
-      auth: json.keys?.auth,
+      p256dh: json.keys.p256dh,
+      auth: json.keys.auth,
       user_agent: navigator.userAgent,
     }, { onConflict: "endpoint" });
     if (error) return { ok: false, error: "Enregistrement impossible : " + error.message + " (as-tu collé le SQL push_notifications.sql ?)" };

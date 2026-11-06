@@ -31,7 +31,7 @@ export async function loadRelancesCatalogue(today = new Date().toISOString().sli
   type Cl = { id: string; nom: string; telephone: string | null; derniere_relance_catalogue?: string | null };
   const clients: Cl[] = [];
   for (let i = 0; i < 10; i++) {
-    let res = await supabase.from("clients").select("id, nom, telephone, derniere_relance_catalogue").range(i * 1000, i * 1000 + 999);
+    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, telephone, derniere_relance_catalogue").range(i * 1000, i * 1000 + 999);
     if (res.error) res = await supabase.from("clients").select("id, nom, telephone").range(i * 1000, i * 1000 + 999); // colonne absente
     const data = res.data as Cl[] | null;
     if (!data || data.length === 0) break;
@@ -75,7 +75,7 @@ export async function loadImpayesRelance(days = 15, today = new Date().toISOStri
   type Cl = { id: string; nom: string; telephone: string | null; derniere_relance?: string | null };
   const clients: Cl[] = [];
   for (let i = 0; i < 10; i++) {
-    let res = await supabase.from("clients").select("id, nom, telephone, derniere_relance").range(i * 1000, i * 1000 + 999);
+    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, telephone, derniere_relance").range(i * 1000, i * 1000 + 999);
     if (res.error) res = await supabase.from("clients").select("id, nom, telephone").range(i * 1000, i * 1000 + 999);
     const data = res.data as Cl[] | null;
     if (!data || data.length === 0) break;
@@ -142,7 +142,7 @@ export async function loadEndormis(today = new Date().toISOString().slice(0, 10)
   type Cl = { id: string; nom: string; derniere_relance_com?: string | null };
   const clients: Cl[] = [];
   for (let i = 0; i < 10; i++) {
-    let res = await supabase.from("clients").select("id, nom, derniere_relance_com").range(i * 1000, i * 1000 + 999);
+    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, derniere_relance_com").range(i * 1000, i * 1000 + 999);
     if (res.error) res = await supabase.from("clients").select("id, nom").range(i * 1000, i * 1000 + 999);
     const data = res.data as Cl[] | null;
     if (!data || data.length === 0) break;

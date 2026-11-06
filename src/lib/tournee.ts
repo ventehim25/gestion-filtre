@@ -9,6 +9,10 @@ export const KENITRA: { lat: number; lng: number; nom: string } = {
 
 export type LatLng = { lat: number; lng: number };
 
+// Un garage stocke latitude/longitude ; les calculs travaillent en {lat, lng}.
+// (Sans cette conversion, toutes les distances valaient NaN : circuit non optimisé, « NaN km ».)
+const pt = (p: Garage | LatLng): LatLng => ("latitude" in p ? { lat: p.latitude, lng: p.longitude } : p);
+
 // Couleurs des statuts (pins + badges). Rouge = à livrer, vert = livré, etc.
 export const STATUT_INFO: Record<GarageStatut, { label: string; color: string; bg: string }> = {
   prospect: { label: "Prospect (à démarcher)", color: "#a855f7", bg: "rgba(168,85,247,0.15)" },
@@ -21,7 +25,8 @@ export const STATUT_INFO: Record<GarageStatut, { label: string; color: string; b
 export const STATUT_ORDER: GarageStatut[] = ["prospect", "a_livrer", "preparee", "livre", "reporte"];
 
 // Distance à vol d'oiseau (km) entre deux points GPS.
-export function haversineKm(a: LatLng, b: LatLng): number {
+export function haversineKm(p: Garage | LatLng, q: Garage | LatLng): number {
+  const a = pt(p), b = pt(q);
   const R = 6371;
   const dLat = ((b.lat - a.lat) * Math.PI) / 180;
   const dLng = ((b.lng - a.lng) * Math.PI) / 180;
@@ -46,7 +51,7 @@ function loopLength(order: Garage[], base: LatLng): number {
 function nearestNeighbor(points: Garage[], base: LatLng): Garage[] {
   const remaining = [...points];
   const order: Garage[] = [];
-  let current: LatLng = base;
+  let current: Garage | LatLng = base;
   while (remaining.length > 0) {
     let bestIdx = 0;
     let bestDist = Infinity;
@@ -112,7 +117,7 @@ export function planDays(ordered: Garage[], base: LatLng, kmCap: number): DayPla
   const cap = Math.max(20, kmCap);
   const days: Garage[][] = [];
   let currentDay: Garage[] = [];
-  let from: LatLng = base;
+  let from: Garage | LatLng = base;
   let dayDist = 0;
 
   for (const g of ordered) {
@@ -131,9 +136,9 @@ export function planDays(ordered: Garage[], base: LatLng, kmCap: number): DayPla
 
   // Construit les polylignes + distances (avec connecteurs entre jours et retour final).
   return days.map((garages, idx) => {
-    const start: LatLng = idx === 0 ? base : days[idx - 1][days[idx - 1].length - 1];
+    const start: LatLng = idx === 0 ? base : pt(days[idx - 1][days[idx - 1].length - 1]);
     const isLast = idx === days.length - 1;
-    const line: LatLng[] = [start, ...garages];
+    const line: LatLng[] = [start, ...garages.map(pt)];
     if (isLast) line.push(base); // retour à Kénitra à la fin
     let distanceKm = 0;
     for (let i = 0; i < line.length - 1; i++) distanceKm += haversineKm(line[i], line[i + 1]);

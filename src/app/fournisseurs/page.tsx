@@ -183,7 +183,7 @@ export default function FournisseursPage() {
     if (!sForm.nom.trim()) { alert("Nom requis"); return; }
     const payload: Record<string, unknown> = { nom: sForm.nom.trim(), telephone: sForm.telephone || null, note: sForm.note || null, type: sForm.type, solde_depart: sForm.solde_depart || 0 };
     const run = (p: Record<string, unknown>) =>
-      editingSupplier ? supabase.from("fournisseurs").update(p).eq("id", editingSupplier.id) : supabase.from("fournisseurs").insert(p);
+      editingSupplier ? supabase.from("fournisseurs").update(p as Partial<Fournisseur>).eq("id", editingSupplier.id) : supabase.from("fournisseurs").insert(p as Omit<Fournisseur, "id" | "created_at">);
     let { error } = await run(payload);
     // Repli si la colonne solde_depart n'est pas encore créée (SQL pas collé)
     if (error && /solde_depart/i.test(error.message)) {

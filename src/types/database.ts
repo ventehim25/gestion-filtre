@@ -1,58 +1,73 @@
+// Format attendu par supabase-js v2 (GenericSchema) : chaque table a Row/Insert/Update/Relationships,
+// et le schéma a Views/Functions/Enums/CompositeTypes. Sans ça, tout insert/update/rpc est typé `never`
+// et les vraies erreurs disparaissent dans le bruit (le build ignore TS).
+type Rel = { foreignKeyName: string; columns: string[]; isOneToOne?: boolean; referencedRelation: string; referencedColumns: string[] };
+type Fk<C extends string, T extends string> = {
+  foreignKeyName: `${C}_fkey`; columns: [C]; isOneToOne: false; referencedRelation: T; referencedColumns: ["id"];
+};
+// Les colonnes ajoutées par jointure (client, items, product) ne sont pas des colonnes de la table
+type Table<R, Auto extends keyof R, Rels extends Rel[] = []> = {
+  Row: R;
+  Insert: Omit<R, Auto | "client" | "items" | "product"> & Partial<Pick<R, Auto>>;
+  Update: Partial<Omit<R, "client" | "items" | "product">>;
+  Relationships: Rels;
+};
+
 export type Database = {
   public: {
     Tables: {
-      products: {
-        Row: Product;
-        Insert: Omit<Product, "id" | "created_at">;
-        Update: Partial<Omit<Product, "id" | "created_at">>;
-      };
-      clients: {
-        Row: Client;
-        Insert: Omit<Client, "id" | "created_at">;
-        Update: Partial<Omit<Client, "id" | "created_at">>;
-      };
-      sales: {
-        Row: Sale;
-        Insert: Omit<Sale, "id" | "created_at">;
-        Update: Partial<Omit<Sale, "id" | "created_at">>;
-      };
-      sale_items: {
-        Row: SaleItem;
-        Insert: Omit<SaleItem, "id">;
-        Update: Partial<Omit<SaleItem, "id">>;
-      };
-      equivalences: {
-        Row: Equivalence;
-        Insert: Omit<Equivalence, "id">;
-        Update: Partial<Omit<Equivalence, "id">>;
-      };
-      applications: {
-        Row: Application;
-        Insert: Omit<Application, "id">;
-        Update: Partial<Omit<Application, "id">>;
-      };
-      garages: {
-        Row: Garage;
-        Insert: Omit<Garage, "id" | "created_at">;
-        Update: Partial<Omit<Garage, "id" | "created_at">>;
-      };
-      fournisseurs: {
-        Row: Fournisseur;
-        Insert: Omit<Fournisseur, "id" | "created_at">;
-        Update: Partial<Omit<Fournisseur, "id" | "created_at">>;
-      };
-      receptions: {
-        Row: Reception;
-        Insert: Omit<Reception, "id" | "created_at">;
-        Update: Partial<Omit<Reception, "id" | "created_at">>;
-      };
-      avances: {
-        Row: Avance;
-        Insert: Omit<Avance, "id" | "created_at">;
-        Update: Partial<Omit<Avance, "id" | "created_at">>;
-      };
+      products: Table<Product, "id" | "created_at">;
+      clients: Table<Client, "id" | "created_at", [Fk<"parrain_id", "clients">]>;
+      sales: Table<Sale, "id" | "created_at", [Fk<"client_id", "clients">]>;
+      sale_items: Table<SaleItem, "id", [Fk<"sale_id", "sales">, Fk<"product_id", "products">, Fk<"fournisseur_id", "fournisseurs">, Fk<"equivalence_id", "equivalences">]>;
+      equivalences: Table<Equivalence, "id", [Fk<"product_id", "products">]>;
+      applications: Table<Application, "id", [Fk<"product_id", "products">]>;
+      garages: Table<Garage, "id" | "created_at" | "jour", [Fk<"client_id", "clients">]>;
+      fournisseurs: Table<Fournisseur, "id" | "created_at">;
+      receptions: Table<Reception, "id" | "created_at", [Fk<"fournisseur_id", "fournisseurs">]>;
+      avances: Table<Avance, "id" | "created_at", [Fk<"fournisseur_id", "fournisseurs">]>;
+      rappels_vidange: Table<RappelVidange, "id" | "created_at" | "garage_id" | "fait", [Fk<"garage_id", "garages">, Fk<"client_id", "clients">]>;
+      demandes_manquees: Table<DemandeManquee, "id" | "created_at" | "note" | "traite">;
+      push_subscriptions: Table<PushSubscriptionRow, "id" | "created_at">;
+      vehicules: Table<Vehicule, "id">;
+      compatibilites: Table<Compatibilite, "id", [Fk<"product_id", "products">, Fk<"vehicule_id", "vehicules">]>;
+      prospects: Table<Prospect, "created_at" | "score" | "statut_prospection" | "premiere_vue" | "derniere_vue">;
     };
+    Views: {
+      prospects_par_jour: { Row: { jour: string; source: string; nb: number }; Relationships: [] };
+    };
+    Functions: {
+      // qty négative = incrémente
+      decrement_stock: { Args: { p_id: string; qty: number }; Returns: undefined };
+      decrement_equiv_stock: { Args: { e_id: string; qty: number }; Returns: undefined };
+    };
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
+};
+
+export type PushSubscriptionRow = {
+  id: string;
+  created_at: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+  user_agent: string | null;
+};
+
+export type Vehicule = {
+  id: string; marque: string; modele: string; annee_debut: number; annee_fin: number | null;
+  motorisation: string; carburant: "diesel" | "essence" | "hybride"; cylindree: string | null;
+};
+export type Compatibilite = { id: string; product_id: string; vehicule_id: string };
+
+export type Prospect = {
+  id: string; source: string; segment: string; nom: string | null; ville: string | null; adresse: string | null;
+  telephone: string | null; whatsapp: string | null; email: string | null; email_type: string | null; site: string | null;
+  categorie: string | null; note_google: number | null; nb_avis: number | null; horaires: string | null;
+  lat: number | null; lon: number | null; maps_url: string | null; source_url: string | null;
+  score: number; score_detail: string | null; statut_prospection: string;
+  premiere_vue: string; derniere_vue: string; created_at: string;
 };
 
 export type FournisseurType = "capital" | "credit";
@@ -83,6 +98,7 @@ export type Avance = {
   date: string;
   montant: number;
   note: string | null;
+  sale_id?: string | null; // avance auto « dinoun payé » liée à un bon (sale_fournisseur_paye.sql)
 };
 
 export type GarageStatut = "prospect" | "a_livrer" | "preparee" | "livre" | "reporte";
@@ -182,6 +198,7 @@ export type Client = {
   limite_credit?: number;
   derniere_relance?: string | null;
   derniere_relance_com?: string | null; // relance commerciale « client endormi » (Bible §4.14)
+  derniere_relance_catalogue?: string | null; // relance « catalogue » (push_notifications.sql)
   avoir?: number;                       // crédit à déduire sur une prochaine vente (Bible §4.15)
   parrain_id?: string | null;           // client qui l'a amené (parrainage)
   parrain_paye?: boolean;               // avoir du parrain déjà crédité

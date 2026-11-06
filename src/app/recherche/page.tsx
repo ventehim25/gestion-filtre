@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { Product, Equivalence, Application } from "@/types/database";
+import { Product, Equivalence, Application, ProductCategory } from "@/types/database";
 import { Car, Search, Package, Tag, Repeat, Sparkles, ChevronDown, ChevronUp, Plus, X, Barcode } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import FilterImage from "@/components/FilterImage";
@@ -201,7 +201,7 @@ export default function RecherchePage() {
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
   const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "huile_moteur", "autre"];
   const ADD_BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mahle", "Hengst", "UFI", "Fram", "Misfat", "Wunder", "OE", "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
-  const emptyAdd = { reference: "", marque: "Filtron", filtronRef: "", categorie: "filtre_huile", prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, code_barre: "" };
+  const emptyAdd = { reference: "", marque: "Filtron", filtronRef: "", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, code_barre: "" };
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState(emptyAdd);
   const [addSaving, setAddSaving] = useState(false);
@@ -673,7 +673,7 @@ export default function RecherchePage() {
                   <input className="input font-mono uppercase" placeholder="ex : OE667/6 — laisse vide si aucune" value={addForm.filtronRef} onChange={e => setAddForm({ ...addForm, filtronRef: e.target.value.toUpperCase() })} /></div>
               )}
               <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
-                <select className="input" value={addForm.categorie} onChange={e => setAddForm({ ...addForm, categorie: e.target.value })}>
+                <select className="input" value={addForm.categorie} onChange={e => setAddForm({ ...addForm, categorie: e.target.value as ProductCategory })}>
                   {ADD_CATS.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
                 </select></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("buyPrice")} (MAD)</label>
