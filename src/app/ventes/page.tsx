@@ -304,10 +304,20 @@ export default function VentesPage() {
   const avoirApplique = useAvoir ? Math.min(avoirDispo, total) : 0;
   const totalNet = total - avoirApplique;
 
+  // Source de la marchandise choisie UNE fois pour tout le bon (dinoun par défaut) ;
+  // une ligne peut s'en écarter (fournisseur_id propre), sinon elle suit le bon.
+  const [sourceBon, setSourceBon] = useState("");
+  const sourceParDefaut = () => (fournisseurs.find(f => f.type === "credit") ?? fournisseurs[0])?.id ?? "";
+  const srcOf = (l: LineItem) => l.fournisseur_id || sourceBon || null;
+  const [ligneSource, setLigneSource] = useState<number | null>(null); // ligne dont on change la source
+  // Fournisseurs chargés après l'ouverture du bon (ex. /ventes?client=…) : appliquer la source par défaut
+  useEffect(() => { if (!sourceBon && fournisseurs.length) setSourceBon(sourceParDefaut()); }, [fournisseurs]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function resetForm() {
     setShowForm(false); setEditingSale(null); setOldLines([]);
     setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye");
     setCrossSell([]); setOilDismissed(false); setUseAvoir(false);
+    setSourceBon(sourceParDefaut()); setLigneSource(null);
   }
 
   function openNew() {
@@ -321,7 +331,12 @@ export default function VentesPage() {
       .select("product_id, quantite, prix_unitaire, fournisseur_id, equivalence_id, cout_unitaire, product:products(reference)")
       .eq("sale_id", s.id);
     const items = (data ?? []) as unknown as { product_id: string; quantite: number; prix_unitaire: number; fournisseur_id: string | null; equivalence_id: string | null; cout_unitaire: number | null; product: { reference: string } | null }[];
-    setLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, prix_unitaire: i.prix_unitaire, nom: i.product?.reference ?? "", fournisseur_id: i.fournisseur_id ?? undefined, equivalence_id: i.equivalence_id, cout_unitaire: i.cout_unitaire ?? undefined })));
+    // Source du bon = la plus fréquente parmi ses lignes ; les lignes identiques « suivent le bon »
+    const freq = new Map<string, number>();
+    for (const i of items) if (i.fournisseur_id) freq.set(i.fournisseur_id, (freq.get(i.fournisseur_id) ?? 0) + 1);
+    const src = [...freq].sort((a, b) => b[1] - a[1])[0]?.[0] ?? sourceParDefaut();
+    setSourceBon(src); setLigneSource(null);
+    setLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, prix_unitaire: i.prix_unitaire, nom: i.product?.reference ?? "", fournisseur_id: i.fournisseur_id && i.fournisseur_id !== src ? i.fournisseur_id : undefined, equivalence_id: i.equivalence_id, cout_unitaire: i.cout_unitaire ?? undefined })));
     setOldLines(items.map(i => ({ product_id: i.product_id, quantite: i.quantite, equivalence_id: i.equivalence_id })));
     setClientId(s.client_id);
     setStatut(s.statut);
@@ -337,8 +352,7 @@ export default function VentesPage() {
     const validLines = lines.filter(l => l.product_id && l.quantite > 0);
     if (!clientId || validLines.length === 0) { flash("Client et au moins un article requis"); return; }
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Modification impossible hors-ligne."); return; }
-    const sansSource = validLines.filter(l => !l.fournisseur_id).length;
-    if (sansSource > 0 && !confirm(`⚠️ ${sansSource} ligne(s) sans source (dinoun / filtropro). Enregistrer quand même ?`)) return;
+    if (!sourceBon && validLines.some(l => !l.fournisseur_id) && !confirm("⚠️ Aucune source choisie pour ce bon (dinoun / filtropro). Enregistrer quand même ?")) return;
     const saleTotal = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
     const montant = statut === "paye" ? saleTotal : montantPaye;
     try {
@@ -353,7 +367,7 @@ export default function VentesPage() {
         client_id: clientId, total: saleTotal, montant_paye: montant, statut, notes: notes || null,
       }).eq("id", editingSale.id);
       await supabase.from("sale_items").insert(
-        validLines.map(l => ({ sale_id: editingSale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id || null, equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null }))
+        validLines.map(l => ({ sale_id: editingSale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null }))
       );
       // 3) Retirer le stock des nouveaux articles
       for (const l of validLines) {
@@ -453,8 +467,8 @@ export default function VentesPage() {
     if (editingSale) { saveEdit(); return; }
     const validLines = lines.filter(l => l.product_id && l.quantite > 0);
     if (!clientId || validLines.length === 0) return;
-    // Rappel : une ligne sans source ne sera comptée sur aucun fournisseur (dinoun/filtropro)
-    const sansSource = validLines.filter(l => !l.fournisseur_id).length;
+    // Rappel : sans source (bon ni ligne), la marchandise n'est comptée sur aucun fournisseur
+    const sansSource = validLines.filter(l => !srcOf(l)).length;
     if (sansSource > 0 && !confirm(`⚠️ ${sansSource} ligne(s) sans source (dinoun / filtropro).\nCette marchandise ne sera comptée sur aucun fournisseur, et le camion « dinoun payé » ne la comptera pas.\n\nEnregistrer quand même ?`)) return;
     const client = clients.find(c => c.id === clientId);
     const brut = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
@@ -474,7 +488,7 @@ export default function VentesPage() {
         }).select().single();
         if (error || !sale) throw error || new Error("insert");
         const { error: e2 } = await supabase.from("sale_items").insert(
-          validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: l.fournisseur_id || null, equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null }))
+          validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null }))
         );
         if (e2) throw e2;
         for (const l of validLines) {
@@ -505,7 +519,7 @@ export default function VentesPage() {
       addPending({
         localId: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
         client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
-        lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: l.fournisseur_id || null, equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
+        lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
         total: saleTotal, statut, montant_paye: montant, notes: saleNotes || null, createdAt: Date.now(),
       });
       setPendingCount(getPending().length);
@@ -622,6 +636,21 @@ export default function VentesPage() {
               )}
             </div>
 
+            {/* Source de la marchandise : une fois pour tout le bon */}
+            {fournisseurs.length > 0 && (
+              <div className="mb-4">
+                <label className="text-xs text-slate-500 mb-1 block">Marchandise prise chez</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {fournisseurs.map(f => (
+                    <button key={f.id} type="button" onClick={() => setSourceBon(f.id)}
+                      className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${sourceBon === f.id ? (f.type === "capital" ? "bg-emerald-600 text-white" : "bg-red-600 text-white") : "btn-secondary"}`}>
+                      {f.nom} <span className="text-[11px] opacity-80">{f.type === "capital" ? "· mon argent" : "· à crédit"}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="mb-3">
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs text-slate-500">{t("products")}</label>
@@ -667,11 +696,19 @@ export default function VentesPage() {
                       ))}
                     </select>
                   )}
-                  {fournisseurs.length > 0 && (
-                    <select className={`input mt-1 py-1 text-xs ${!l.fournisseur_id ? "ring-1 ring-orange-500/70" : ""}`} value={l.fournisseur_id ?? ""} onChange={e => updateLine(i, "fournisseur_id", e.target.value)}>
-                      <option value="">⚠ Source : — (à choisir : dinoun / filtropro)</option>
-                      {fournisseurs.map(f => <option key={f.id} value={f.id}>Source : {f.nom}{f.type === "capital" ? " (capital)" : ""}</option>)}
-                    </select>
+                  {/* Source : suit le bon ; à changer seulement pour une ligne d'une autre origine (cas rare) */}
+                  {fournisseurs.length > 0 && l.product_id && (
+                    l.fournisseur_id || ligneSource === i ? (
+                      <select className="input mt-1 py-1 text-xs ring-1 ring-amber-500/60" value={l.fournisseur_id ?? ""}
+                        onChange={e => { updateLine(i, "fournisseur_id", e.target.value); setLigneSource(null); }}>
+                        <option value="">Source : comme le bon</option>
+                        {fournisseurs.map(f => <option key={f.id} value={f.id}>Source de cette ligne : {f.nom}{f.type === "capital" ? " (capital)" : " (crédit)"}</option>)}
+                      </select>
+                    ) : (
+                      <button type="button" onClick={() => setLigneSource(i)} className="mt-0.5 text-[10px] text-slate-500 hover:text-slate-300">
+                        Source : {fournisseurs.find(f => f.id === sourceBon)?.nom ?? "—"} · changer pour cette ligne
+                      </button>
+                    )
                   )}
                 </div>
               ))}
