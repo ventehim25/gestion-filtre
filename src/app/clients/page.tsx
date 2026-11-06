@@ -15,7 +15,7 @@ const LocationPicker = nextDynamic(() => import("@/components/LocationPicker"), 
   loading: () => <div className="w-full h-56 rounded-lg bg-[var(--surface-2)] flex items-center justify-center text-xs text-slate-500">Chargement de la carte…</div>,
 });
 
-const empty = { nom: "", telephone: "", ville: "", adresse: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0, parrain_id: "", latitude: null as number | null, longitude: null as number | null };
+const empty = { nom: "", telephone: "", ville: "", quartier: "", adresse: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0, parrain_id: "", latitude: null as number | null, longitude: null as number | null };
 
 const TYPE_LABELS: Record<ClientType, string> = { comptoir: "Comptoir", garage: "Garage", gros: "Gros" };
 
@@ -32,6 +32,8 @@ export default function ClientsPage() {
   const { t } = useLang();
   const [clients, setClients] = useState<Client[]>([]);
   const [search, setSearch] = useState("");
+  const [villeF, setVilleF] = useState("");
+  const [quartierF, setQuartierF] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState(empty);
@@ -143,12 +145,17 @@ export default function ClientsPage() {
 
   async function save() {
     // parrain_id "" → null ; si la colonne n'existe pas encore (SQL Bible §4.15 pas collé), on réessaie sans
-    const payload: Record<string, unknown> = { ...form, parrain_id: form.parrain_id || null };
+    const payload: Record<string, unknown> = { ...form, parrain_id: form.parrain_id || null, quartier: form.quartier.trim() || null };
     const attempt = (p: Record<string, unknown>) =>
       editing ? supabase.from("clients").update(p as Partial<Client>).eq("id", editing.id) : supabase.from("clients").insert(p as Omit<Client, "id" | "created_at">);
     let { error } = await attempt(payload);
     if (error && /parrain/i.test(error.message)) {
       delete payload.parrain_id;
+      ({ error } = await attempt(payload));
+    }
+    if (error && /quartier/i.test(error.message)) {
+      alert("Quartier non enregistré : colle supabase/clients_quartier.sql dans Supabase. Le reste de la fiche est enregistré.");
+      delete payload.quartier;
       ({ error } = await attempt(payload));
     }
     if (error && /latitude|longitude/i.test(error.message)) {
@@ -204,17 +211,29 @@ export default function ClientsPage() {
 
   function startEdit(c: Client) {
     setEditing(c);
-    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, adresse: c.adresse ?? "", notes: c.notes ?? "", solde_du: c.solde_du, type: c.type ?? "comptoir", remise_pct: c.remise_pct ?? 0, limite_credit: c.limite_credit ?? 0, parrain_id: c.parrain_id ?? "", latitude: c.latitude ?? null, longitude: c.longitude ?? null });
+    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, quartier: c.quartier ?? "", adresse: c.adresse ?? "", notes: c.notes ?? "", solde_du: c.solde_du, type: c.type ?? "comptoir", remise_pct: c.remise_pct ?? 0, limite_credit: c.limite_credit ?? 0, parrain_id: c.parrain_id ?? "", latitude: c.latitude ?? null, longitude: c.longitude ?? null });
     setLienMaps(""); setGeoMsg(""); setShowMap(false);
     setShowForm(true);
   }
 
+  // Villes / quartiers comparés sans tenir compte de la casse ni des espaces (« larache » = « Larache »)
+  const key = (s?: string | null) => (s ?? "").trim().toLowerCase();
+  const uniques = (vals: (string | null | undefined)[]) => {
+    const m = new Map<string, string>();
+    for (const v of vals) if (v?.trim() && !m.has(key(v))) m.set(key(v), v.trim());
+    return [...m.values()].sort((a, b) => a.localeCompare(b, "fr"));
+  };
+  const quartiersDe = (ville: string) => uniques(clients.filter(c => key(c.ville) === key(ville)).map(c => c.quartier));
+
+  const q = key(search);
   const filtered = clients.filter(c =>
-    c.nom.toLowerCase().includes(search.toLowerCase()) ||
-    c.ville.toLowerCase().includes(search.toLowerCase())
+    (!villeF || key(c.ville) === key(villeF)) &&
+    (!quartierF || key(c.quartier) === key(quartierF)) &&
+    (!q || [c.nom, c.ville, c.quartier, c.telephone].some(v => key(v).includes(q)))
   );
 
-  const cities = [...new Set(clients.map(c => c.ville))].sort();
+  const cities = uniques(clients.map(c => c.ville));
+  const quartiersFiltre = villeF ? quartiersDe(villeF) : [];
 
   return (
     <div>
@@ -224,14 +243,19 @@ export default function ClientsPage() {
         </button>
       } />
 
-      <div className="card p-4 mb-4 flex gap-3">
-        <div className="relative flex-1">
+      {/* Grille (et non flex + largeurs) : .input est w-full */}
+      <div className="card p-4 mb-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="relative col-span-2">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input className="input ps-9" placeholder={t("search")} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <select className="input w-40" onChange={e => setSearch(e.target.value)}>
-          <option value="">{t("city")} — tous</option>
+        <select className="input" value={villeF} onChange={e => { setVilleF(e.target.value); setQuartierF(""); }}>
+          <option value="">{t("city")} — toutes</option>
           {cities.map(v => <option key={v} value={v}>{v}</option>)}
+        </select>
+        <select className="input" value={quartierF} onChange={e => setQuartierF(e.target.value)} disabled={!villeF || quartiersFiltre.length === 0}>
+          <option value="">{!villeF ? "Quartier (choisir une ville)" : quartiersFiltre.length ? "Quartier — tous" : "Aucun quartier saisi"}</option>
+          {quartiersFiltre.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
       </div>
 
@@ -243,7 +267,12 @@ export default function ClientsPage() {
               <div><label className="text-xs text-slate-500 mb-1 block">{t("name")}</label><input className="input" value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("phone")}</label><input className="input" value={form.telephone} onChange={e => setForm({ ...form, telephone: e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("city")}</label><input className="input" value={form.ville} onChange={e => setForm({ ...form, ville: e.target.value })} /></div>
-              <div><label className="text-xs text-slate-500 mb-1 block">Adresse</label><input className="input" value={form.adresse} placeholder="Quartier, rue, repère…" onChange={e => setForm({ ...form, adresse: e.target.value })} /></div>
+              <div><label className="text-xs text-slate-500 mb-1 block">Quartier</label>
+                <input className="input" list="quartiers-ville" value={form.quartier} placeholder={form.ville ? `Quartier à ${form.ville}` : "Quartier"} onChange={e => setForm({ ...form, quartier: e.target.value })} />
+                {/* Suggestions : quartiers déjà saisis pour cette ville (même orthographe = filtre fiable) */}
+                <datalist id="quartiers-ville">{quartiersDe(form.ville).map(v => <option key={v} value={v} />)}</datalist>
+              </div>
+              <div><label className="text-xs text-slate-500 mb-1 block">Adresse</label><input className="input" value={form.adresse} placeholder="Rue, n°, repère…" onChange={e => setForm({ ...form, adresse: e.target.value })} /></div>
 
               {/* Localisation exacte du local */}
               <div className="rounded-lg border border-slate-700 p-3 space-y-2">
@@ -309,7 +338,7 @@ export default function ClientsPage() {
             <div className="flex items-start justify-between mb-2">
               <div>
                 <p className="font-semibold text-slate-800">{c.nom}</p>
-                <p className="text-sm text-slate-500">{c.ville}{c.adresse ? ` · ${c.adresse}` : ""}</p>
+                <p className="text-sm text-slate-500">{c.ville}{c.quartier ? ` · ${c.quartier}` : ""}{c.adresse ? ` · ${c.adresse}` : ""}</p>
                 {c.latitude != null && c.longitude != null && (
                   <a href={gmapsTo({ lat: c.latitude, lng: c.longitude })} target="_blank" rel="noreferrer"
                     className="mt-1 inline-flex items-center gap-1 text-xs text-red-400 hover:underline">

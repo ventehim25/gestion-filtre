@@ -200,6 +200,7 @@ export type Client = {
   derniere_relance_com?: string | null; // relance commerciale « client endormi » (Bible §4.14)
   derniere_relance_catalogue?: string | null; // relance « catalogue » (push_notifications.sql)
   avoir?: number;                       // crédit à déduire sur une prochaine vente (Bible §4.15)
+  quartier?: string | null;             // quartier dans la ville (clients_quartier.sql)
   latitude?: number | null;             // position exacte du local (clients_localisation.sql)
   longitude?: number | null;
   parrain_id?: string | null;           // client qui l'a amené (parrainage)
