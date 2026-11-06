@@ -48,7 +48,7 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 4. Quand le garage te verse, c'est **tout pour toi** (dinoun est déjà payé).
 
 **Dans l'app :**
-- **Marchandise prise** (Fournisseurs) → augmente le stock **et** ta dette dinoun. Choisis la **marque** par ligne (le stock va sur la bonne marque).
+- **Marchandise prise** (Fournisseurs) → augmente le stock **et** ta dette dinoun. Choisis la **marque** par ligne (le stock va sur la bonne marque). Saisis **prix d'achat + prix de vente** par ligne (marge affichée) : ils sont enregistrés sur la fiche du filtre → il apparaît tout seul dans le catalogue (depuis le 06/11/2026).
 - **Vente** (Ventes) → choisis la **source** par ligne : **dinoun** (crédit) ou **filtropro** (ton capital). ⚠️ Une ligne sans source n'est comptée nulle part (voyant orange + rappel avant d'enregistrer).
 - **Camion 🚚** sur un bon (Ventes) → marque « dinoun payé » : ça **baisse ta dette dinoun** automatiquement (du coût de sa marchandise sur ce bon). Re-cliquer annule.
 - **Solde de départ** (Fournisseurs, crayon) : ce que tu dois déjà à dinoun au démarrage. `50000` = tu lui dois ; négatif (`-500`) = il te doit.
