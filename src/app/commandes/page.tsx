@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import { loadAll } from "@/lib/pagedFetch";
 import { Product, Garage, Client } from "@/types/database";
 import { Check, X, ClipboardPaste, Package, MessageCircle } from "lucide-react";
 import ProductPicker from "@/components/ProductPicker";
@@ -40,26 +41,10 @@ export default function CommandesPage() {
   useEffect(() => {
     supabase.from("garages").select("*").order("nom").then(({ data }) => setGarages((data as Garage[]) ?? []));
     supabase.from("clients").select("*").order("nom").then(({ data }) => setClients((data as Client[]) ?? []));
-    (async () => {
-      const all: Product[] = [];
-      for (let i = 0; i < 20; i++) {
-        const { data } = await supabase.from("products").select("*").order("reference").range(i * 1000, i * 1000 + 999);
-        if (!data || data.length === 0) break;
-        all.push(...data);
-        if (data.length < 1000) break;
-      }
-      setProducts(all);
-    })();
-    (async () => {
-      const all: EquivRow[] = [];
-      for (let i = 0; i < 30; i++) {
-        const { data } = await supabase.from("equivalences").select("id, product_id, marque, reference, prix, prix_achat").range(i * 1000, i * 1000 + 999);
-        if (!data || data.length === 0) break;
-        all.push(...(data as EquivRow[]));
-        if (data.length < 1000) break;
-      }
-      setEquivs(all);
-    })();
+    // Pages chargées en parallèle (23 000 équivalences = ~24 requêtes : en série c'était très lent sur mobile)
+    loadAll<Product>("products", "*", { filter: (q) => q.order("reference") }).then(setProducts).catch(() => {});
+    loadAll<EquivRow>("equivalences", "id, product_id, marque, reference, prix, prix_achat", { filter: (q) => q.order("id") })
+      .then(setEquivs).catch(() => {});
     loadChargement();
   }, []);
 

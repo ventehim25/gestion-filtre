@@ -3,7 +3,7 @@ export const dynamic = "force-dynamic";
 import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
-import { supabase } from "@/lib/supabase";
+import { loadAll } from "@/lib/pagedFetch";
 import { Product } from "@/types/database";
 import { Search, Printer, CheckSquare, Square } from "lucide-react";
 import JsBarcode from "jsbarcode";
@@ -24,17 +24,8 @@ export default function EtiquettesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    (async () => {
-      const all: Product[] = [];
-      for (let i = 0; i < 20; i++) {
-        const { data } = await supabase.from("products").select("id, reference, nom_fr, code_barre").order("reference").range(i * 1000, i * 1000 + 999);
-        if (!data || data.length === 0) break;
-        all.push(...(data as Product[]));
-        if (data.length < 1000) break;
-      }
-      setProducts(all);
-      setLoading(false);
-    })();
+    loadAll<Product>("products", "id, reference, nom_fr, code_barre", { filter: (q) => q.order("reference") })
+      .then(setProducts).catch(() => {}).finally(() => setLoading(false));
   }, []);
 
   const filtered = useMemo(() => {
