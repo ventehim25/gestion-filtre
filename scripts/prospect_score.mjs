@@ -45,7 +45,7 @@ export function scoreProspect(p) {
   return { score, score_detail: parts.map(([n, w]) => `${w} +${n}`).join(" · ") };
 }
 
-const supabase = createClient(
+export const supabase = createClient(
   "https://wehsvgoolozqzxsgwibb.supabase.co",
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHN2Z29vbG96cXp4c2d3aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTA3NzYsImV4cCI6MjA5NTgyNjc3Nn0.8z624yNoX-CQirJM5VQvYyMdeOCj5jau_0BvTaMKj1c"
 );
