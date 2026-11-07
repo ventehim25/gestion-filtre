@@ -1,7 +1,39 @@
 # 📌 Récap de session — FiltroPro
 
 > Point de reprise pour une nouvelle session. Complément de [GUIDE](GUIDE.md) et [BIBLE](BIBLE.md).
-> **Dernière session : 29/10/2026.**
+> **Dernière session : 05→07/11/2026** (voir §0 ci-dessous ; §1-4 = session du 29/10).
+
+---
+
+## 0. Session du 05 au 07/11/2026 — ce qui a changé
+
+### 📊 État actuel de la base (07/11)
+- **Remise à zéro faite** : 0 réception, 0 vente, 0 avance. **Stock = 0 et prix = 0** sur toutes les références (sauvegardes locales dans `backups/`, hors GitHub).
+- Fournisseurs : **dinoun auto** (crédit, **solde de départ 50 000** = dette) · **filtropro** (capital, départ 0).
+- **73 clients**, tous `origine = 'terrain'`. **Prochaine étape = l'utilisateur ressaisit sa marchandise** dans « Marchandise prise ».
+
+### 🔄 Nouveau déroulement (validé avec l'utilisateur + avis ChatGPT)
+- **Accueil** : 4 gros boutons **Réception · Vente · Encaisser · Mon activité** (liens directs `/fournisseurs?reception=1`, `/ventes?nouvelle=1`, `/ventes?impayes=1`, `/stats`).
+- **Marchandise prise** : choix « Chez » (dinoun/filtropro), **📷 Scanner les boîtes** (caméra ouverte, +1 par boîte, compteur en direct, boîte inconnue = ligne « à compléter »), par ligne qté + **prix achat + prix vente** (enregistrés sur la fiche) + marque (« + Autre marque » crée la variante) + code-barres mémorisé. **Hors-ligne** : file `src/lib/offlineReceptions.ts` reprise ligne par ligne. **Annulation** : ✕ dans l'historique (stock retiré + dette corrigée ; prévient si déjà vendu → stock négatif).
+- **Vente** : **source par LIGNE automatique** = fournisseur de la dernière réception du filtre (`receptions.lignes`), boutons dinoun | filtropro pour corriger. (La « source unique par bon » a été abandonnée : un bon peut mélanger les deux.)
+- **Camion « Rembourser {coût} » / « Remboursé »** sur chaque bon dinoun (confirmation) + liste **« Bons à rembourser »** sur la carte dinoun. Logique commune `src/lib/dinoun.ts`.
+- **Recherche d'article** : taper une réf **Mann, Wix, Mahle, Purflux, Flag…** trouve le Filtron et règle la marque.
+- Test complet bout en bout fait le 07/11 (réception → vente mixte → camion → annulations) : OK, données de test nettoyées.
+
+### 🔗 Équivalents de marques (officiels, importés en base)
+- **Mann** (+ EAN des boîtes) et **Wix** : catalogues mann-filter.com / wixfilters.com (`supabase/equivalents_mann_wix.sql`).
+- **Mahle (255) et Purflux (166)** : filtron.eu, recherche « référence correspondante » parcourue à l'envers (`supabase/equivalents_mahle_purflux.sql`).
+- Pour les 120 réfs Filtron de `docs/prix-catalogue.md`. Méthode détaillée dans la mémoire (`project_equivalents_mann_wix.md`).
+
+### 👥 Clients & prospection
+- Clients : **quartier**, **localisation GPS** (ma position / lien Maps / carte), **adresse**, filtres Ville/Quartier, « Y aller », « + Ajouter à la tournée ». **Terrain vs prospection** séparés (onglets) ; un prospect devient client **seulement quand il commande** (`/prospects` → « A passé commande → créer la vente »).
+- **Prospection** : page `/prospects` (note d'intérêt /10, suivi), robot OSM quotidien (tâche Windows 9 h 30), Google Maps consulté à la main dans Chromium (~50 fiches/séance, jamais de robot furtif). Campagne e-mail **en pause** jusqu'au catalogue rempli (`docs/prospects/CAMPAGNE_EMAIL.md`).
+
+### 🛠️ Technique
+- Types Supabase au format v2 : **`npx tsc --noEmit` = 0 erreur** (à garder). Bug NaN du circuit des tournées corrigé. Next.js 15.5.29 (faille corrigée).
+- PWA **sw v17** : pages + requêtes RSC en réseau d'abord (mises à jour visibles tout de suite). Scanner = détecteur natif du téléphone (net, léger).
+- Le CLI `vercel` a un jeton expiré → **le push GitHub déploie tout seul**. SQL : exécuté par Claude dans l'éditeur Supabase via Chromium (« Run without RLS » = fausse alerte sur les INSERT).
+- Chromium : **ne jamais fermer l'onglet/la fenêtre** (demande de l'utilisateur).
 
 ---
 
@@ -64,4 +96,5 @@
 ## 4. Pour reprendre dans une nouvelle session
 - La **mémoire se charge automatiquement** (voir `MEMORY.md`). Relire aussi ce fichier + [GUIDE](GUIDE.md).
 - **Navigateur** : double-cliquer **« Chrome-pour-Claude »** (Bureau) AVANT de demander à Claude d'utiliser le navigateur, et le garder ouvert.
-- Fichiers clés : `docs/GUIDE.md`, `docs/BIBLE.md`, `docs/prix-catalogue.md`, `docs/VIDANGE_DOMICILE.md`, `.claude/agents/`, `.mcp.json`, `vercel.json`, `src/lib/{relances,push,pagedFetch,catalogue}.ts`.
+- Fichiers clés : `docs/GUIDE.md`, `docs/BIBLE.md`, `docs/prix-catalogue.md`, `docs/VIDANGE_DOMICILE.md`, `.claude/agents/`, `.mcp.json`, `vercel.json`, `src/lib/{relances,push,pagedFetch,catalogue,dinoun,offlineReceptions,brands}.ts`.
+- **À faire ensuite (07/11)** : l'utilisateur ressaisit sa marchandise (premier vrai test du scan caméra sur téléphone) → vérifier avec lui ; puis remplir/structurer le catalogue → relancer la campagne e-mail ; 4 réfs Wix non vérifiées (réseau) à reprendre si besoin.
