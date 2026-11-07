@@ -869,12 +869,56 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 
 ---
 
-# PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/07/2026 — idées 5, 18-24 en ligne ✅)*
+# 8. JOURNAL DES LIVRAISONS — tout ce qui est en ligne, daté
 
-**1. Colle le SQL `supabase/idees_bible_19_24.sql` dans l'éditeur Supabase** (2 minutes, une seule fois) puis **recharge l'app** (PWA). Sans ça, « j'ai pas », le réveil des endormis et l'avoir/parrainage restent en veille — tout le reste marche déjà.
+> **Règle** : chaque fonction livrée, chaque décision et chaque donnée importée est notée ici (date + où c'est + le geste). La Bible reste la référence unique. Détails techniques : `docs/SESSION_RECAP.md` et `docs/GUIDE.md`.
 
-**2. Tague tes 20 meilleurs clients** (type garage/gros + remise + limite de crédit, dans `/clients`) — 15 minutes. Tant que ce n'est pas fait, les prix automatiques et le parrainage tournent à vide.
+## 8.1 Juillet → octobre 2026 (rappel)
+- **18/07** — Idées 1 à 24 livrées (§4.1 à §4.16).
+- **Août** — Vitesse mobile : chargement parallèle (`loadAll`), cache des images, accueil en 1 requête groupée.
+- **Oct.** — Notifications push quotidiennes (relances catalogue, impayés, réappro, endormis, bilan du vendredi) · agents prospection / acquisition / pub · routines cloud (prospection lundi, pub jeudi) · pilotage navigateur + WhatsApp Web.
+- **29/10** — Catalogue 100 % automatique : `/tarif` (avec prix) et `/catalogue` (sans prix) n'affichent que **stock > 0 et prix > 0**. Feuille d'audit des prix (`docs/prix-catalogue.md`).
 
-**3. Prends les nouveaux réflexes (une semaine suffit)** : client sans sa réf → « ❌ J'ai pas » · filtre à huile vendu → tap sur l'huile suggérée · vendredi → « 📣 Arrivages » en statut WhatsApp. Et un dimanche : la fiche Google Business (idée 25 — la seule chose que l'app ne peut pas faire à ta place).
+## 8.2 Prospection (05-06/11/2026)
+- **Stratégie B2B** concertée avec ChatGPT, top 6 : magasins de pièces > garages/vidange > flottes > location > auto-écoles > poids lourds (`docs/prospects/STRATEGIE_B2B.md`).
+- **Page `/prospects`** : nombre collecté par jour, fiches dépliables, **note d'intérêt /10** (barème visible), suivi (à contacter → client).
+- **Robot OpenStreetMap quotidien** (tâche Windows 9 h 30, ~3 000 entreprises) + **Google Maps** consulté à la main dans Chromium (~50 fiches par séance, jamais de robot furtif). API Google Places prête si l'utilisateur la veut un jour.
+- **Prospect ≠ client** : un prospect ne devient client **que lorsqu'il commande** (« A passé commande → créer la vente ») ; onglets Clients « Terrain » / « Venus de la prospection ».
+- **Campagne e-mail** rédigée, **en pause** jusqu'au catalogue rempli (`docs/prospects/CAMPAGNE_EMAIL.md`).
 
-*Prochains chantiers côté Opus : promo stock dormant (§4.2), bilan hebdo (§4.4), fiche produit WhatsApp (§4.5) — puis le parseur de commandes WhatsApp (§4.6) qui ouvre la trajectoire T2. Relis le §7 chaque vendredi : cinq chiffres, dix ans.*
+## 8.3 Clients (06/11/2026)
+- **Localisation exacte du local** (GPS du téléphone, lien Google Maps / position WhatsApp, ou repère sur la carte) + bouton **Y aller** + **Ajouter à la tournée**.
+- **Quartier** (suggestions par ville) + **adresse** ; filtres Ville / Quartier. 62 fiches corrigées (quartier séparé de la ville, orthographe des villes harmonisée).
+
+## 8.4 Le nouveau déroulement quotidien (06-07/11/2026) — validé avec l'utilisateur et ChatGPT
+- **Accueil = 4 gros boutons** : Réception · Vente · Encaisser · Mon activité.
+- **Réception (Marchandise prise)** : choix du fournisseur (dinoun = crédit / filtropro = mon argent) ; **📷 scanner les boîtes** (caméra ouverte, +1 par boîte, compteur en direct) ou taper la réf (Filtron, Mann, Wix, Mahle, Purflux, Flag…) ; par ligne : quantité, **prix d'achat, prix de vente** (marge affichée), marque (« + Autre marque » la crée), code-barres mémorisé → **stock + prix + dette/capital + catalogue** en un enregistrement. Fonctionne **hors connexion**. **Annulation** d'une réception ou d'un paiement par ✕ dans l'historique.
+- **Vente** : la **source de chaque ligne est automatique** (fournisseur de la dernière réception du filtre) ; un bon peut mélanger dinoun et filtropro ; 1 tap pour corriger.
+- **Camion dinoun clarifié** : « Rembourser {coût} » → « Remboursé » (confirmation), + liste **« Bons à rembourser »** sur la carte dinoun. Le paiement du garage ne touche jamais dinoun.
+- **Décisions** : la « source unique par bon » proposée a été **abandonnée** (bons mixtes) ; les « lots FIFO » proposés par ChatGPT ont été **écartés** (trop lourds) ; le camion a été **gardé** (vrai fonctionnement bon par bon).
+- **Test complet bout en bout le 07/11** : réception → vente mixte → camion → annulations : OK.
+
+## 8.5 Équivalents de marques (06-07/11/2026) — sources officielles uniquement
+- Pour les **120 réfs Filtron** de la feuille de prix : **Mann** (avec code-barres EAN des boîtes) et **Wix** via leurs catalogues officiels ; **Mahle (255 réfs) et Purflux (166 réfs)** via le catalogue **filtron.eu** (recherche « référence correspondante »).
+- Effet : taper ou scanner une réf de ces marques retrouve le filtre et règle la marque. Mahle/Wix/Purflux : le code-barres est retenu au premier scan.
+
+## 8.6 Technique & fiabilité (06-07/11/2026)
+- **Scanner** refait : détecteur natif du téléphone (net, léger), lampe, zoom.
+- **Audit** : 85 erreurs de code → 0 ; bug du **circuit des tournées** (distances NaN) corrigé ; **faille Next.js** corrigée ; pages Commandes/Étiquettes 15 s → 2 s.
+- **Mises à jour de l'app visibles immédiatement** (fini les 2-3 rechargements).
+
+## 8.7 Données — remise à zéro avant le vrai démarrage (06-07/11/2026)
+- Les anciennes données étaient des **essais** : 4 réceptions supprimées, **stock et prix remis à 0** partout (sauvegardes dans `backups/`, hors GitHub).
+- On garde : **dinoun = dette de départ 50 000**, **filtropro = 0**, 73 clients. Tout est désormais ressaisi par « Marchandise prise ».
+
+---
+
+# PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 07/11/2026)*
+
+**1. Ressaisis ta marchandise** : accueil → **Réception** → scanne une boîte par référence, tape la quantité, le prix d'achat et le prix de vente → Enregistrer. Le stock, les prix, la dette et le catalogue se mettent à jour tout seuls. Première fois : les boîtes Filtron/Wix/Flag sont à compléter une fois, ensuite elles sont reconnues au scan.
+
+**2. Vends normalement** : accueil → **Vente**. La source (dinoun / filtropro) se met toute seule par ligne. Rembourse dinoun **bon par bon** avec le camion 🚚.
+
+**3. Une fois le catalogue rempli** : envoie le lien `/tarif` aux garages (message darija prêt dans `docs/SESSION_RECAP.md`), puis on lance la campagne e-mail des prospects.
+
+*Relis le §7 chaque vendredi : cinq chiffres, dix ans.*

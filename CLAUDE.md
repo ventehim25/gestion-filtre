@@ -9,6 +9,11 @@ Travailler en **français**. Autonomie totale : agir sans demander, puis rapport
 **Commiter ET pusher après CHAQUE modification.** Un commit par changement logique.
 `git add` + `git commit` + `git push origin master`. Le dossier contient des espaces → utiliser l'outil Bash pour git.
 
+## Règle « tout enregistrer » (IMPORTANTE — demande de l'utilisateur)
+Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à zéro) est **noté dans `docs/BIBLE.md` §8 « Journal des livraisons »** (daté, où c'est, le geste) — et le « Par où je commence lundi matin » de la Bible est tenu à jour. Le point de reprise technique va dans `docs/SESSION_RECAP.md`, le mode d'emploi dans `docs/GUIDE.md`. À faire **avant de terminer** chaque série de changements.
+- Contrôle qualité : `npx tsc --noEmit -p .` doit rester à **0 erreur** (le build ignore TS) ; toute nouvelle table/colonne → l'ajouter au type `Database` de `src/types/database.ts`.
+- Le CLI `vercel` peut avoir un jeton expiré : **le push GitHub déploie tout seul**. Le SQL peut être exécuté par Claude dans l'éditeur Supabase via Chromium (« Run without RLS » = fausse alerte sur les INSERT).
+
 ## Environnement (Windows / PowerShell 5.1)
 - Node PAS dans le PATH : préfixer les commandes par
   `$env:PATH = "C:\Program Files\nodejs;C:\Users\deux\AppData\Roaming\npm;" + $env:PATH`
@@ -36,11 +41,11 @@ Travailler en **français**. Autonomie totale : agir sans demander, puis rapport
 ## Règle données
 - **Ne JAMAIS inventer de référence** de pièce. Au moindre doute, questionner.
 - Source de vérité véhicules : table `applications` (vraies données Filtron) > `compatibilites` (mapping fait main).
-- Photos produit : Scene7 via `FilterImage.tsx`. Équivalences = numéros OE (aftermarket indisponible gratuitement).
+- Photos produit : Scene7 via `FilterImage.tsx`. Équivalences = numéros OE (scrape Filtron) **+ variantes de marque officielles** pour les 120 réfs vendues : Mann (+EAN), Wix (catalogues mann-filter.com / wixfilters.com), Mahle & Purflux (filtron.eu, recherche « référence correspondante »). Liste des marques gérées : `src/lib/brands.ts` (FILTER_BRANDS).
 
 ## Schéma DB (RLS allow-all) — détails colonnes : `src/types/database.ts`
 Tables : products, clients, sales, sale_items, vehicules, compatibilites, equivalences, applications,
-**garages**, **fournisseurs**, **receptions**, **avances**. Vue product_vehicles.
+**garages**, **fournisseurs**, **receptions**, **avances**, **prospects**, rappels_vidange, demandes_manquees, push_subscriptions. Vues product_vehicles, prospects_par_jour.
 RPC : `decrement_stock(p_id, qty)`, `decrement_equiv_stock(e_id, qty)` (qty négative = incrémente).
 Colonnes ajoutées (migrations dans `supabase/`) :
 - products : `prix_promo` (promos.sql)
@@ -48,17 +53,23 @@ Colonnes ajoutées (migrations dans `supabase/`) :
 - sale_items : `fournisseur_id` (source capital/crédit), `equivalence_id` (variante de marque vendue), `cout_unitaire` (coût d'achat figé)
 - fournisseurs : `type` ('capital' = argent propre type filtropro / 'credit' = à rembourser type dinoun)
 - garages : statut ∈ {prospect, a_livrer, preparee, livre, reporte}
+- clients : `quartier`, `latitude`/`longitude` (localisation exacte), `origine` ('terrain' | 'prospection')
+- receptions : `lignes` jsonb (détail produit/variante/qté → annulation propre)
+- avances : `sale_id` (remboursement dinoun d'un bon via le camion) · sales : `fournisseur_paye`
+- prospects : robots OSM/Google + note d'intérêt `score` /10 + `statut_prospection`
 
 ## Fonctionnalités principales (par page)
-- `/` accueil : raccourcis, chiffres cliquables, montants masquables (œil), alertes (réappro/impayés/hors-ligne/à relancer), vitrine repliable.
+- `/` accueil : **4 gros boutons** Réception (`/fournisseurs?reception=1`) · Vente (`/ventes?nouvelle=1`) · Encaisser (`/ventes?impayes=1`) · Mon activité (`/stats`), chiffres cliquables, montants masquables (œil), alertes, vitrine repliable.
 - `/tournees` : carte Leaflet/OSM (gratuit), garages (clic = poser), statuts colorés, circuit optimisé multi-jours, "Y aller" Google Maps. Tuiles OSM cachées hors-ligne (sw.js).
 - `/produits` : équivalences = **variantes de marque** (Flag/Mann/Wix/Filtrex…) avec prix achat/vente/**stock par marque**. Prix promo + bouton "Promo WhatsApp".
-- `/ventes` : choix **source** (capital/crédit) + **marque** par ligne (prix auto, coût figé, décrémente le bon stock), vente croisée, édition/suppression paiement, hors-ligne.
-- `/fournisseurs` : type **capital** (filtropro = mon argent, capital qui grandit) vs **crédit** (dinoun = dette : marchandise prise − avances). Filtre mois, montants masquables.
+- `/ventes` : **source par ligne automatique** (fournisseur de la dernière réception du filtre, `receptions.lignes`) + boutons dinoun|filtropro ; marque par ligne (recherche par réf Mann/Wix/Mahle/Purflux…) ; prix auto, coût figé ; camion **« Rembourser {coût} »** (`src/lib/dinoun.ts`) ; filtre impayés ; hors-ligne.
+- `/fournisseurs` : type **capital** (filtropro = mon argent, capital qui grandit) vs **crédit** (dinoun = dette : départ + marchandise prise − avances). **Marchandise prise** : choix « Chez », scan des boîtes (+1/boîte), prix achat+vente enregistrés sur la fiche, « + Autre marque », code-barres mémorisé, **hors-ligne** (`src/lib/offlineReceptions.ts`), annulation ✕ dans l'historique. Liste « Bons à rembourser » (dinoun).
+- `/clients` : onglets **Terrain / Venus de la prospection**, quartier, localisation GPS + « Y aller » + « Ajouter à la tournée », filtres Ville/Quartier.
+- `/prospects` : prospects collectés (OSM quotidien + Google Maps à la main), note /10, suivi ; « A passé commande → créer la vente » (seule façon de devenir client).
 - `/recherche` (par référence) : clic sur la réf = déplie les **références enregistrées** (avec prix), pas les OE auto.
 - `/stats` : coûts/bénéfices jour/semaine/mois, par fournisseur, capital vs crédit, évolution du capital. Bénéfices basés sur `cout_unitaire` (fallback `products.prix_achat`).
 - PWA installable (bannière), `manifest.json` orientation `any`.
 
 ## Scripts (dossier scripts/, reprenables)
 scrape_filtron.mjs (apps+équiv+dimensions), scrape_images.mjs (image_url), import_filtron_catalog.mjs,
-cleanup_fakes.mjs, seed_garages.mjs. Lancer : `node scripts/xxx.mjs`. (Scripts `_*.mjs` = vérifs jetables.)
+cleanup_fakes.mjs, seed_garages.mjs, scrape_prospects_osm.mjs / scrape_prospects_gmaps.mjs (API Places, clé optionnelle) / import_gmaps_manuel.mjs / prospect_score.mjs (note /10 + envoi Supabase), prospects_quotidien.cmd (tâche Windows 9 h 30). Lancer : `node scripts/xxx.mjs`. (Scripts `_*.mjs` = vérifs jetables.)
