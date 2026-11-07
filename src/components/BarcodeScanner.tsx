@@ -12,8 +12,9 @@ const VIDEO: MediaTrackConstraints = { facingMode: { ideal: "environment" }, wid
 const containerId = "barcode-reader";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-export default function BarcodeScanner({ onScan, onClose, hint = "Visez le code-barres de la boîte." }: {
+export default function BarcodeScanner({ onScan, onClose, hint = "Visez le code-barres de la boîte.", status }: {
   onScan: (code: string) => void; onClose: () => void; hint?: string;
+  status?: string; // retour en direct (ex. « ✓ OE640/1 +1 · 12 boîtes ») — la liste est cachée derrière la caméra
 }) {
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
@@ -179,6 +180,7 @@ export default function BarcodeScanner({ onScan, onClose, hint = "Visez le code-
         )}
         {mode === "fallback" && <div id={containerId} className="w-full rounded-lg overflow-hidden bg-black min-h-[200px]" />}
 
+        {status && <p className="mt-2 rounded-lg bg-[var(--surface-2)] px-3 py-2 text-center text-sm font-medium text-emerald-300">{status}</p>}
         {!ready && !error && <p className="text-center text-slate-400 py-3 text-sm">Démarrage de la caméra…</p>}
         {error && <p className="text-center text-red-400 py-3 text-sm">{error}</p>}
         <p className="text-center text-slate-500 text-xs mt-2">{hint}{zoom ? " Code trop petit ou flou : reculez un peu et activez le zoom." : ""}</p>

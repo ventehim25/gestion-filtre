@@ -277,8 +277,14 @@ export default function FournisseursPage() {
     }
     const nonVide = (l: RecLine) => !!(l.product_id || l.code_barre); // retire la ligne vide de départ
     if (!found) {
-      setScanMsg(`Code ${code} inconnu : choisis le filtre de cette boîte sur la ligne ajoutée (le code sera enregistré).`);
-      setRecLines(prev => [...prev.filter(nonVide), { ...emptyRecLine(), code_barre: code }]);
+      // Même boîte inconnue scannée plusieurs fois : +1 sur sa ligne (pas une ligne par boîte)
+      const deja = recLines.some(l => l.code_barre === code);
+      setScanMsg(`❓ Code ${code} inconnu${deja ? " +1" : ""} — après le scan, choisis son filtre sur la ligne « à compléter »`);
+      setRecLines(prev => {
+        const lines = prev.filter(nonVide);
+        if (lines.some(l => l.code_barre === code)) return lines.map(l => l.code_barre === code ? { ...l, quantite: l.quantite + 1 } : l);
+        return [...lines, { ...emptyRecLine(), code_barre: code }];
+      });
       return;
     }
     const { p, v } = found;
@@ -582,7 +588,10 @@ export default function FournisseursPage() {
         // au-dessus de la fenêtre de réception (même z-50)
         <div className="relative z-[70]">
           <BarcodeScanner onScan={onRecScan} onClose={() => setScanTarget(null)}
-            hint={scanTarget === "boite" ? "Scanne chaque boîte : +1 à chaque lecture. Ferme quand tu as fini." : "Vise le code-barres de la boîte de cette ligne."} />
+            hint={scanTarget === "boite" ? "Scanne les boîtes une par une, tous produits mélangés : +1 à chaque lecture. Ferme (✕) quand tu as fini." : "Vise le code-barres de la boîte de cette ligne."}
+            status={scanTarget === "boite" && scanMsg
+              ? `${scanMsg} · ${recLines.filter(l => l.product_id || l.code_barre).reduce((s, l) => s + l.quantite, 0)} boîte(s), ${recLines.filter(l => l.product_id || l.code_barre).length} réf.`
+              : undefined} />
         </div>
       )}
 
@@ -623,6 +632,9 @@ export default function FournisseursPage() {
                     <div className="col-span-11"><ProductPicker products={products} variants={pickerVariants} value={l.product_id} onSelect={(p, v) => { setRecProduct(i, p); if (v) setRecVariant(i, v.marque); }} /></div>
                     <button onClick={() => setRecLines(prev => prev.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center"><Trash2 size={14} /></button>
                   </div>
+                  {!l.product_id && l.code_barre && (
+                    <p className="text-[11px] text-amber-400 mt-1">📦 Boîte scannée ×{l.quantite} (code {l.code_barre}) : tape sa réf. ci-dessus — le code sera retenu pour les prochaines fois.</p>
+                  )}
                   {/* Qté + prix sur une 2e ligne : lisible sur téléphone (grille avec libellés : .input est w-full) */}
                   <div className="grid grid-cols-3 gap-2 mt-1">
                     <label className="text-[10px] uppercase text-slate-500">Qté
