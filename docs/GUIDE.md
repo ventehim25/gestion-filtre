@@ -48,9 +48,11 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 4. Quand le garage te verse, c'est **tout pour toi** (dinoun est déjà payé).
 
 **Dans l'app :**
-- **Marchandise prise** (Fournisseurs) → augmente le stock **et** ta dette dinoun. Choisis la **marque** par ligne (le stock va sur la bonne marque). Saisis **prix d'achat + prix de vente** par ligne (marge affichée) : ils sont enregistrés sur la fiche du filtre → il apparaît tout seul dans le catalogue (depuis le 06/11/2026).
-- **Vente** (Ventes) → choisis la **source** par ligne : **dinoun** (crédit) ou **filtropro** (ton capital). ⚠️ Une ligne sans source n'est comptée nulle part (voyant orange + rappel avant d'enregistrer).
-- **Camion 🚚** sur un bon (Ventes) → marque « dinoun payé » : ça **baisse ta dette dinoun** automatiquement (du coût de sa marchandise sur ce bon). Re-cliquer annule.
+- **Marchandise prise** (accueil → **Réception**, ou Fournisseurs) → choisis **chez qui** (dinoun = dette, filtropro = ton argent), puis **scanne les boîtes** (+1 par boîte) ou tape la réf (Filtron, Wix, Mann… reconnues). Par ligne : qté, **prix d'achat + prix de vente** (marge affichée), marque (« + Autre marque » crée Mahle/Purflux…), code-barres mémorisé. Enregistrer → stock + prix sur la fiche + dette (ou capital) + catalogue à jour. **Marche hors-ligne** : envoyée au retour du réseau (bandeau jaune).
+- **Erreur de réception / de paiement** → Fournisseurs → Historique → **✕** sur la ligne : la réception est annulée (stock retiré + dette corrigée) ; un paiement libre est annulé.
+- **Vente** (accueil → **Vente**) → choisis **une fois** en haut « Marchandise prise chez » (**dinoun** par défaut, ou filtropro) : tout le bon suit. Cas rare : « changer pour cette ligne ».
+- **Rembourser dinoun bon par bon** → sur le bon (Ventes) : bouton **🚚 Rembourser {coût}** (confirmation) → devient **Remboursé** et ta dette baisse du coût de ce bon. Ou dans Fournisseurs → carte dinoun → **Bons à rembourser**. Le paiement du garage reste séparé : il ne touche jamais dinoun.
+- **Encaisser un garage** → accueil → **Encaisser** (liste des impayés) → 💰 sur le bon.
 - **Solde de départ** (Fournisseurs, crayon) : ce que tu dois déjà à dinoun au démarrage. `50000` = tu lui dois ; négatif (`-500`) = il te doit.
 - **Capital (filtropro)** = ton argent qui tourne et grandit. **Crédit (dinoun)** = dette à rembourser.
 
@@ -60,7 +62,7 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 
 ## 4. Les pages de l'app
 
-- **Accueil** : recherche par réf, chiffres, alertes. Cartes : **À relancer (impayés)** avec WhatsApp 1-tap, **À réveiller** (clients endormis), **Vidanges à rappeler**, bouton **📣 Arrivages** (message hebdo à poster en statut WhatsApp).
+- **Accueil** : **4 gros boutons** (Réception · Vente · Encaisser · Mon activité), recherche par réf, chiffres, alertes. Cartes : **À relancer (impayés)** avec WhatsApp 1-tap, **À réveiller** (clients endormis), **Vidanges à rappeler**, bouton **📣 Arrivages** (message hebdo à poster en statut WhatsApp).
 - **Produits** : fiche par référence + variantes de marque (prix achat/vente/stock/code-barres par marque). **📷 Photo du filtre**. Bouton **fiche WhatsApp**. Promo + « Promo WhatsApp ».
 - **Stock** : compter les quantités (scan +1 par boîte, ou saisie). Pour le démarrage.
 - **Réappro** : 4 onglets — **Sous seuil**, **📈 Prédictif** (jours de stock restants, commande WhatsApp), **💤 Dormant** (rien vendu 90 j → promo −15 %), **🔎 Demandé** (les « j'ai pas »).

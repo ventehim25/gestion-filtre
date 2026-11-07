@@ -32,6 +32,8 @@ export default function VentesPage() {
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [crossSell, setCrossSell] = useState<Product[]>([]);
   // Variantes de marque par produit (Filtron + équivalences avec prix) → prix auto à la vente
+  // Bouton « Encaisser » de l'accueil : n'affiche que les bons pas (entièrement) payés
+  const [impayesOnly, setImpayesOnly] = useState(false);
   // Réfs des variantes de marque (Wix, Flag…) pour la recherche d'article
   const [brandVariants, setBrandVariants] = useState<PickerVariant[]>([]);
   const [variants, setVariants] = useState<Record<string, { marque: string; reference: string; prix: number; prix_achat: number; stock: number; equivalence_id: string | null }[]>>({});
@@ -115,13 +117,15 @@ export default function VentesPage() {
         setPendingCount(left);
       }
       await load();
-      // /ventes?client=<id> (prospect qui passe commande) : ouvre une vente pour ce client
-      const pre = new URLSearchParams(window.location.search).get("client");
-      if (pre) {
+      // Liens directs : /ventes?client=<id> (prospect qui commande) · ?nouvelle=1 (bouton Vente) · ?impayes=1 (bouton Encaisser)
+      const params = new URLSearchParams(window.location.search);
+      const pre = params.get("client");
+      if (pre || params.has("nouvelle")) {
         openNew();
-        setClientId(pre);
-        window.history.replaceState(null, "", "/ventes");
+        if (pre) setClientId(pre);
       }
+      if (params.has("impayes")) setImpayesOnly(true);
+      if ([...params.keys()].length) window.history.replaceState(null, "", "/ventes");
     })();
     const onOnline = async () => { const { left } = await syncPending(supabase); setPendingCount(left); if (left === 0) load(); };
     window.addEventListener("online", onOnline);
@@ -779,6 +783,14 @@ export default function VentesPage() {
         </div>
       )}
 
+      <div className="flex gap-2 mb-3">
+        {[[false, "Tous les bons"], [true, `Impayés (${sales.filter(s => s.statut !== "paye").length})`]].map(([v, label]) => (
+          <button key={String(v)} onClick={() => setImpayesOnly(v as boolean)}
+            className={`rounded-full px-3 py-1 text-xs font-medium ${impayesOnly === v ? "bg-amber-500 text-black" : "btn-secondary"}`}>{label as string}</button>
+        ))}
+        {impayesOnly && <span className="text-[11px] text-slate-500 self-center">Touche 💰 sur un bon pour encaisser</span>}
+      </div>
+
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
@@ -789,7 +801,7 @@ export default function VentesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {sales.map(s => {
+            {sales.filter(s => !impayesOnly || s.statut !== "paye").map(s => {
               const hasItems = (s.items ?? []).length > 0;
               const cost = (s.items ?? []).reduce((a, it) => a + it.quantite * (it.cout_unitaire ?? (it.product as Product | undefined)?.prix_achat ?? 0), 0);
               const benef = s.total - cost;
@@ -838,7 +850,7 @@ export default function VentesPage() {
             })}
           </tbody>
         </table>
-        {sales.length === 0 && <p className="text-center text-slate-400 py-10">{t("noData")}</p>}
+        {sales.filter(s => !impayesOnly || s.statut !== "paye").length === 0 && <p className="text-center text-slate-400 py-10">{impayesOnly ? "Aucun impayé 🎉" : t("noData")}</p>}
       </div>
 
       {/* Scanner caméra */}

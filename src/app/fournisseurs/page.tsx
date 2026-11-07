@@ -1,6 +1,6 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
@@ -230,6 +230,15 @@ export default function FournisseursPage() {
   // ---- Réception (marchandise prise) ----
   const emptyRecLine = (): RecLine => ({ product_id: "", equivalence_id: null, marque: "Filtron", quantite: 1, prix_achat: 0, prix_vente: 0, reference: "", code_barre: "", nouvelleMarque: null, nouvelleRef: "" });
   function openReception(f: Fournisseur) { setRecFor(f); setRecDate(todayStr()); setRecLines([emptyRecLine()]); setScanMsg(""); }
+  // Bouton « Réception » de l'accueil (/fournisseurs?reception=1) : ouvre directement sur le fournisseur crédit
+  const autoReception = useRef(false);
+  useEffect(() => {
+    if (autoReception.current || !fournisseurs.length) return;
+    if (!new URLSearchParams(window.location.search).has("reception")) return;
+    autoReception.current = true;
+    openReception(fournisseurs.find(x => (x.type ?? "credit") === "credit") ?? fournisseurs[0]);
+    window.history.replaceState(null, "", "/fournisseurs");
+  }, [fournisseurs]); // eslint-disable-line react-hooks/exhaustive-deps
   function setRecProduct(i: number, p: Product) {
     setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, prix_vente: p.prix_vente, reference: p.reference, code_barre: l.code_barre || p.code_barre || "", nouvelleMarque: null, nouvelleRef: "" } : l));
   }
@@ -582,12 +591,19 @@ export default function FournisseursPage() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <div className="card p-6 w-full max-w-lg my-4">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-100 flex items-center gap-2"><PackagePlus size={18} className="text-orange-400" /> Marchandise prise — {recFor.nom}</h3>
+              <h3 className="font-semibold text-slate-100 flex items-center gap-2"><PackagePlus size={18} className="text-orange-400" /> Marchandise prise</h3>
               <button onClick={() => setRecFor(null)} className="text-slate-400 hover:text-white"><X size={18} /></button>
             </div>
-            <div className="mb-3">
-              <label className="text-xs text-slate-400 mb-1 block">Date</label>
-              <input type="date" className="input w-44" value={recDate} onChange={e => setRecDate(e.target.value)} />
+            {/* Chez qui (crédit = dette / capital = ton argent) + date — grille : .input est w-full */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <label className="text-xs text-slate-400">Chez
+                <select className="input mt-1" value={recFor.id} onChange={e => { const f = fournisseurs.find(x => x.id === e.target.value); if (f) setRecFor(f); }}>
+                  {fournisseurs.map(f => <option key={f.id} value={f.id}>{f.nom} {isCapital(f) ? "(mon argent)" : "(à crédit)"}</option>)}
+                </select>
+              </label>
+              <label className="text-xs text-slate-400">Date
+                <input type="date" className="input mt-1" value={recDate} onChange={e => setRecDate(e.target.value)} />
+              </label>
             </div>
             {/* Scan des boîtes : chaque boîte scannée ajoute sa ligne (ou +1) */}
             <button onClick={() => { setScanMsg(""); setScanTarget("boite"); }} disabled={products.length === 0}
@@ -668,7 +684,7 @@ export default function FournisseursPage() {
               <p className="text-[11px] text-slate-500">Tape la réf. (Filtron, Wix, Flag…) ou scanne la boîte. Marque absente : « + Autre marque » sous la ligne, elle est créée à l&apos;enregistrement. Le code-barres scanné est mémorisé : la prochaine fois, la boîte est reconnue toute seule.</p>
             </div>
             <div className="bg-[var(--surface-2)] rounded-lg p-3 mb-4 flex items-center justify-between">
-              <span className="text-sm text-slate-300">Coût total (ajouté à la dette)</span>
+              <span className="text-sm text-slate-300">{isCapital(recFor) ? "Coût total (payé avec ton argent)" : "Coût total (ajouté à la dette)"}</span>
               <span className="text-lg font-bold text-orange-400">{recMontant.toFixed(2)} MAD</span>
             </div>
             <p className="text-[11px] text-slate-500 mb-3">Le stock augmente automatiquement et les prix saisis (achat/vente) sont enregistrés sur la fiche du filtre → il apparaît dans le catalogue.</p>

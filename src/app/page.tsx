@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, ClipboardList, MapPin, CloudOff, Banknote, MessageCircle } from "lucide-react";
+import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, CloudOff, Banknote, MessageCircle, PackagePlus, BarChart2, ClipboardList } from "lucide-react";
 // Truck déjà importé pour la tuile Fournisseurs
 import BrandLogo from "@/components/BrandLogo";
 import Logo from "@/components/Logo";
@@ -445,17 +445,21 @@ export default function Dashboard() {
 
       {dbError && <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm font-mono">{dbError}</div>}
 
-      {/* Raccourcis rapides */}
+      {/* Les 4 gestes du quotidien : gros boutons, 1 tap chacun */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
         {[
-          { label: t("addSale"), icon: ShoppingCart, href: "/ventes", color: "bg-blue-500/15 text-blue-400" },
-          { label: t("suppliers"), icon: Truck, href: "/fournisseurs", color: "bg-violet-500/15 text-violet-400" },
-          { label: t("reorder"), icon: ClipboardList, href: "/reappro", color: "bg-amber-500/15 text-amber-400" },
-          { label: t("tours"), icon: MapPin, href: "/tournees", color: "bg-emerald-500/15 text-emerald-400" },
+          { label: "Réception", sub: "Marchandise prise", icon: PackagePlus, href: "/fournisseurs?reception=1", color: "from-orange-600 to-orange-700" },
+          { label: "Vente", sub: "Nouveau bon", icon: ShoppingCart, href: "/ventes?nouvelle=1", color: "from-red-600 to-red-700" },
+          { label: "Encaisser", sub: stats.unpaid ? `${stats.unpaid} bon(s) impayé(s)` : "Aucun impayé", icon: Wallet, href: "/ventes?impayes=1", color: "from-amber-500 to-amber-600" },
+          { label: "Mon activité", sub: "Bénéfices & stats", icon: BarChart2, href: "/stats", color: "from-emerald-600 to-emerald-700" },
         ].map((s) => (
-          <button key={s.href} onClick={() => router.push(s.href)} className="card p-4 flex items-center gap-3 text-left hover:-translate-y-0.5">
-            <div className={`h-10 w-10 shrink-0 rounded-xl flex items-center justify-center ${s.color}`}><s.icon size={20} /></div>
-            <span className="font-semibold text-slate-100 text-sm">{s.label}</span>
+          <button key={s.href} onClick={() => router.push(s.href)}
+            className={`rounded-2xl p-4 min-h-[96px] flex flex-col justify-between text-left text-white bg-gradient-to-br ${s.color} shadow-lg hover:-translate-y-0.5 transition-transform`}>
+            <s.icon size={26} />
+            <div>
+              <div className="font-bold text-base leading-tight">{s.label}</div>
+              <div className="text-[11px] opacity-85">{s.sub}</div>
+            </div>
           </button>
         ))}
       </div>
