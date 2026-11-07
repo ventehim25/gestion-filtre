@@ -411,7 +411,10 @@ export default function VentesPage() {
   // et supprime le bon (les paiements dinoun liés partent en cascade via avances.sale_id).
   async function deleteSale(s: Sale & { client: Client }) {
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Suppression impossible hors-ligne."); return; }
-    if (!confirm(`Supprimer la vente de ${s.client?.nom ?? "ce client"} — ${s.total.toFixed(0)} MAD ?\nLe stock des articles sera rendu.`)) return;
+    // Bon déjà remboursé à dinoun : son remboursement part avec lui (la dette remonte) alors que l'argent a été donné
+    const remb = s.fournisseur_paye ? [...coutCreditParFournisseur(s.items ?? [], creditIds).values()].reduce((a, b) => a + b, 0) : 0;
+    if (!confirm(`Supprimer la vente de ${s.client?.nom ?? "ce client"} — ${s.total.toFixed(0)} MAD ?\nLe stock des articles sera rendu.`
+      + (remb > 0 ? `\n\n⚠ Ce bon est déjà REMBOURSÉ à dinoun (${remb.toFixed(0)} MAD) : ce remboursement sera aussi annulé et la dette remontera.\nSi tu as vraiment payé dinoun, enregistre ensuite ces ${remb.toFixed(0)} MAD en « Avance / paiement » (Fournisseurs).` : ""))) return;
     try {
       const prepared = (s.notes ?? "").startsWith("Commande WhatsApp"); // vente préparée = stock jamais retiré
       if (!prepared) {
