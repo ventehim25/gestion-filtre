@@ -363,12 +363,24 @@ export default function FournisseursPage() {
 
   // ---- Annulations (erreur de saisie) ----
   async function annulerReception(r: Reception) {
-    const lignes = r.lignes ?? [];
-    const msg = lignes.length
-      ? `Annuler la réception du ${r.date} ?\n${r.details ?? ""}\n\n→ le stock de ces articles est retiré et ${r.montant.toFixed(0)} MAD sont enlevés de la dette.`
-      : `Annuler la réception du ${r.date} ?\n${r.details ?? ""}\n\n⚠ Réception sans détail enregistré : la dette sera corrigée (−${r.montant.toFixed(0)} MAD) mais le STOCK ne sera pas retiré (corrige-le dans Stock).`;
-    if (!confirm(msg)) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Annulation impossible hors-ligne."); return; }
+    const lignes = r.lignes ?? [];
+    // Articles déjà (en partie) vendus : le stock passerait en négatif -> on le dit avant d'annuler
+    const negatifs: string[] = [];
+    for (const l of lignes) {
+      const { data } = l.equivalence_id
+        ? await supabase.from("equivalences").select("stock").eq("id", l.equivalence_id).single()
+        : await supabase.from("products").select("stock").eq("id", l.product_id).single();
+      const stock = data?.stock ?? 0;
+      if (stock < l.quantite) negatifs.push(`${l.ref} : stock ${stock}, à retirer ${l.quantite} → ${stock - l.quantite}`);
+    }
+    const quoi = r.fournisseur_id && isCapital(fournisseurs.find(f => f.id === r.fournisseur_id) ?? ({} as Fournisseur))
+      ? `${r.montant.toFixed(0)} MAD reviennent dans ton capital` : `${r.montant.toFixed(0)} MAD sont enlevés de la dette`;
+    const msg = (lignes.length
+      ? `Annuler la réception du ${r.date} ?\n${r.details ?? ""}\n\n→ le stock de ces articles est retiré et ${quoi}.`
+      : `Annuler la réception du ${r.date} ?\n${r.details ?? ""}\n\n⚠ Réception sans détail enregistré : ${quoi}, mais le STOCK ne sera pas retiré (corrige-le dans Stock).`)
+      + (negatifs.length ? `\n\n⚠ Déjà vendu en partie — le stock passera en NÉGATIF :\n• ${negatifs.join("\n• ")}\n(À corriger ensuite dans Stock, ou annule plutôt les ventes concernées.)` : "");
+    if (!confirm(msg)) return;
     for (const l of lignes) {
       if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: l.quantite });
       else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
