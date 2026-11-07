@@ -5,7 +5,7 @@
    - Images produits (Scene7 / Unsplash) : cache-first (photos dispo hors-ligne).
    - Écritures (POST/PATCH/DELETE) : réseau direct (échec si hors-ligne -> à gérer côté app).
 */
-const VERSION = "v16";
+const VERSION = "v17";
 const STATIC = "fp-static-" + VERSION;
 const DATA = "fp-data-" + VERSION;
 const IMG = "fp-img-" + VERSION;
@@ -121,10 +121,12 @@ self.addEventListener("fetch", (event) => {
   }
 
   // --- App (même origine, GET) ---
-  //     Pages (navigation) : réseau d'abord, cache si le réseau ne répond pas sous 3 s ou hors-ligne
-  //     -> une mise à jour déployée s'affiche dès la 1re ouverture (avant : 2-3 rechargements).
+  //     Pages (navigation) ET données de page des changements d'écran Next.js (requêtes RSC, `?_rsc=`) :
+  //     réseau d'abord, cache si le réseau ne répond pas sous 3 s ou hors-ligne
+  //     -> une mise à jour déployée s'affiche tout de suite (avant : l'ancienne page revenait du cache).
   //     Fichiers /_next/static (noms versionnés) et autres : stale-while-revalidate.
   if (url.origin === self.location.origin && req.method === "GET") {
+    const reseauDabord = req.mode === "navigate" || url.searchParams.has("_rsc") || req.headers.get("RSC") === "1";
     event.respondWith((async () => {
       const cache = await caches.open(STATIC);
       const cached = await cache.match(req);
@@ -132,7 +134,7 @@ self.addEventListener("fetch", (event) => {
         if (res && res.ok) cache.put(req, res.clone());
         return res;
       }).catch(() => null);
-      if (cached && req.mode === "navigate") {
+      if (cached && reseauDabord) {
         const winner = await Promise.race([fetching, new Promise((r) => setTimeout(() => r(null), 3000))]);
         if (winner) return winner;
         event.waitUntil(fetching);
