@@ -911,6 +911,10 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - Les anciennes données étaient des **essais** : 4 réceptions supprimées, **stock et prix remis à 0** partout (sauvegardes dans `backups/`, hors GitHub).
 - On garde : **dinoun = dette de départ 50 000**, **filtropro = 0**, 73 clients. Tout est désormais ressaisi par « Marchandise prise ».
 
+## 8.8 Prospection hebdomadaire — routine cloud (09/11/2026)
+- **Larache** prospectée (région Nord, après Tanger/Tétouan/Fès/Asilah) : 10 prospects B2B réels sourcés (`docs/prospects/larache.md`), surtout des revendeurs de pièces auto, 8 avec téléphone confirmé (2 mobiles 06 → WhatsApp probable). Aucun garage de réparation générale ni centre de vidange/lavage dédié trouvé avec coordonnées fiables cette fois — telecontact.ma/annuaire-gratuit.ma/dnb.com inaccessibles en WebFetch direct dans l'environnement cloud (contournés via extraits WebSearch, toujours sourcés).
+- **Prochaine ville** (ordre Nord → loin) : Ksar El Kebir.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 07/11/2026)*
