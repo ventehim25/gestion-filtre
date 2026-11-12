@@ -89,6 +89,22 @@ Attention : un même code moteur de base (par exemple K9K) a plusieurs variantes
 
 **Lien avec Vidani** : le même moteur d'identification servira à l'assistant WhatsApp. Le client envoie son VIN ou la photo de sa carte grise, et reçoit le prix exact de la vidange avec le bon filtre.
 
+## 8. Autre inspiration : partsouq (proposé par l'utilisateur)
+
+- Site de pièces d'origine (Dubaï) : on tape le **VIN** sur la page d'accueil, puis on navigue dans le catalogue du constructeur, ou on cherche par nom, numéro ou code de pièce. Marques : Toyota, Nissan, Hyundai, Kia, Renault, Peugeot, VW, BMW, Mercedes…
+- **Même principe que partslink24** : le moteur exact vient des catalogues des constructeurs, pas du VIN lui-même. Une page de partsouq signalait d'ailleurs que le décodage VIN était **temporairement limité à Toyota** : preuve que ces données dépendent de fournisseurs extérieurs.
+- **Ce qu'on reprend** (idées seulement, aucune donnée ni image copiée) : un seul champ bien visible pour le VIN ; recherche aussi par numéro de pièce ; parcours en peu d'écrans, bilingue (partsouq existe en arabe).
+
+## 9. Étape 1 livrée le 12/11/2026
+
+- **Recherche rapide → bloc « VIN ou code moteur »** (`src/components/RechercheVin.tsx`) :
+  - code moteur → voitures + leurs filtres, regroupés par voiture ;
+  - VIN confirmé → 🟢 ; même famille de VIN (8 premiers caractères) → 🟠 ; VIN inconnu → 🔴, on tape le code moteur ou le modèle, puis « C'est cette voiture » retient le VIN.
+- **Repli** : si la variante (ex. « K9K 612 ») n'existe pas dans les données Filtron, on montre le moteur de base (« K9K ») avec un avertissement 🟠.
+- **`src/lib/vin.ts`** : tableau des constructeurs **vérifié** (9 erreurs corrigées, plus de 30 codes ajoutés, dont DF9 Laraki pour le Maroc), corrections O→0, I→1, Q→0, contrôle des 17 caractères, année probable (indication seulement).
+- **Onglet « Par véhicule »** : même tableau vérifié, et l'année du VIN **n'est plus appliquée d'office**.
+- **Mémoire** : table `vin_connus` (`supabase/vin_connus.sql`, règle `equipe`), données techniques seulement.
+
 ---
 
 ### Sources

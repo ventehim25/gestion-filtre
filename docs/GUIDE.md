@@ -35,6 +35,7 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 | `supabase/sale_fournisseur_paye.sql` | Camion « dinoun payé » par bon + paiement auto | ✅ collé |
 | `supabase/storage_produits.sql` | Stockage des photos produits | ✅ collé |
 | `supabase/securite.sql` | **Base protégée + connexion obligatoire** (voir §9) | ✅ collé le 12/11/2026 (compte ventehim@gmail.com) |
+| `supabase/vin_connus.sql` | Mémoire des VIN confirmés (« VIN ou code moteur ») | ⏳ à coller |
 
 > Règle : après un `CREATE`/`ALTER`, le SQL finit par `notify pgrst, 'reload schema';` et tu **recharges l'app**.
 
@@ -151,6 +152,19 @@ Avant : n'importe qui pouvait lire, modifier ou effacer tes clients, tes ventes 
 `insert into public.utilisateurs_autorises (email) values (lower('son@email.com'));`
 
 **Urgence** (l'appli ne marche plus après la sécurisation) : colle `supabase/securite_annuler.sql`. La base redevient ouverte comme avant, le temps de corriger.
+
+---
+
+## 10. Trouver les filtres par VIN ou par code moteur
+
+**Recherche → Recherche rapide → bloc « VIN ou code moteur »** (en haut) :
+- **Le plus fiable : le code moteur**, écrit sur le moteur (par exemple `H4D`, `DV6FC`, `K9K 872`). Tape-le et les voitures s'affichent avec leurs filtres (huile, air, habitacle, carburant), le prix et le stock.
+- **Le VIN** (17 caractères, sur la carte grise ou le pare-brise) : l'appli reconnaît la marque.
+  - 🟢 si ce VIN a déjà été vendu → les filtres s'affichent directement ;
+  - 🟠 si un VIN qui lui ressemble a déjà été confirmé → vérifie, puis confirme ;
+  - 🔴 sinon → tape le code moteur ou le modèle dans le 2e champ, choisis la bonne voiture et appuie sur **« C'est cette voiture »**. La prochaine fois, ce VIN sera reconnu tout seul.
+- Si la variante tapée n'existe pas dans les données Filtron, l'appli montre le moteur de base avec un avertissement 🟠 : vérifie le modèle et l'année avant de vendre.
+- L'année lue dans le VIN est seulement une **indication** : beaucoup de marques européennes ne l'écrivent pas.
 
 ---
 

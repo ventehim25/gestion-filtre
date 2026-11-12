@@ -5,6 +5,19 @@
 
 ---
 
+## 000. Session du 12/11/2026 (suite) — recherche VIN, étape 1
+
+- **Analyse** : `docs/VIN_ANALYSE.md` (partslink24, partsouq, sources du code moteur, plan en 3 étapes).
+- **Code** :
+  - `src/lib/vin.ts` : WMI vérifiés sur Wikibooks, nettoyage du VIN, année probable, famille = 8 premiers caractères, détection et motifs de code moteur ;
+  - `src/components/RechercheVin.tsx` : en haut de l'onglet « Recherche rapide » de `/recherche` ;
+  - l'onglet « Par véhicule » utilise `vin.ts` et n'impose plus l'année.
+- **Codes moteur Filtron** : écrits de façons variées (« K9K », « K9K 872 », « K9K700 », « K9K-722 », listes « K9K 790/792 »). Le motif `%K9K%612%` couvre l'espace, le tiret et l'absence d'espace. Si rien n'est trouvé, repli sur les 3 premiers caractères.
+- **SQL** : `supabase/vin_connus.sql` (table + règle `equipe`) **pas encore exécuté**. Le clic de confirmation « destructive » de Supabase a été bloqué par la permission automatique : c'est l'utilisateur qui doit cliquer sur « Run query ». Le code gère l'absence de la table (message clair au clic sur « C'est cette voiture »).
+- **Étape 2** : 30 vrais VIN marocains, avec carte grise et code moteur confirmé, à tester sur la base seule et avec Vincario (20 essais gratuits).
+
+---
+
 ## 00. Session du 12/11/2026 — sécurité de la base
 
 - **Code en ligne** :

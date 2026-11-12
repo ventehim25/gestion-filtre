@@ -947,6 +947,13 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Plan retenu (à valider)** : mémoire des VIN confirmés → identification locale (marque + carte grise + base) → service payant seulement si besoin (Vincario à tester sur 30 vrais VIN marocains, 20 essais gratuits) → filtres ; pastilles de confiance 🟢🟠🔴 ; **recherche par code moteur** ; l'année du 10ᵉ caractère devient une indication, plus un filtre obligatoire. Étape 1 gratuite.
 - **Défauts repérés dans la recherche VIN actuelle** : année imposée (fausse pour beaucoup de marques européennes), tableau des constructeurs avec erreurs probables (TMA, WFO, MAT) et codes récents manquants (VR3…), pas de contrôle de saisie.
 
+## 8.12 Recherche par VIN — étape 1 livrée (12/11/2026)
+- **Recherche → Recherche rapide → « VIN ou code moteur »** : le code moteur (lu sur le moteur) donne les voitures et leurs filtres exacts, regroupés par voiture. Si la variante n'est pas dans les données Filtron, le moteur de base est proposé avec un avertissement 🟠.
+- **VIN** : constructeur reconnu (tableau **vérifié** : 9 erreurs corrigées, dont TMA = Hyundai et pas Skoda, MAT = Tata et pas Opel) ; pastilles 🟢 VIN déjà confirmé / 🟠 même famille / 🔴 inconnu ; bouton **« C'est cette voiture »** qui retient le VIN pour la prochaine fois (table `vin_connus`).
+- **Onglet « Par véhicule »** : l'année lue dans le VIN n'est plus imposée (elle cachait parfois la bonne voiture).
+- Testé : 22 tests des fonctions VIN OK ; « H4D » chez Dacia → 18 voitures avec leurs filtres ; « DV6FC » chez Peugeot → 17 voitures. Contrôle qualité à 0 erreur, compilation OK.
+- **Reste** : coller `supabase/vin_connus.sql` (mémoire des VIN), puis l'étape 2 (30 vrais VIN marocains à tester).
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*
