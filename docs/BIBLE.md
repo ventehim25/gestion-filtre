@@ -941,6 +941,12 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
   - photos : lecture publique, envoi réservé à l'équipe ;
   - vues et fonctions de stock protégées ; les futures tables ne sont plus ouvertes au public par défaut.
 
+## 8.11 Recherche par VIN — analyse partslink24 (12/11/2026)
+- **Analyse** : `docs/VIN_ANALYSE.md` (recherches + base réelle + avis ChatGPT « Architecture VIN FiltroPro »). partslink24 trouve le moteur exact grâce aux **données de fabrication des constructeurs** (sous licence) : un VIN européen seul **ne contient pas** le code moteur.
+- **Notre atout** : 114 373 applications Filtron, **91 % avec code moteur** → une fois le code moteur connu, le filtre exact est déjà en base.
+- **Plan retenu (à valider)** : mémoire des VIN confirmés → identification locale (marque + carte grise + base) → service payant seulement si besoin (Vincario à tester sur 30 vrais VIN marocains, 20 essais gratuits) → filtres ; pastilles de confiance 🟢🟠🔴 ; **recherche par code moteur** ; l'année du 10ᵉ caractère devient une indication, plus un filtre obligatoire. Étape 1 gratuite.
+- **Défauts repérés dans la recherche VIN actuelle** : année imposée (fausse pour beaucoup de marques européennes), tableau des constructeurs avec erreurs probables (TMA, WFO, MAT) et codes récents manquants (VR3…), pas de contrôle de saisie.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*
