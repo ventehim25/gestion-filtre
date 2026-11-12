@@ -915,6 +915,11 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Larache** prospectée (région Nord, après Tanger/Tétouan/Fès/Asilah) : 10 prospects B2B réels sourcés (`docs/prospects/larache.md`), surtout des revendeurs de pièces auto, 8 avec téléphone confirmé (2 mobiles 06 → WhatsApp probable). Aucun garage de réparation générale ni centre de vidange/lavage dédié trouvé avec coordonnées fiables cette fois — telecontact.ma/annuaire-gratuit.ma/dnb.com inaccessibles en WebFetch direct dans l'environnement cloud (contournés via extraits WebSearch, toujours sourcés).
 - **Prochaine ville** (ordre Nord → loin) : Ksar El Kebir.
 
+## 8.9 Pub réseaux hebdomadaire — routine cloud (12/11/2026)
+- Kit publicitaire créé pour **OE688/1** (filtre à huile Filtron, Ford Focus III / Fiesta VI-VII 1.5 TDCi) — 5ᵉ produit traité après oe667-3, oe688-3, ap071-7, golf-7-4-filtres. Référence, équivalences (Mann HU 7017 z, Wix WL7489, Mahle OX 1099/OX 422/OX 422 D, Purflux L508) et prix (achat 20 MAD / vente 34 MAD) sourcés dans `supabase/new_refs.sql`, `supabase/compat_new.sql`, `supabase/equivalents_mann_wix.sql`, `supabase/equivalents_mahle_purflux.sql` — aucune invention.
+- Fichiers : `docs/pub/oe688-1.md` (angle, scénario vidéo 9:16 FR+darija, variantes TikTok/Story, post FR+darija, hashtags, plan de publication) + `docs/pub/oe688-1-affiche.html` (affiche 9:16 autonome, charte FiltroPro).
+- Reste à faire côté utilisateur : filmer les plans, monter dans CapCut, exporter l'affiche en image, publier jeudi/vendredi/samedi.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 07/11/2026)*
