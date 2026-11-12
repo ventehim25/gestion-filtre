@@ -8,7 +8,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Application, Product, VinConnu } from "@/types/database";
-import { nettoyerVin, vinValide, constructeur, anneeProbable, familleVin, ressembleCodeMoteur, motifsCodeMoteur } from "@/lib/vin";
+import { nettoyerVin, vinValide, constructeur, anneeProbable, familleVin, ressembleCodeMoteur, motifsCodeMoteur, MARQUES_COURANTES, AUTRES_MARQUES, type MarqueVin } from "@/lib/vin";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import { Search, ScanLine } from "lucide-react";
@@ -109,11 +109,14 @@ export default function RechercheVin() {
   const [chargement, setChargement] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Marque choisie à la main (comme partslink24) : facultative, elle passe avant la marque lue dans le VIN
+  const [marqueManuelle, setMarqueManuelle] = useState<MarqueVin | null>(null);
 
   const net = nettoyerVin(q);
   const estVin = vinValide(net);
   const vinEnCours = !estVin && net.length >= 9 && net.length < 17 && /^[A-HJ-NPR-Z0-9]+$/.test(net) && !ressembleCodeMoteur(q);
-  const marque = estVin ? constructeur(net) : null;
+  const marqueVin = estVin ? constructeur(net) : null;
+  const marque = marqueManuelle ?? marqueVin;
   const annee = estVin ? anneeProbable(net) : null;
 
   // Saisie principale : VIN ou code moteur / modèle
@@ -150,7 +153,7 @@ export default function RechercheVin() {
           }
         } else {
           setNiveau(null); setConfirme(null);
-          const r = await chercherVoitures(t);
+          const r = await chercherVoitures(t, marqueManuelle?.motif);
           if (actif) { setVoitures(r.voitures); setNote(r.note); }
         }
       } finally {
@@ -158,7 +161,7 @@ export default function RechercheVin() {
       }
     }, 350);
     return () => { actif = false; clearTimeout(id); };
-  }, [q, estVin, vinEnCours, net]);
+  }, [q, estVin, vinEnCours, net, marqueManuelle]);
 
   // VIN inconnu (ou probable) : le vendeur précise avec le code moteur ou le modèle
   useEffect(() => {
@@ -201,6 +204,29 @@ export default function RechercheVin() {
     <div className="card p-5 mb-4">
       <h3 className="font-semibold text-slate-700 mb-1 flex items-center gap-2"><ScanLine size={18} /> VIN ou code moteur</h3>
       <p className="text-xs text-slate-400 mb-3">Le code moteur (sur le moteur, ex. « K9K 612 ») donne les filtres exacts. Un VIN confirmé une fois est reconnu ensuite tout seul.</p>
+
+      {/* 1. La marque (facultatif, comme partslink24) — reconnue toute seule si le VIN est connu */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-3" role="group" aria-label="Marque">
+        <span className="text-xs text-slate-400 me-1">Marque :</span>
+        <button type="button" onClick={() => setMarqueManuelle(null)}
+          className={`px-2.5 py-1 rounded-full text-xs border ${!marqueManuelle ? "bg-blue-600 border-blue-600 text-white" : "border-slate-600 text-slate-300"}`}>
+          {marqueVin && !marqueManuelle ? `Auto : ${marqueVin.nom}` : "Toutes"}
+        </button>
+        {MARQUES_COURANTES.map((m) => (
+          <button key={m.nom} type="button" onClick={() => setMarqueManuelle(marqueManuelle?.nom === m.nom ? null : m)}
+            className={`px-2.5 py-1 rounded-full text-xs border ${marqueManuelle?.nom === m.nom ? "bg-blue-600 border-blue-600 text-white" : "border-slate-600 text-slate-300"}`}>
+            {m.nom}
+          </button>
+        ))}
+        <select aria-label="Autres marques" className="text-xs rounded-full border border-slate-600 bg-transparent px-2 py-1 text-slate-300"
+          value={AUTRES_MARQUES.some((m) => m.nom === marqueManuelle?.nom) ? marqueManuelle!.nom : ""}
+          onChange={(e) => setMarqueManuelle(AUTRES_MARQUES.find((m) => m.nom === e.target.value) ?? null)}>
+          <option value="">Autres marques…</option>
+          {AUTRES_MARQUES.map((m) => <option key={m.nom} value={m.nom}>{m.nom}</option>)}
+        </select>
+      </div>
+
+      {/* 2. Le VIN ou le code moteur */}
       <div className="relative">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <label htmlFor="vin-ou-code" className="sr-only">VIN ou code moteur</label>
@@ -214,8 +240,10 @@ export default function RechercheVin() {
       {estVin && (
         <div className="mt-3 space-y-2">
           <p className="text-sm text-slate-300">
-            VIN valide · <b>{marque ? marque.nom : `constructeur inconnu (${net.slice(0, 3)})`}</b>
-            {marque?.detail ? ` · ${marque.detail}` : ""}
+            VIN valide · <b>{marqueVin ? marqueVin.nom : `constructeur inconnu (${net.slice(0, 3)})`}</b>
+            {marqueVin?.detail ? ` · ${marqueVin.detail}` : ""}
+            {!marqueVin && !marqueManuelle ? <span className="text-amber-300"> · choisis la marque ci-dessus</span> : null}
+            {marqueManuelle && marqueManuelle.nom !== marqueVin?.nom ? <span className="text-slate-400"> · marque choisie : {marqueManuelle.nom}</span> : null}
             {annee ? <span className="text-slate-400"> · année probable {annee} (à vérifier, certaines marques ne l&apos;indiquent pas)</span> : null}
           </p>
           {niveau && <p className={`text-sm px-3 py-2 rounded-lg ${pastille[niveau].classe}`}>{pastille[niveau].texte}</p>}

@@ -57,6 +57,19 @@ const WMI: Record<string, MarqueVin> = {
   DF9: M("Laraki", "LARAKI%", "Maroc"),
 };
 
+/** Marques proposées en boutons (comme partslink24 : on peut choisir la marque avant de taper le VIN ou le code
+ *  moteur). Les premières sont les plus courantes au Maroc ; le reste va dans « Autres marques ». */
+export const MARQUES_COURANTES: MarqueVin[] = [
+  M("Dacia", "DACIA%"), M("Renault", "RENAULT"), M("Peugeot", "PEUGEOT%"), M("Citroën", "CITRO%"),
+  M("Hyundai", "HYUNDAI%"), M("Kia", "KIA%"), M("Volkswagen", "VW%"), M("Toyota", "TOYOTA%"),
+];
+export const AUTRES_MARQUES: MarqueVin[] = [
+  M("Alfa Romeo", "ALFA%"), M("Audi", "AUDI%"), M("BMW", "BMW%"), M("Chery", "CHERY%"), M("DS", "DS%"),
+  M("Fiat", "FIAT%"), M("Ford", "FORD%"), M("Geely", "GEELY%"), M("Honda", "HONDA%"), M("Mercedes", "MERCEDES%"),
+  M("MG", "MG%"), M("Nissan", "NISSAN%"), M("Opel", "OPEL%"), M("Seat", "SEAT%"), M("Skoda", "SKODA%"),
+  M("Suzuki", "SUZUKI%"), M("Tata", "TATA%"),
+];
+
 /** Majuscules, sans espaces ni tirets. Les lettres O, I et Q sont interdites dans un VIN : O→0, I→1, Q→0. */
 export function nettoyerVin(raw: string): string {
   return raw.toUpperCase().replace(/[\s\-._]/g, "").replace(/O/g, "0").replace(/I/g, "1").replace(/Q/g, "0");

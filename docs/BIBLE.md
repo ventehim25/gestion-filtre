@@ -948,6 +948,7 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Défauts repérés dans la recherche VIN actuelle** : année imposée (fausse pour beaucoup de marques européennes), tableau des constructeurs avec erreurs probables (TMA, WFO, MAT) et codes récents manquants (VR3…), pas de contrôle de saisie.
 
 ## 8.12 Recherche par VIN — étape 1 livrée (12/11/2026)
+- **Choix de la marque avant le VIN** (idée partslink24, demandée par l'utilisateur) : rangée de boutons Dacia, Renault, Peugeot, Citroën, Hyundai, Kia, VW, Toyota + « Autres marques ». Facultatif : la marque du VIN reste détectée toute seule (« Auto »), le choix manuel sert si le VIN est inconnu ou pour réduire un code moteur partagé (K9K).
 - **Recherche → Recherche rapide → « VIN ou code moteur »** : le code moteur (lu sur le moteur) donne les voitures et leurs filtres exacts, regroupés par voiture. Si la variante n'est pas dans les données Filtron, le moteur de base est proposé avec un avertissement 🟠.
 - **VIN** : constructeur reconnu (tableau **vérifié** : 9 erreurs corrigées, dont TMA = Hyundai et pas Skoda, MAT = Tata et pas Opel) ; pastilles 🟢 VIN déjà confirmé / 🟠 même famille / 🔴 inconnu ; bouton **« C'est cette voiture »** qui retient le VIN pour la prochaine fois (table `vin_connus`).
 - **Onglet « Par véhicule »** : l'année lue dans le VIN n'est plus imposée (elle cachait parfois la bonne voiture).

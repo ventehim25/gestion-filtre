@@ -158,6 +158,7 @@ Avant : n'importe qui pouvait lire, modifier ou effacer tes clients, tes ventes 
 ## 10. Trouver les filtres par VIN ou par code moteur
 
 **Recherche → Recherche rapide → bloc « VIN ou code moteur »** (en haut) :
+- **La marque (facultatif, comme sur partslink24)** : les boutons Dacia, Renault, Peugeot… au-dessus du champ. Utile quand le VIN n'est pas reconnu, ou pour un code moteur partagé par plusieurs marques (ex. K9K chez Renault, Dacia, Nissan). Sinon, laisse « Toutes » : la marque est lue toute seule dans le VIN (« Auto »).
 - **Le plus fiable : le code moteur**, écrit sur le moteur (par exemple `H4D`, `DV6FC`, `K9K 872`). Tape-le et les voitures s'affichent avec leurs filtres (huile, air, habitacle, carburant), le prix et le stock.
 - **Le VIN** (17 caractères, sur la carte grise ou le pare-brise) : l'appli reconnaît la marque.
   - 🟢 si ce VIN a déjà été vendu → les filtres s'affichent directement ;
