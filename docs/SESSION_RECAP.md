@@ -14,7 +14,9 @@
   - `src/lib/supabase.ts` : sur le serveur, clé `SUPABASE_SERVICE_ROLE_KEY` si présente ;
   - `/c/[...ref]` : colonnes listées (plus de `select("*")`, donc plus de prix d'achat dans la page publique) ;
   - `scripts/cle_supabase.mjs` utilisé par tous les scripts (clé service de `.env.local`, sinon clé anon).
-- **SQL collé et vérifié le 12/11** (exécuté par Claude dans l'éditeur Supabase via Chromium, compte `ventehim@gmail.com`, inscriptions fermées). Avec la clé anon : toutes les tables de gestion → 42501, catalogue OK, tarif OK (8 articles). **Restent** : la clé service dans Vercel (cron de 8 h) et dans `.env.local` (robot de 9 h 30).
+- **SQL collé et vérifié le 12/11** (exécuté par Claude dans l'éditeur Supabase via Chromium, compte `ventehim@gmail.com`, inscriptions fermées). Avec la clé anon : toutes les tables de gestion → 42501, catalogue OK, tarif OK (8 articles).
+- **Clé serveur ajoutée le 12/11** : nouvelle **clé secrète Supabase `serveur2`** (format `sb_secret_…`, les clés « legacy » s'arrêtent début 2027) dans `.env.local` → testée : accès complet, 73 clients, prospects OK. Même clé dans **Vercel** (`SUPABASE_SERVICE_ROLE_KEY`, Production), redéploiement déclenché par ce commit. L'ancienne clé secrète, visible sur une capture, a été **supprimée** dans Supabase.
+- **À faire avant début 2027** : remplacer la clé publique « legacy » (anon JWT dans `src/lib/supabase.ts`, `scripts/cle_supabase.mjs`, `.env.local`, Vercel) par la **publishable key** `sb_publishable_…`.
 - **Contenu du SQL** :
   - `supabase/securite.sql` : `utilisateurs_autorises` + `est_autorise()`, suppression de toutes les règles « allow all », règle `equipe` sur chaque table, lecture publique en colonnes limitées sur products/equivalences/applications, vues en `security_invoker`, RPC de stock fermées à anon, photos : envoi réservé à l'équipe, privilèges par défaut sans anon ;
   - urgence : `supabase/securite_annuler.sql`.
