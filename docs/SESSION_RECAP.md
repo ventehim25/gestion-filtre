@@ -14,7 +14,8 @@
   - `src/lib/supabase.ts` : sur le serveur, clé `SUPABASE_SERVICE_ROLE_KEY` si présente ;
   - `/c/[...ref]` : colonnes listées (plus de `select("*")`, donc plus de prix d'achat dans la page publique) ;
   - `scripts/cle_supabase.mjs` utilisé par tous les scripts (clé service de `.env.local`, sinon clé anon).
-- **SQL prêt, PAS encore collé** :
+- **SQL collé et vérifié le 12/11** (exécuté par Claude dans l'éditeur Supabase via Chromium, compte `ventehim@gmail.com`, inscriptions fermées). Avec la clé anon : toutes les tables de gestion → 42501, catalogue OK, tarif OK (8 articles). **Restent** : la clé service dans Vercel (cron de 8 h) et dans `.env.local` (robot de 9 h 30).
+- **Contenu du SQL** :
   - `supabase/securite.sql` : `utilisateurs_autorises` + `est_autorise()`, suppression de toutes les règles « allow all », règle `equipe` sur chaque table, lecture publique en colonnes limitées sur products/equivalences/applications, vues en `security_invoker`, RPC de stock fermées à anon, photos : envoi réservé à l'équipe, privilèges par défaut sans anon ;
   - urgence : `supabase/securite_annuler.sql`.
 - **Ordre pour l'utilisateur** : GUIDE §9 (compte → inscriptions fermées → SQL → connexion PC et téléphone → clé service dans Vercel et `.env.local`).

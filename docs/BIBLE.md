@@ -929,7 +929,12 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
   - page publique `/c/…` : plus aucun prix d'achat dans les données de la page ;
   - côté serveur (cron des relances, `/c/`, sitemap) : clé **service** `SUPABASE_SERVICE_ROLE_KEY` si définie dans Vercel ;
   - scripts : connexion commune `scripts/cle_supabase.mjs` (clé service lue dans `.env.local`).
-- **À faire par l'utilisateur (une fois)** : créer son compte dans Supabase Auth, fermer les inscriptions, lancer `supabase/securite.sql`, ajouter la clé service dans Vercel et dans `.env.local`. Mode d'emploi : **GUIDE §9**. Urgence : `supabase/securite_annuler.sql`.
+- **✅ Activé le 12/11/2026** :
+  - compte `ventehim@gmail.com` (déjà présent dans Supabase Auth), inscriptions fermées, `securite.sql` exécuté ;
+  - **vérifié** avec la clé publique : clients, ventes, prospects, fournisseurs, garages, avances, réceptions, abonnements push, rappels, prix d'achat, écriture et fonction de stock sont tous **refusés** ;
+  - le catalogue public, le tarif (8 articles) et la page `/c/…` marchent ;
+  - l'appli en ligne affiche l'écran de connexion.
+- **Reste à faire par l'utilisateur** : se connecter sur le PC et le téléphone ; ajouter la clé service dans Vercel (notifications de 8 h) et dans `.env.local` (robot de 9 h 30). Mode d'emploi : **GUIDE §9**. Urgence : `supabase/securite_annuler.sql`.
 - **Règles posées par le SQL** :
   - seuls les emails de `utilisateurs_autorises` accèdent aux données (fonction `est_autorise()`) ;
   - le public ne lit que le catalogue : produits, variantes et applications, **sans prix d'achat** ;
