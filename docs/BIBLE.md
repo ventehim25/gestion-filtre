@@ -952,7 +952,7 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **VIN** : constructeur reconnu (tableau **vérifié** : 9 erreurs corrigées, dont TMA = Hyundai et pas Skoda, MAT = Tata et pas Opel) ; pastilles 🟢 VIN déjà confirmé / 🟠 même famille / 🔴 inconnu ; bouton **« C'est cette voiture »** qui retient le VIN pour la prochaine fois (table `vin_connus`).
 - **Onglet « Par véhicule »** : l'année lue dans le VIN n'est plus imposée (elle cachait parfois la bonne voiture).
 - Testé : 22 tests des fonctions VIN OK ; « H4D » chez Dacia → 18 voitures avec leurs filtres ; « DV6FC » chez Peugeot → 17 voitures. Contrôle qualité à 0 erreur, compilation OK.
-- **Reste** : coller `supabase/vin_connus.sql` (mémoire des VIN), puis l'étape 2 (30 vrais VIN marocains à tester).
+- **`supabase/vin_connus.sql` collé le 12/11** (vérifié : table protégée, mémoire et famille OK). **Reste** : l'étape 2 (30 vrais VIN marocains à tester).
 
 ---
 

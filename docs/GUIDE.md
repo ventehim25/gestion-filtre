@@ -35,7 +35,7 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 | `supabase/sale_fournisseur_paye.sql` | Camion « dinoun payé » par bon + paiement auto | ✅ collé |
 | `supabase/storage_produits.sql` | Stockage des photos produits | ✅ collé |
 | `supabase/securite.sql` | **Base protégée + connexion obligatoire** (voir §9) | ✅ collé le 12/11/2026 (compte ventehim@gmail.com) |
-| `supabase/vin_connus.sql` | Mémoire des VIN confirmés (« VIN ou code moteur ») | ⏳ à coller |
+| `supabase/vin_connus.sql` | Mémoire des VIN confirmés (« VIN ou code moteur ») | ✅ collé le 12/11/2026 |
 
 > Règle : après un `CREATE`/`ALTER`, le SQL finit par `notify pgrst, 'reload schema';` et tu **recharges l'app**.
 
