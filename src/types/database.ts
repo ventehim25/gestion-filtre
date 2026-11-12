@@ -34,6 +34,8 @@ export type Database = {
       prospects: Table<Prospect, "created_at" | "score" | "statut_prospection" | "premiere_vue" | "derniere_vue">;
       // Sécurité (supabase/securite.sql) : emails autorisés. Non lisible depuis l'appli (géré dans l'éditeur SQL).
       utilisateurs_autorises: Table<{ email: string; ajoute_le: string }, "ajoute_le">;
+      // Mémoire des VIN confirmés (supabase/vin_connus.sql)
+      vin_connus: Table<VinConnu, "famille" | "confirme_le">;
     };
     Views: {
       prospects_par_jour: { Row: { jour: string; source: string; nb: number }; Relationships: [] };
@@ -48,6 +50,20 @@ export type Database = {
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
+};
+
+// VIN confirmé par une vente : la voiture et son code moteur (données techniques, jamais le client)
+export type VinConnu = {
+  vin: string;
+  famille: string;
+  marque: string;
+  modele: string;
+  moteur: string | null;
+  code_moteur: string | null;
+  annee_debut: string | null;
+  annee_fin: string | null;
+  puissance: string | null;
+  confirme_le: string;
 };
 
 export type PushSubscriptionRow = {

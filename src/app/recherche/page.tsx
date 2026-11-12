@@ -11,6 +11,8 @@ import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
 import VoiceButton from "@/components/VoiceButton";
+import RechercheVin from "@/components/RechercheVin";
+import { constructeur, anneeProbable, nettoyerVin } from "@/lib/vin";
 
 type Vehicule = {
   id: string;
@@ -29,40 +31,15 @@ type RefResult = Product & {
   applications: Application[];
 };
 
-const WMI_MAP: Record<string, string> = {
-  VF1: "Renault", VF2: "Renault", VF3: "Peugeot", VF6: "Citroën", VF7: "Citroën",
-  UU1: "Dacia", UU2: "Dacia",
-  WVW: "Volkswagen", WV1: "Volkswagen", WV2: "Volkswagen",
-  WBA: "BMW", WBS: "BMW", WBX: "BMW",
-  WDB: "Mercedes", WDD: "Mercedes", WDC: "Mercedes",
-  WF0: "Ford", WFO: "Ford",
-  JTD: "Toyota", JTN: "Toyota", JT2: "Toyota",
-  KMH: "Hyundai", KMF: "Hyundai",
-  KNA: "Kia", KNM: "Kia",
-  JN1: "Nissan", JN3: "Nissan",
-  TMB: "Skoda", TMA: "Skoda",
-  VSS: "Seat", VSE: "Seat",
-  ZFA: "Fiat", ZFF: "Fiat",
-  MAT: "Opel", W0L: "Opel",
-  SHH: "Honda", JHM: "Honda",
-  VF8: "Renault", NM0: "Ford",
-};
-
+// VIN de l'onglet « Par véhicule » : constructeur d'après le tableau VÉRIFIÉ (src/lib/vin.ts, 12/11/2026 —
+// l'ancien tableau contenait des erreurs : TMA≠Skoda, MAT≠Opel, VF6≠Citroën, KNM≠Kia…) et année PROBABLE.
 function decodeWmi(vin: string): string | null {
-  if (vin.length < 3) return null;
-  return WMI_MAP[vin.substring(0, 3).toUpperCase()] ?? null;
+  return constructeur(nettoyerVin(vin))?.nom ?? null;
 }
-
-// Année modèle = 10ᵉ caractère du VIN (norme ISO). Lettres => 2010+, chiffres => 2001-2009.
-const YEAR_CODES: Record<string, number> = {
-  "1": 2001, "2": 2002, "3": 2003, "4": 2004, "5": 2005, "6": 2006, "7": 2007, "8": 2008, "9": 2009,
-  A: 2010, B: 2011, C: 2012, D: 2013, E: 2014, F: 2015, G: 2016, H: 2017, J: 2018, K: 2019,
-  L: 2020, M: 2021, N: 2022, P: 2023, R: 2024, S: 2025, T: 2026, V: 2027, W: 2028, X: 2029, Y: 2030,
-};
+// Le 10ᵉ caractère n'est pas toujours l'année chez les constructeurs européens : indication seulement.
 function decodeYear(vin: string): string {
-  if (vin.length < 10) return "";
-  const y = YEAR_CODES[vin[9].toUpperCase()];
-  return y ? String(y) : "";
+  const a = anneeProbable(nettoyerVin(vin));
+  return a ? String(a) : "";
 }
 
 // Affiche une liste de "tags" repliée (aperçu sur UNE ligne) avec une flèche pour
@@ -302,8 +279,9 @@ export default function RecherchePage() {
   const vinYear = decodeYear(vin);
   useEffect(() => {
     if (vinDetected) {
+      // L'année lue dans le VIN n'est PAS appliquée d'office (elle peut être fausse et cacher la bonne voiture)
       setMakeFilter(vinDetected); setModelFilter(""); setEngineFilter(""); setFuelFilter("");
-      setYearFilter(vinYear || "");
+      setYearFilter("");
     }
   }, [vinDetected, vinYear]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -502,6 +480,9 @@ export default function RecherchePage() {
       {/* ============ ONGLET RECHERCHE RAPIDE ============ */}
       {tab === "smart" && (
         <>
+          {/* VIN ou code moteur → filtres exacts (docs/VIN_ANALYSE.md) */}
+          <RechercheVin />
+
           <div className="card p-5 mb-4">
             <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><Sparkles size={18} /> Trouvez le filtre par véhicule</h3>
             <div className="flex gap-2">
@@ -559,8 +540,8 @@ export default function RecherchePage() {
             </div>
             {vinDetected && (
               <p className="mt-2 text-sm text-green-400 bg-green-500/10 px-3 py-1.5 rounded-md inline-flex items-center gap-2">
-                <Car size={14} /> <strong>{t("vinDetected")} :</strong> {vinDetected}{vinYear ? ` · ${vinYear}` : ""}
-                <span className="text-slate-400 text-xs">— choisissez le modèle</span>
+                <Car size={14} /> <strong>{t("vinDetected")} :</strong> {vinDetected}{vinYear ? ` · année probable ${vinYear} (non appliquée)` : ""}
+                <span className="text-slate-400 text-xs">— choisissez le modèle, ou utilisez « VIN ou code moteur » dans Recherche rapide</span>
               </p>
             )}
           </div>
