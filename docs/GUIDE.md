@@ -34,6 +34,7 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 | `supabase/fournisseur_solde_depart.sql` | Solde de départ fournisseur | ✅ collé |
 | `supabase/sale_fournisseur_paye.sql` | Camion « dinoun payé » par bon + paiement auto | ✅ collé |
 | `supabase/storage_produits.sql` | Stockage des photos produits | ✅ collé |
+| `supabase/securite.sql` | **Base protégée + connexion obligatoire** (voir §9 : créer ton compte AVANT) | ⏳ à coller |
 
 > Règle : après un `CREATE`/`ALTER`, le SQL finit par `notify pgrst, 'reload schema';` et tu **recharges l'app**.
 
@@ -126,6 +127,30 @@ Fais une **marque « début app »** dans ton cahier. Avant la marque = un seul 
 3. **Impayés** : total + le plus vieux.
 4. **Stock dormant** (valeur au prix d'achat).
 5. **Garages actifs sur 30 jours.**
+
+---
+
+## 9. Sécurité : protéger la base (à faire une seule fois, environ 15 minutes)
+
+Avant : n'importe qui pouvait lire, modifier ou effacer tes clients, tes ventes et tes prix d'achat avec la clé publique de l'appli. Après : il faut te connecter, et seuls les emails autorisés voient les données. Le catalogue public (`/catalogue`, `/tarif`, `/c/…`) reste ouvert, **sans les prix d'achat**.
+
+**Fais les étapes dans cet ordre** (si tu lances le SQL avant d'avoir un compte, tu ne peux plus entrer) :
+
+1. **Créer ton compte** : Supabase → **Authentication → Users → Add user → Create new user**. Mets ton email et un mot de passe solide (au moins 12 caractères), et coche **Auto Confirm User**.
+2. **Fermer les inscriptions** : Supabase → **Authentication → Sign In / Providers** (ou Settings). Décoche **« Allow new users to sign up »**. Personne d'autre ne pourra créer de compte.
+3. **Lancer le SQL** :
+   - ouvre `supabase/securite.sql` et **remplace `TON_EMAIL@exemple.com`** par l'email de l'étape 1 ;
+   - colle tout dans l'éditeur SQL (lien en §1) et clique sur **Run** ;
+   - la dernière ligne doit afficher ton email.
+4. **Te connecter** : recharge l'appli sur le **PC** puis sur le **téléphone**, et connecte-toi. Fais-le **avant d'aller sur le terrain** : hors réseau, l'appli marche seulement si tu t'es déjà connecté sur ce téléphone.
+5. **Clé service pour les tâches automatiques** : Supabase → **Settings → API → `service_role`** (clé secrète : ne la montre à personne, ne l'envoie jamais par WhatsApp) :
+   - dans **Vercel → Settings → Environment Variables**, ajoute `SUPABASE_SERVICE_ROLE_KEY` = cette clé (Production), puis **Redeploy**. Sans elle, les notifications de 8 h et la page publique `/c/…` ne trouvent plus les données ;
+   - dans le fichier **`.env.local`** du PC, ajoute la ligne `SUPABASE_SERVICE_ROLE_KEY=…`. Sans elle, le robot de prospection de 9 h 30 et les scripts ne peuvent plus écrire.
+
+**Ajouter une personne** (un employé, plus tard) : crée son compte (étape 1), puis colle dans l'éditeur SQL :
+`insert into public.utilisateurs_autorises (email) values (lower('son@email.com'));`
+
+**Urgence** (l'appli ne marche plus après la sécurisation) : colle `supabase/securite_annuler.sql`. La base redevient ouverte comme avant, le temps de corriger.
 
 ---
 

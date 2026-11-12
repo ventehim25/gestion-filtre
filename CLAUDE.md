@@ -25,7 +25,7 @@ Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à z
 - Le **CLI Supabase est bloqué** (Smart App Control Windows) et la **clé anon ne peut pas faire de DDL**.
 - Pour créer table/colonne/fonction : fournir un fichier `supabase/*.sql` et **le faire coller à l'utilisateur dans l'éditeur SQL web** (https://supabase.com/dashboard/project/wehsvgoolozqzxsgwibb/sql/new). Écrire le SQL **idempotent** (`if not exists`, `drop policy if exists`).
 - Après un CREATE/ALTER, le cache PostgREST peut ne pas voir la table en écriture : terminer le SQL par `NOTIFY pgrst, 'reload schema';` (sinon erreur « Could not find the table … in the schema cache » côté app).
-- Lecture/écriture de **données** (insert/update/delete, RPC) marche avec l'anon key via un script Node `@supabase/supabase-js` (voir scripts `_*.mjs` jetables, à supprimer après).
+- Lecture/écriture de **données** (insert/update/delete, RPC) par script Node `@supabase/supabase-js` : importer `SUPABASE_URL, SUPABASE_CLE` de `scripts/cle_supabase.mjs` (après `securite.sql`, la clé anon ne suffit plus : il faut `SUPABASE_SERVICE_ROLE_KEY` dans `.env.local`). Scripts `_*.mjs` jetables, à supprimer après.
 
 ## Gotchas
 - Supabase limite à **1000 lignes/requête** → toujours paginer avec `.range()`.
@@ -43,7 +43,13 @@ Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à z
 - Source de vérité véhicules : table `applications` (vraies données Filtron) > `compatibilites` (mapping fait main).
 - Photos produit : Scene7 via `FilterImage.tsx`. Équivalences = numéros OE (scrape Filtron) **+ variantes de marque officielles** pour les 120 réfs vendues : Mann (+EAN), Wix (catalogues mann-filter.com / wixfilters.com), Mahle & Purflux (filtron.eu, recherche « référence correspondante »). Liste des marques gérées : `src/lib/brands.ts` (FILTER_BRANDS).
 
-## Schéma DB (RLS allow-all) — détails colonnes : `src/types/database.ts`
+## Sécurité (12/11/2026) — `supabase/securite.sql` (voir GUIDE §9)
+- Une fois le SQL collé : RLS **fermé**. Chaque table a la règle `equipe` (`for all to authenticated using (public.est_autorise())`). Seuls les emails de `utilisateurs_autorises` accèdent aux données. Le public (anon) ne lit QUE products/equivalences/applications, en **colonnes limitées** (jamais `prix_achat`).
+- **Nouvelle table** → dans son SQL : `alter table … enable row level security;` + `create policy equipe on public.xxx for all to authenticated using (public.est_autorise()) with check (public.est_autorise());`. Si une page publique doit la lire : `grant select (colonnes) … to anon` + une règle `for select to anon`.
+- **Pages publiques** (`/c`, `/tarif`, `/catalogue`, sitemap) : toujours lister les colonnes, jamais `select("*")`.
+- Connexion : `src/components/AuthGate.tsx` (s'active quand `utilisateurs_autorises` existe). Serveur : `SUPABASE_SERVICE_ROLE_KEY` (variable Vercel, sans `NEXT_PUBLIC_`). Scripts : `scripts/cle_supabase.mjs` (clé service lue dans `.env.local`). Ne jamais mettre la clé service dans le code ni sur GitHub.
+
+## Schéma DB — détails colonnes : `src/types/database.ts`
 Tables : products, clients, sales, sale_items, vehicules, compatibilites, equivalences, applications,
 **garages**, **fournisseurs**, **receptions**, **avances**, **prospects**, rappels_vidange, demandes_manquees, push_subscriptions. Vues product_vehicles, prospects_par_jour.
 RPC : `decrement_stock(p_id, qty)`, `decrement_equiv_stock(e_id, qty)` (qty négative = incrémente).

@@ -920,9 +920,27 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - Fichiers : `docs/pub/oe688-1.md` (angle, scénario vidéo 9:16 FR+darija, variantes TikTok/Story, post FR+darija, hashtags, plan de publication) + `docs/pub/oe688-1-affiche.html` (affiche 9:16 autonome, charte FiltroPro).
 - Reste à faire côté utilisateur : filmer les plans, monter dans CapCut, exporter l'affiche en image, publier jeudi/vendredi/samedi.
 
+## 8.10 Sécurité de la base (12/11/2026)
+- **Constat** : la base était ouverte à tous (règles « tout autoriser » + clé publique visible dans l'appli). N'importe qui pouvait lire, modifier ou effacer clients (73), ventes, prospects, fournisseurs ; les **prix d'achat** étaient lisibles, y compris via la page publique `/c/…` ; les photos pouvaient être remplacées par n'importe qui.
+- **Livré (en ligne)** :
+  - **connexion obligatoire** pour les pages de gestion (`src/components/AuthGate.tsx`), qui s'active **toute seule** dès que `supabase/securite.sql` est lancé (avant : bandeau orange, rien ne bloque) ;
+  - **hors-ligne** conservé : une session déjà ouverte sur le téléphone reste utilisable sans réseau ;
+  - rubrique **Compte** dans Paramètres (qui est connecté, « Se déconnecter ») ;
+  - page publique `/c/…` : plus aucun prix d'achat dans les données de la page ;
+  - côté serveur (cron des relances, `/c/`, sitemap) : clé **service** `SUPABASE_SERVICE_ROLE_KEY` si définie dans Vercel ;
+  - scripts : connexion commune `scripts/cle_supabase.mjs` (clé service lue dans `.env.local`).
+- **À faire par l'utilisateur (une fois)** : créer son compte dans Supabase Auth, fermer les inscriptions, lancer `supabase/securite.sql`, ajouter la clé service dans Vercel et dans `.env.local`. Mode d'emploi : **GUIDE §9**. Urgence : `supabase/securite_annuler.sql`.
+- **Règles posées par le SQL** :
+  - seuls les emails de `utilisateurs_autorises` accèdent aux données (fonction `est_autorise()`) ;
+  - le public ne lit que le catalogue : produits, variantes et applications, **sans prix d'achat** ;
+  - photos : lecture publique, envoi réservé à l'équipe ;
+  - vues et fonctions de stock protégées ; les futures tables ne sont plus ouvertes au public par défaut.
+
 ---
 
-# PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 07/11/2026)*
+# PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*
+
+**0. Protège la base (15 minutes, une seule fois)** : suis le **GUIDE §9**. Tu crées ton compte dans Supabase, tu fermes les inscriptions, tu colles `supabase/securite.sql`, puis tu te connectes sur le PC et sur le téléphone. Fais-le **avant** de ressaisir la marchandise : aujourd'hui, n'importe qui peut lire tes clients et tes prix d'achat.
 
 **1. Ressaisis ta marchandise** : accueil → **Réception** → scanne une boîte par référence, tape la quantité, le prix d'achat et le prix de vente → Enregistrer. Le stock, les prix, la dette et le catalogue se mettent à jour tout seuls. Première fois : les boîtes Filtron/Wix/Flag sont à compléter une fois, ensuite elles sont reconnues au scan.
 

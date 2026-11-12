@@ -1,7 +1,25 @@
 # 📌 Récap de session — FiltroPro
 
 > Point de reprise pour une nouvelle session. Complément de [GUIDE](GUIDE.md) et [BIBLE](BIBLE.md).
-> **Dernière session : 05→07/11/2026** (voir §0 ci-dessous ; §1-4 = session du 29/10).
+> **Dernière session : 12/11/2026** (sécurité, §00 ci-dessous) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
+
+---
+
+## 00. Session du 12/11/2026 — sécurité de la base
+
+- **Code en ligne** :
+  - `src/components/AuthGate.tsx` (connexion Supabase Auth email + mot de passe, s'active quand la table `utilisateurs_autorises` existe ; hors-ligne OK si une session existe ; écran « compte non autorisé ») ;
+  - `AppShell` l'utilise pour toutes les pages sauf `/c`, `/tarif`, `/catalogue` ;
+  - `src/components/CompteSection.tsx` dans `/parametres` ;
+  - `src/lib/supabase.ts` : sur le serveur, clé `SUPABASE_SERVICE_ROLE_KEY` si présente ;
+  - `/c/[...ref]` : colonnes listées (plus de `select("*")`, donc plus de prix d'achat dans la page publique) ;
+  - `scripts/cle_supabase.mjs` utilisé par tous les scripts (clé service de `.env.local`, sinon clé anon).
+- **SQL prêt, PAS encore collé** :
+  - `supabase/securite.sql` : `utilisateurs_autorises` + `est_autorise()`, suppression de toutes les règles « allow all », règle `equipe` sur chaque table, lecture publique en colonnes limitées sur products/equivalences/applications, vues en `security_invoker`, RPC de stock fermées à anon, photos : envoi réservé à l'équipe, privilèges par défaut sans anon ;
+  - urgence : `supabase/securite_annuler.sql`.
+- **Ordre pour l'utilisateur** : GUIDE §9 (compte → inscriptions fermées → SQL → connexion PC et téléphone → clé service dans Vercel et `.env.local`).
+- **Piège évité** : une requête `select(..., { head: true })` sur une table inexistante répond **204 sans erreur**. La détection « sécurité installée » utilise donc une vraie lecture (erreur PGRST205 = pas installée).
+- **Vérifier après le SQL** : avec la clé anon, `clients` doit renvoyer 0 ligne, `products.prix_achat` doit être refusé, et `/catalogue`, `/tarif`, `/c/…` doivent toujours s'afficher.
 
 ---
 
