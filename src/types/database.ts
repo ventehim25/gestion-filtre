@@ -32,6 +32,8 @@ export type Database = {
       vehicules: Table<Vehicule, "id">;
       compatibilites: Table<Compatibilite, "id", [Fk<"product_id", "products">, Fk<"vehicule_id", "vehicules">]>;
       prospects: Table<Prospect, "created_at" | "score" | "statut_prospection" | "premiere_vue" | "derniere_vue">;
+      // Sécurité (supabase/securite.sql) : emails autorisés. Non lisible depuis l'appli (géré dans l'éditeur SQL).
+      utilisateurs_autorises: Table<{ email: string; ajoute_le: string }, "ajoute_le">;
     };
     Views: {
       prospects_par_jour: { Row: { jour: string; source: string; nb: number }; Relationships: [] };
@@ -40,6 +42,8 @@ export type Database = {
       // qty négative = incrémente
       decrement_stock: { Args: { p_id: string; qty: number }; Returns: undefined };
       decrement_equiv_stock: { Args: { e_id: string; qty: number }; Returns: undefined };
+      // true si la personne connectée est dans utilisateurs_autorises
+      est_autorise: { Args: Record<string, never>; Returns: boolean };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

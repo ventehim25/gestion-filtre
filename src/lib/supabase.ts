@@ -16,4 +16,12 @@ function clean(value: string | undefined, fallback: string): string {
 const supabaseUrl = clean(process.env.NEXT_PUBLIC_SUPABASE_URL, FALLBACK_URL);
 const supabaseAnonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, FALLBACK_KEY);
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Sécurité (supabase/securite.sql) : dans le NAVIGATEUR, clé publique + session de l'utilisateur connecté
+// (les règles RLS ne laissent passer que l'équipe autorisée). Sur le SERVEUR (cron des relances, pages
+// publiques /c/ et sitemap), clé « service » SUPABASE_SERVICE_ROLE_KEY si elle est définie dans Vercel.
+// Cette variable n'a PAS le préfixe NEXT_PUBLIC_ : Next.js ne l'envoie jamais au navigateur.
+const serviceKey = typeof window === "undefined" ? clean(process.env.SUPABASE_SERVICE_ROLE_KEY, "") : "";
+
+export const supabase = serviceKey
+  ? createClient<Database>(supabaseUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } })
+  : createClient<Database>(supabaseUrl, supabaseAnonKey);

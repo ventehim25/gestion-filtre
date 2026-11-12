@@ -1,10 +1,8 @@
 // Enrichit UNE référence Filtron passée en argument : node scrape_one.mjs "AP026/2"
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";
 
-const supabase = createClient(
-  "https://wehsvgoolozqzxsgwibb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHN2Z29vbG96cXp4c2d3aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTA3NzYsImV4cCI6MjA5NTgyNjc3Nn0.8z624yNoX-CQirJM5VQvYyMdeOCj5jau_0BvTaMKj1c"
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_CLE);
 
 const ref = process.argv[2];
 if (!ref) { console.error("usage: node scrape_one.mjs <reference>"); process.exit(1); }

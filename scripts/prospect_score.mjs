@@ -2,6 +2,7 @@
 // + envoi vers la table Supabase `prospects` (page /prospects). Partagé par les deux robots.
 // Barème transparent (score_detail) : segment + joignabilité + proximité + activité + mots-clés.
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";
 
 const SEGMENT_PTS = {
   "Magasin pièces auto / sous-grossiste": 4,
@@ -45,10 +46,7 @@ export function scoreProspect(p) {
   return { score, score_detail: parts.map(([n, w]) => `${w} +${n}`).join(" · ") };
 }
 
-export const supabase = createClient(
-  "https://wehsvgoolozqzxsgwibb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHN2Z29vbG96cXp4c2d3aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTA3NzYsImV4cCI6MjA5NTgyNjc3Nn0.8z624yNoX-CQirJM5VQvYyMdeOCj5jau_0BvTaMKj1c"
-);
+export const supabase = createClient(SUPABASE_URL, SUPABASE_CLE);
 
 // Upsert par lots. `statut_prospection` n'est jamais envoyé -> le suivi fait dans l'app est conservé.
 export async function pushProspects(rows) {

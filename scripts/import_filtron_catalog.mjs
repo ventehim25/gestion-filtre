@@ -1,10 +1,8 @@
 // Importe TOUT le catalogue Filtron depuis le sitemap (toutes les références réelles)
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";
 
-const supabase = createClient(
-  "https://wehsvgoolozqzxsgwibb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHN2Z29vbG96cXp4c2d3aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTA3NzYsImV4cCI6MjA5NTgyNjc3Nn0.8z624yNoX-CQirJM5VQvYyMdeOCj5jau_0BvTaMKj1c"
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_CLE);
 
 const CAT = {
   filtre_huile:      { fr: "Filtre à huile Filtron",    ar: "فلتر زيت فيلترون",   pa: 18, pv: 30 },

@@ -23,8 +23,10 @@ async function getProduct(segs: string[]): Promise<Row | null> {
   const cleanNorm = raw.toUpperCase().replace(/\s+/g, "");
   if (cleanNorm.length < 2) return null;
   const loose = "%" + cleanNorm.replace(/[%_]/g, "").split("").join("%") + "%";
+  // Colonnes listées une par une : jamais de prix d'achat dans une page publique
+  // (avant : select("*") envoyait aussi prix_achat dans les données de la page).
   const { data } = await supabase.from("products")
-    .select("*, equivalences(*), applications(*)")
+    .select("id, reference, marque, categorie, stock, image_url, dimensions, equivalences(marque, reference, stock), applications(marque, modele, moteur, annee_debut, annee_fin)")
     .ilike("reference", loose).limit(10);
   const rows = (data ?? []) as unknown as Row[];
   return rows.find(p => p.reference.toUpperCase().replace(/\s+/g, "") === cleanNorm) ?? null;

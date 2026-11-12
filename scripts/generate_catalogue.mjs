@@ -6,6 +6,7 @@
 //   npm i -D puppeteer
 // Lancement :  node scripts/generate_catalogue.mjs
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";
 import puppeteer from "puppeteer";
 import fs from "node:fs";
 import path from "node:path";
@@ -16,10 +17,7 @@ const IMG_DIR = path.join(__dirname, ".catalog_imgs");
 const HTML_PATH = path.join(__dirname, ".catalogue.html");
 const OUT_DIR = path.join(__dirname, "..", "public");
 
-const supabase = createClient(
-  "https://wehsvgoolozqzxsgwibb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHN2Z29vbG96cXp4c2d3aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTA3NzYsImV4cCI6MjA5NTgyNjc3Nn0.8z624yNoX-CQirJM5VQvYyMdeOCj5jau_0BvTaMKj1c"
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_CLE);
 
 // --- Métadonnées par type (label, icône, photo de couverture, pitch marketing) ---
 const TYPES = {

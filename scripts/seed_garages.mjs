@@ -1,11 +1,9 @@
 // Insère quelques garages de test pour démontrer la carte + le circuit.
 // Lancer : node scripts/seed_garages.mjs
 import { createClient } from "@supabase/supabase-js";
+import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";
 
-const supabase = createClient(
-  "https://wehsvgoolozqzxsgwibb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHN2Z29vbG96cXp4c2d3aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTA3NzYsImV4cCI6MjA5NTgyNjc3Nn0.8z624yNoX-CQirJM5VQvYyMdeOCj5jau_0BvTaMKj1c"
-);
+const supabase = createClient(SUPABASE_URL, SUPABASE_CLE);
 
 const garages = [
   { nom: "Garage Atlas (test)", ville: "Tanger", region: "Tanger-Tétouan", latitude: 35.7595, longitude: -5.834, statut: "a_livrer", telephone: "0661000001", refs_demandees: "OP540\nW7015\nAP026/2", note: "Demande un devis pour 20 filtres huile." },

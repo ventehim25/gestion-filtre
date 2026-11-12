@@ -1,9 +1,7 @@
 // Supprime les références Filtron FAUSSES (pas dans le catalogue officiel, sans données réelles)
 import { createClient } from "@supabase/supabase-js";
-const supabase = createClient(
-  "https://wehsvgoolozqzxsgwibb.supabase.co",
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHN2Z29vbG96cXp4c2d3aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTA3NzYsImV4cCI6MjA5NTgyNjc3Nn0.8z624yNoX-CQirJM5VQvYyMdeOCj5jau_0BvTaMKj1c"
-);
+import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";
+const supabase = createClient(SUPABASE_URL, SUPABASE_CLE);
 
 async function loadAll(table, cols) {
   const out = [];
