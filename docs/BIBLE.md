@@ -955,6 +955,13 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - Testé : 22 tests des fonctions VIN OK ; « H4D » chez Dacia → 18 voitures avec leurs filtres ; « DV6FC » chez Peugeot → 17 voitures. Contrôle qualité à 0 erreur, compilation OK.
 - **`supabase/vin_connus.sql` collé le 12/11** (vérifié : table protégée, mémoire et famille OK). **Reste** : l'étape 2 (30 vrais VIN marocains à tester).
 
+## 8.13 Catalogue par marque (13/11/2026)
+- **Recherche → onglet « Par marque »** (demandé par l'utilisateur, idée partslink24) : on choisit la **marque** (Dacia, Renault, Peugeot… + autres), puis le **modèle** (avec sa période, ex. « Logan II / MCV II · 13- », champ pour chercher un modèle), puis le **moteur** (motorisation, code moteur, puissance, années, nombre de filtres et combien en stock). Un clic sur le moteur affiche ses **filtres exacts** avec photo, prix et stock.
+- **Nos données seulement** : les 114 000 applications Filtron (table `applications`). Aucun schéma, aucune image ni donnée de partslink24 ou partsouq.
+- Les sous-marques (ex. « VW MARINE », « TOYOTA INDUSTRIAL EQUIPMENT ») sont rangées à part, sous la marque principale.
+- Code : `src/components/CatalogueMarques.tsx` ; l'affichage « voiture + filtres » est maintenant partagé avec le bloc VIN (`src/lib/voitures.ts`, `src/components/VoitureCarte.tsx`). Lien direct : `/recherche?tab=marques`.
+- Testé sur les vraies données : Mercedes (14 472 lignes, 141 modèles) se charge en environ 2 secondes ; Logan II → 13 moteurs avec leurs filtres. Contrôle qualité à 0 erreur, compilation OK. Correction au passage : une année de fin vide s'affiche « … » (encore fabriquée).
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*

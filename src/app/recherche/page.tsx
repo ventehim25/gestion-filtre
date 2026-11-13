@@ -5,13 +5,14 @@ import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { Product, Equivalence, Application, ProductCategory } from "@/types/database";
-import { Car, Search, Package, Tag, Repeat, Sparkles, ChevronDown, ChevronUp, Plus, X, Barcode } from "lucide-react";
+import { Car, Search, Package, Tag, Repeat, Sparkles, ChevronDown, ChevronUp, Plus, X, Barcode, Factory } from "lucide-react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
 import VoiceButton from "@/components/VoiceButton";
 import RechercheVin from "@/components/RechercheVin";
+import CatalogueMarques from "@/components/CatalogueMarques";
 import { constructeur, anneeProbable, nettoyerVin } from "@/lib/vin";
 
 type Vehicule = {
@@ -76,7 +77,7 @@ function distinctByMarque<T extends { marque: string }>(list: T[], n: number): T
 
 export default function RecherchePage() {
   const { t } = useLang();
-  const [tab, setTab] = useState<"ref" | "smart" | "vehicule">("ref");
+  const [tab, setTab] = useState<"ref" | "smart" | "marques" | "vehicule">("ref");
 
   // ---------- Recherche rapide véhicule (texte libre sur les applications) ----------
   const [smartQ, setSmartQ] = useState("");
@@ -113,6 +114,7 @@ export default function RecherchePage() {
     const tb = sp.get("tab");
     const qp = sp.get("q");
     if (tb === "vehicule") setTab("vehicule");
+    if (tb === "marques") setTab("marques");
     if (qp) { setTab("ref"); setRefQuery(qp.toUpperCase()); searchRef(qp); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -315,7 +317,7 @@ export default function RecherchePage() {
       <Header title="vehicleSearch" />
 
       {/* Onglets */}
-      <div className="flex gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-4">
         <button onClick={() => setTab("ref")}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "ref" ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}>
           <Tag size={16} /> {t("tabByRef")}
@@ -323,6 +325,10 @@ export default function RecherchePage() {
         <button onClick={() => setTab("smart")}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "smart" ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}>
           <Sparkles size={16} /> Recherche rapide
+        </button>
+        <button onClick={() => setTab("marques")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "marques" ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}>
+          <Factory size={16} /> Par marque
         </button>
         <button onClick={() => setTab("vehicule")}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === "vehicule" ? "bg-blue-600 text-white" : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"}`}>
@@ -528,6 +534,9 @@ export default function RecherchePage() {
           </div>
         </>
       )}
+
+      {/* ============ ONGLET CATALOGUE PAR MARQUE (marque → modèle → moteur → filtres) ============ */}
+      {tab === "marques" && <CatalogueMarques />}
 
       {/* ============ ONGLET VÉHICULE ============ */}
       {tab === "vehicule" && (

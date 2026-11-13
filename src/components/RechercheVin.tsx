@@ -7,45 +7,14 @@
 //   retient le VIN pour la prochaine fois. Le VIN seul ne donne JAMAIS le moteur : on ne devine pas.
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { Application, Product, VinConnu } from "@/types/database";
+import type { VinConnu } from "@/types/database";
 import { nettoyerVin, vinValide, constructeur, anneeProbable, familleVin, ressembleCodeMoteur, motifsCodeMoteur, MARQUES_COURANTES, AUTRES_MARQUES, type MarqueVin } from "@/lib/vin";
-import FilterImage from "@/components/FilterImage";
-import StockBadge from "@/components/StockBadge";
+import { COLS, grouper, type Ligne, type Voiture } from "@/lib/voitures";
+import VoitureCarte from "@/components/VoitureCarte";
 import { Search, ScanLine } from "lucide-react";
 
-type ProdLite = Pick<Product, "id" | "reference" | "marque" | "categorie" | "stock" | "stock_min" | "prix_vente" | "image_url">;
-type Ligne = Application & { products: ProdLite | null };
-type Voiture = {
-  cle: string; marque: string; modele: string; moteur: string | null; code_moteur: string | null;
-  annee_debut: string | null; annee_fin: string | null; puissance: string | null; filtres: ProdLite[];
-};
 type Niveau = "vert" | "orange" | "rouge" | null;
-
-const COLS = "marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, product_id, products(id, reference, marque, categorie, stock, stock_min, prix_vente, image_url)";
-const ORDRE = ["filtre_huile", "filtre_air", "filtre_habitacle", "filtre_carburant", "filtre_refroidissement", "huile_moteur", "autre"];
-const LIBELLE: Record<string, string> = {
-  filtre_huile: "Filtre à huile", filtre_air: "Filtre à air", filtre_habitacle: "Filtre d'habitacle",
-  filtre_carburant: "Filtre à carburant", filtre_refroidissement: "Refroidissement", huile_moteur: "Huile moteur", autre: "Autre",
-};
 const MAX_VOITURES = 30;
-
-function grouper(rows: Ligne[]): Voiture[] {
-  const map = new Map<string, Voiture>();
-  for (const r of rows) {
-    const cle = [r.marque, r.modele, r.moteur ?? "", r.code_moteur ?? ""].join("|");
-    let v = map.get(cle);
-    if (!v) {
-      v = { cle, marque: r.marque, modele: r.modele, moteur: r.moteur, code_moteur: r.code_moteur, annee_debut: r.annee_debut, annee_fin: r.annee_fin, puissance: r.puissance, filtres: [] };
-      map.set(cle, v);
-    }
-    const p = r.products;
-    if (p && !v.filtres.some((f) => f.id === p.id)) v.filtres.push(p);
-  }
-  const out = [...map.values()];
-  out.forEach((v) => v.filtres.sort((a, b) => ORDRE.indexOf(a.categorie) - ORDRE.indexOf(b.categorie)));
-  out.sort((a, b) => `${a.marque} ${a.modele} ${a.moteur ?? ""}`.localeCompare(`${b.marque} ${b.modele} ${b.moteur ?? ""}`, undefined, { numeric: true }));
-  return out;
-}
 
 type Resultat = { voitures: Voiture[]; note: string | null };
 
@@ -93,11 +62,6 @@ async function voitureDe(vc: VinConnu): Promise<Voiture> {
   const { data } = await q.limit(200);
   const g = grouper((data ?? []) as unknown as Ligne[]);
   return g[0] ?? { cle: vc.vin, marque: vc.marque, modele: vc.modele, moteur: vc.moteur, code_moteur: vc.code_moteur, annee_debut: vc.annee_debut, annee_fin: vc.annee_fin, puissance: vc.puissance, filtres: [] };
-}
-
-function annees(v: Voiture) {
-  if (!v.annee_debut && !v.annee_fin) return "";
-  return `${v.annee_debut ?? "?"} → ${v.annee_fin ?? "…"}`;
 }
 
 export default function RechercheVin() {
@@ -265,35 +229,9 @@ export default function RechercheVin() {
         <div className="mt-4 space-y-3">
           {voitures.length > MAX_VOITURES && <p className="text-xs text-slate-400">{voitures.length} voitures trouvées : précise (code moteur complet, modèle) pour réduire la liste.</p>}
           {voitures.slice(0, MAX_VOITURES).map((v) => (
-            <div key={v.cle} className="rounded-xl border border-slate-700/60 p-3">
-              <div className="flex items-start justify-between gap-2 flex-wrap">
-                <div className="min-w-0">
-                  <div className="font-semibold">{v.marque} · {v.modele}</div>
-                  <div className="text-sm text-slate-400">
-                    {[v.moteur, v.code_moteur && `code ${v.code_moteur}`, annees(v), v.puissance && `${v.puissance} ch`].filter(Boolean).join(" · ")}
-                  </div>
-                </div>
-                {estVin && niveau !== "vert" && (
-                  <button className="btn-primary text-sm shrink-0" onClick={() => retenir(v)}>✅ C&apos;est cette voiture</button>
-                )}
-              </div>
-              <div className="grid sm:grid-cols-2 gap-2 mt-3">
-                {v.filtres.map((f) => (
-                  <div key={f.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/40">
-                    <FilterImage reference={f.reference} categorie={f.categorie} imageUrl={f.image_url} wid={120} className="h-12 w-12 rounded object-contain bg-white shrink-0 p-0.5" />
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs text-slate-400">{LIBELLE[f.categorie] ?? f.categorie}</div>
-                      <div className="font-mono font-semibold truncate">{f.reference}</div>
-                    </div>
-                    <div className="text-end shrink-0 space-y-1">
-                      {f.prix_vente > 0 && <div className="text-sm font-semibold">{f.prix_vente} MAD</div>}
-                      <StockBadge stock={f.stock} stockMin={f.stock_min} />
-                    </div>
-                  </div>
-                ))}
-                {v.filtres.length === 0 && <p className="text-xs text-slate-400">Aucun filtre enregistré pour cette voiture.</p>}
-              </div>
-            </div>
+            <VoitureCarte key={v.cle} v={v} action={estVin && niveau !== "vert"
+              ? <button className="btn-primary text-sm shrink-0" onClick={() => retenir(v)}>✅ C&apos;est cette voiture</button>
+              : null} />
           ))}
         </div>
       )}

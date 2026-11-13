@@ -1,0 +1,48 @@
+// Voitures et leurs filtres à partir des applications Filtron (114 000 lignes, docs/VIN_ANALYSE.md).
+// Partagé par « VIN ou code moteur » (RechercheVin) et le « Catalogue par marque » (CatalogueMarques).
+import type { Application, Product } from "@/types/database";
+
+export type ProdLite = Pick<Product, "id" | "reference" | "marque" | "categorie" | "stock" | "stock_min" | "prix_vente" | "image_url">;
+export type Ligne = Application & { products: ProdLite | null };
+export type Voiture = {
+  cle: string; marque: string; modele: string; moteur: string | null; code_moteur: string | null;
+  annee_debut: string | null; annee_fin: string | null; puissance: string | null; filtres: ProdLite[];
+};
+
+export const COLS = "marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, product_id, products(id, reference, marque, categorie, stock, stock_min, prix_vente, image_url)";
+export const ORDRE = ["filtre_huile", "filtre_air", "filtre_habitacle", "filtre_carburant", "filtre_refroidissement", "huile_moteur", "autre"];
+export const LIBELLE: Record<string, string> = {
+  filtre_huile: "Filtre à huile", filtre_air: "Filtre à air", filtre_habitacle: "Filtre d'habitacle",
+  filtre_carburant: "Filtre à carburant", filtre_refroidissement: "Refroidissement", huile_moteur: "Huile moteur", autre: "Autre",
+};
+
+/** Regroupe les lignes par voiture (marque + modèle + motorisation + code moteur), filtres triés huile → air → habitacle → carburant. */
+export function grouper(rows: Ligne[]): Voiture[] {
+  const map = new Map<string, Voiture>();
+  for (const r of rows) {
+    const cle = [r.marque, r.modele, r.moteur ?? "", r.code_moteur ?? ""].join("|");
+    let v = map.get(cle);
+    if (!v) {
+      v = { cle, marque: r.marque, modele: r.modele, moteur: r.moteur, code_moteur: r.code_moteur, annee_debut: r.annee_debut, annee_fin: r.annee_fin, puissance: r.puissance, filtres: [] };
+      map.set(cle, v);
+    }
+    const p = r.products;
+    if (p && !v.filtres.some((f) => f.id === p.id)) v.filtres.push(p);
+  }
+  const out = [...map.values()];
+  out.forEach((v) => v.filtres.sort((a, b) => ORDRE.indexOf(a.categorie) - ORDRE.indexOf(b.categorie)));
+  out.sort((a, b) => `${a.marque} ${a.modele} ${a.moteur ?? ""}`.localeCompare(`${b.marque} ${b.modele} ${b.moteur ?? ""}`, undefined, { numeric: true }));
+  return out;
+}
+
+export function annees(v: Pick<Voiture, "annee_debut" | "annee_fin">): string {
+  // Filtron laisse souvent la fin vide ("") quand la voiture est encore fabriquée
+  if (!v.annee_debut && !v.annee_fin) return "";
+  return `${v.annee_debut || "?"} → ${v.annee_fin || "…"}`;
+}
+
+/** Filtron écrit « Logan II / MCV II | 13- » : nom du modèle + période de fabrication. */
+export function decouperModele(modele: string): { nom: string; periode: string } {
+  const i = modele.lastIndexOf(" | ");
+  return i > 0 ? { nom: modele.slice(0, i), periode: modele.slice(i + 3) } : { nom: modele, periode: "" };
+}

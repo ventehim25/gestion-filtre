@@ -167,6 +167,16 @@ Avant : n'importe qui pouvait lire, modifier ou effacer tes clients, tes ventes 
 - Si la variante tapée n'existe pas dans les données Filtron, l'appli montre le moteur de base avec un avertissement 🟠 : vérifie le modèle et l'année avant de vendre.
 - L'année lue dans le VIN est seulement une **indication** : beaucoup de marques européennes ne l'écrivent pas.
 
+## 11. Le catalogue par marque
+
+**Recherche → onglet « Par marque »** : pour trouver un filtre sans VIN ni code moteur.
+1. Appuie sur la **marque** (Dacia, Renault, Peugeot… ou une marque de la liste « Autres marques »).
+2. Appuie sur le **modèle**. Le chiffre à droite est la période de fabrication (« 13- » = depuis 2013). Tu peux taper le nom dans le champ pour le trouver plus vite (ex. « Logan »).
+3. Appuie sur le **moteur** de la voiture (le code moteur en jaune est écrit sur le moteur ou sur la carte grise). À droite : le nombre de filtres et combien sont en stock.
+4. Les filtres s'affichent : huile, air, habitacle, carburant, avec la photo, le prix et le stock.
+
+Pour revenir en arrière, appuie sur « Marques » ou sur le nom de la marque en haut.
+
 ---
 
 *Généré avec Claude Code. Pour toute modif de l'app, on repart de ce guide et de la [BIBLE](BIBLE.md).*

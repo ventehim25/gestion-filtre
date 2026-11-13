@@ -1,7 +1,15 @@
 # 📌 Récap de session — FiltroPro
 
 > Point de reprise pour une nouvelle session. Complément de [GUIDE](GUIDE.md) et [BIBLE](BIBLE.md).
-> **Dernière session : 12/11/2026** (sécurité, §00 ci-dessous) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
+> **Dernière session : 13/11/2026** (catalogue par marque, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
+
+---
+
+## 0000. Session du 13/11/2026 — catalogue par marque
+
+- **Onglet « Par marque »** de `/recherche` (`?tab=marques`) : `src/components/CatalogueMarques.tsx`. Marque → modèles (comptage puis pages de 1000 lues en parallèle, mises en cache par marque) → moteurs (`eq marque` + `eq modele`, paginé) → filtres.
+- **Partagé** avec le bloc VIN : `src/lib/voitures.ts` (types, `COLS`, `grouper`, `annees`, `decouperModele`) et `src/components/VoitureCarte.tsx`.
+- **Données Filtron** : `modele` = « Nom | période » ; `code_moteur` et `annee_fin` sont souvent "" (pas null) ; les motifs comme `VW%` ramènent aussi des sous-marques (VW MARINE…), rangées à part.
 
 ---
 
