@@ -962,6 +962,9 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - Code : `src/components/CatalogueMarques.tsx` ; l'affichage « voiture + filtres » est maintenant partagé avec le bloc VIN (`src/lib/voitures.ts`, `src/components/VoitureCarte.tsx`). Lien direct : `/recherche?tab=marques`.
 - Testé sur les vraies données : Mercedes (14 472 lignes, 141 modèles) se charge en environ 2 secondes ; Logan II → 13 moteurs avec leurs filtres. Contrôle qualité à 0 erreur, compilation OK. Correction au passage : une année de fin vide s'affiche « … » (encore fabriquée).
 
+- **Moteurs rangés par type** (demande de l'utilisateur, 13/11) : cylindrée + famille du code moteur (ex. « Moteur 1.2 · D4F »), et dans un même type, de la plus ancienne version à la plus récente (`rangerParType` dans `src/lib/voitures.ts`).
+- **Filtres à carburant manquants** : vérifié sur les données. (1) Chez les essence, c'est souvent normal (filtre dans le réservoir). (2) Le robot `scrape_filtron.mjs` gardait **250 voitures maximum par filtre** : 138 filtres, parmi les plus courants (OP626, PP861/3…), sont incomplets. (3) Certaines voitures ont un filtre absent de nos références (ex. Sandero II 1.5 dCi K9K 872). La carte affiche maintenant une indication quand il n'y a pas de filtre à carburant. **Reste** : compléter les 138 filtres ; l'ancienne adresse du catalogue Filtron (`catalogue-frame?action=showFilter`) répond 404 depuis la refonte de leur site, il faut d'abord trouver la nouvelle.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*

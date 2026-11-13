@@ -41,6 +41,46 @@ export function annees(v: Pick<Voiture, "annee_debut" | "annee_fin">): string {
   return `${v.annee_debut || "?"} → ${v.annee_fin || "…"}`;
 }
 
+/** Date Filtron → nombre triable : « 05/2013 » → 201305, « 2013 » → 201300, vide → null. */
+export function dateTri(s: string | null): number | null {
+  if (!s) return null;
+  const mois = s.match(/(\d{1,2})\s*[/.-]\s*(\d{4})/);
+  if (mois) return Number(mois[2]) * 100 + Number(mois[1]);
+  const an = s.match(/(\d{4})/);
+  return an ? Number(an[1]) * 100 : null;
+}
+
+/** Type de moteur : cylindrée (« 1.2 » au début de la motorisation) + famille du code moteur (« D4F732 » → « D4F »). */
+export function typeMoteur(v: Pick<Voiture, "moteur" | "code_moteur">): { cyl: string; base: string } {
+  const cyl = (v.moteur ?? "").trim().match(/^(\d+[.,]\d+)/)?.[1].replace(",", ".") ?? "";
+  const c = (v.code_moteur ?? "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 3);
+  const base = c.length === 3 && /[A-Z]/.test(c) && /\d/.test(c) ? c : "";
+  return { cyl, base };
+}
+
+export type TypeMoteur = { cle: string; cyl: string; base: string; voitures: Voiture[] };
+
+/** Moteurs rangés par type (cylindrée, puis famille du code moteur, ex. « 1.2 · D4F ») ; dans un même type,
+ *  de la plus ancienne version à la plus récente (demande de l'utilisateur, 13/11/2026). */
+export function rangerParType(vs: Voiture[]): TypeMoteur[] {
+  const map = new Map<string, TypeMoteur>();
+  for (const v of vs) {
+    const { cyl, base } = typeMoteur(v);
+    const cle = `${cyl}|${base}`;
+    let t = map.get(cle);
+    if (!t) { t = { cle, cyl, base, voitures: [] }; map.set(cle, t); }
+    t.voitures.push(v);
+  }
+  const debut = (v: Voiture) => dateTri(v.annee_debut) ?? Infinity;
+  const cylindree = (t: TypeMoteur) => (t.cyl ? parseFloat(t.cyl) : Infinity);
+  const types = [...map.values()];
+  types.forEach((t) => t.voitures.sort((a, b) =>
+    debut(a) - debut(b) || (a.moteur ?? "").localeCompare(b.moteur ?? "", "fr", { numeric: true })));
+  // Infinity − Infinity = NaN (faux) → on passe au critère suivant
+  types.sort((a, b) => cylindree(a) - cylindree(b) || debut(a.voitures[0]) - debut(b.voitures[0]) || a.base.localeCompare(b.base));
+  return types;
+}
+
 /** Filtron écrit « Logan II / MCV II | 13- » : nom du modèle + période de fabrication. */
 export function decouperModele(modele: string): { nom: string; periode: string } {
   const i = modele.lastIndexOf(" | ");

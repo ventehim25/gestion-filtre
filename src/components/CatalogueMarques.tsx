@@ -4,7 +4,7 @@
 import { useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { MARQUES_COURANTES, AUTRES_MARQUES, type MarqueVin } from "@/lib/vin";
-import { COLS, grouper, annees, decouperModele, type Ligne, type Voiture } from "@/lib/voitures";
+import { COLS, grouper, annees, decouperModele, rangerParType, type Ligne, type Voiture } from "@/lib/voitures";
 import VoitureCarte from "@/components/VoitureCarte";
 import { ChevronRight, ChevronDown, Factory, Search } from "lucide-react";
 
@@ -113,6 +113,7 @@ export default function CatalogueMarques() {
     .map((g) => ({ ...g, modeles: f ? g.modeles.filter((m) => m.nom.toLowerCase().includes(f)) : g.modeles }))
     .filter((g) => g.modeles.length > 0);
   const nbModeles = groupes.reduce((n, g) => n + g.modeles.length, 0);
+  const typesMoteur = rangerParType(moteurs);
 
   const puce = "px-3 py-1.5 rounded-lg text-sm border border-slate-600 text-slate-200 hover:border-blue-500 hover:bg-blue-600/10 transition-colors";
 
@@ -195,8 +196,16 @@ export default function CatalogueMarques() {
       {/* 3. Les moteurs du modèle → 4. leurs filtres */}
       {modele && !chargement && moteurs.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs text-slate-400">{moteurs.length} moteur{moteurs.length > 1 ? "s" : ""} : choisis celui de la voiture (code moteur sur le moteur ou la carte grise).</p>
-          {moteurs.map((v) => {
+          <p className="text-xs text-slate-400">{moteurs.length} moteur{moteurs.length > 1 ? "s" : ""}, rangés par type puis du plus ancien au plus récent : choisis celui de la voiture (code moteur sur le moteur ou la carte grise).</p>
+          {typesMoteur.map((t) => (
+            <div key={t.cle} className="space-y-2">
+              {typesMoteur.length > 1 && (
+                <p className="pt-2 text-xs uppercase tracking-wide text-slate-400">
+                  {t.cyl ? `Moteur ${t.cyl}` : "Autres moteurs"}
+                  {t.base && <span className="ms-2 font-mono normal-case text-amber-300/80">{t.base}</span>}
+                </p>
+              )}
+          {t.voitures.map((v) => {
             const enStock = v.filtres.filter((x) => x.stock > 0).length;
             const estOuvert = ouvert === v.cle;
             return (
@@ -222,6 +231,8 @@ export default function CatalogueMarques() {
               </div>
             );
           })}
+            </div>
+          ))}
         </div>
       )}
       {modele && !chargement && !erreur && moteurs.length === 0 && (

@@ -32,6 +32,13 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
         ))}
         {v.filtres.length === 0 && <p className="text-xs text-slate-400">Aucun filtre enregistré pour cette voiture.</p>}
       </div>
+      {/* Pas de filtre à carburant dans nos références : normal sur beaucoup d'essence (il est dans le réservoir),
+          à vérifier chez Filtron sur un diesel. On ne devine jamais une référence. */}
+      {v.filtres.length > 0 && !v.filtres.some((f) => f.categorie === "filtre_carburant") && (
+        <p className="mt-2 text-xs text-slate-400">
+          Filtre à carburant : aucun dans tes références pour ce moteur. Sur beaucoup de moteurs essence, il est dans le réservoir avec la pompe ; sur un diesel, vérifie dans le catalogue Filtron.
+        </p>
+      )}
     </div>
   );
 }

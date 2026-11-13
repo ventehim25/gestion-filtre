@@ -175,6 +175,10 @@ Avant : n'importe qui pouvait lire, modifier ou effacer tes clients, tes ventes 
 3. Appuie sur le **moteur** de la voiture (le code moteur en jaune est écrit sur le moteur ou sur la carte grise). À droite : le nombre de filtres et combien sont en stock.
 4. Les filtres s'affichent : huile, air, habitacle, carburant, avec la photo, le prix et le stock.
 
+Les moteurs sont rangés **par type** (ex. « Moteur 1.2 · D4F »), et dans chaque type, du plus ancien au plus récent.
+
+S'il n'y a pas de filtre à carburant : sur beaucoup de moteurs essence, il est dans le réservoir (pas à changer en vidange). Sur un diesel, vérifie dans le catalogue Filtron : certaines références manquent encore dans la base.
+
 Pour revenir en arrière, appuie sur « Marques » ou sur le nom de la marque en haut.
 
 ---
