@@ -10,7 +10,8 @@
 //   node scripts/completer_filtron.mjs --ecrire        → écrit dans la base
 //   node scripts/completer_filtron.mjs PP987/2 OP643/5 → seulement ces références (avec ou sans --ecrire)
 //   --par-code   → une ligne par version de moteur (code moteur + date) : SEULEMENT après supabase/applications_par_code_moteur.sql
-//   --tout       → toutes les références de filtres (≈ 1 h 30, poli avec le site) ; --depuis 500 pour reprendre au 500ᵉ
+//   --tout       → toutes les références de filtres (≈ 4 h : 4 s entre deux pages, pause automatique si Filtron bloque) ;
+//                  --depuis 500 pour reprendre au 501ᵉ (le numéro est affiché en cas d'arrêt)
 //   --detail     → affiche chaque ligne ajoutée
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";
@@ -104,11 +105,33 @@ async function main() {
   console.log(`${cibles.length} références à compléter${DEPUIS ? ` (reprise au n° ${DEPUIS + 1})` : ""} · règle ${PAR_CODE ? "une ligne par version de moteur" : "une ligne par motorisation"}\n`);
 
   const total = { page: 0, nouvelles: 0, rattachees: 0, nouvellesVoitures: 0, ecrites: 0, absentes: 0, erreurs: 0 };
+  // Le 13/11, Filtron a bloqué l'adresse après ≈ 180 pages à 1,5 s d'écart : on va plus lentement, et on s'arrête
+  // de soi-même s'il bloque (3 échecs de suite → pause 10 min, puis on réessaie ces 3 pages ; 3 pauses sans succès → arrêt).
+  const ECART = 4000, PAUSE = 10 * 60 * 1000;
+  let echecsDeSuite = 0, pauses = 0;
+  const enEchec = [];
   for (let i = DEPUIS; i < cibles.length; i++) {
     const p = cibles[i];
+    if (i > DEPUIS) await sleep(ECART);
     try {
-      const html = await page(p.reference);
-      await sleep(1500); // poli avec le site Filtron
+      let html;
+      try { html = await page(p.reference); }
+      catch (e) {
+        enEchec.push(p.reference); total.erreurs++; echecsDeSuite++;
+        console.log(`[${i + 1}/${cibles.length}] ${p.reference} ERREUR téléchargement : ${e.message}`);
+        if (echecsDeSuite >= 3) {
+          pauses++;
+          if (pauses > 3) {
+            console.log(`\n!!! ARRÊT : Filtron refuse toujours les pages. Reprendre plus tard avec : --depuis ${i - 2}`);
+            break;
+          }
+          console.log(`--- PAUSE 10 min (Filtron bloque, pause ${pauses}/3), puis on réessaie ces 3 pages`);
+          await sleep(PAUSE);
+          enEchec.splice(-3); total.erreurs -= 3; echecsDeSuite = 0; i -= 3;
+        }
+        continue;
+      }
+      echecsDeSuite = 0; pauses = 0;
       if (!html) { total.absentes++; console.log(`[${i + 1}/${cibles.length}] ${p.reference} : page introuvable`); continue; }
       const neuves = lireApplications(html);
       // Période d'un modèle inconnu, au format ancien (« 13- », « 10-18 ») : de sa 1re à sa dernière année sur la page
@@ -167,5 +190,6 @@ async function main() {
     }
   }
   console.log("\n=== TERMINÉ ===", total);
+  if (enEchec.length) console.log(`Références en échec (à relancer en les donnant au robot) : ${enEchec.join(" ")}`);
 }
 main();
