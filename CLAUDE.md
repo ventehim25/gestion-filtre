@@ -77,5 +77,5 @@ Colonnes ajoutées (migrations dans `supabase/`) :
 - PWA installable (bannière), `manifest.json` orientation `any`.
 
 ## Scripts (dossier scripts/, reprenables)
-scrape_filtron.mjs (apps+équiv+dimensions), scrape_images.mjs (image_url), import_filtron_catalog.mjs,
+completer_filtron.mjs (applications depuis le nouveau site Filtron, liste complète, sans doublons — remplace scrape_filtron.mjs dont l'adresse répond 404), scrape_images.mjs (image_url), import_filtron_catalog.mjs,
 cleanup_fakes.mjs, seed_garages.mjs, scrape_prospects_osm.mjs / scrape_prospects_gmaps.mjs (API Places, clé optionnelle) / import_gmaps_manuel.mjs / prospect_score.mjs (note /10 + envoi Supabase), prospects_quotidien.cmd (tâche Windows 9 h 30). Lancer : `node scripts/xxx.mjs`. (Scripts `_*.mjs` = vérifs jetables.)

@@ -1,3 +1,5 @@
+// ⚠️ 13/11/2026 : l'adresse Filtron « catalogue-frame?action=showFilter » répond 404 (site refait) et ce robot gardait 250 voitures max.
+// Pour les applications, utiliser scripts/completer_filtron.mjs (nouvelle page produit, liste complète, sans doublons).
 // Enrichit UNE référence Filtron passée en argument : node scrape_one.mjs "AP026/2"
 import { createClient } from "@supabase/supabase-js";
 import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";

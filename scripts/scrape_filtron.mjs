@@ -1,3 +1,5 @@
+// ⚠️ 13/11/2026 : l'adresse Filtron « catalogue-frame?action=showFilter » répond 404 (site refait) et ce robot gardait 250 voitures max.
+// Pour les applications, utiliser scripts/completer_filtron.mjs (nouvelle page produit, liste complète, sans doublons).
 // Enrichissement Filtron robuste & reprenable :
 //  - applications (véhicule/moteur/code/années) + équivalences OE + dimensions
 //  - retries avec backoff, saute les réfs déjà complètes
