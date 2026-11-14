@@ -120,7 +120,7 @@ export default function TourneesPrevues() {
           {voirMessage && (
             <div className="mb-3">
               <textarea dir="auto" className="input text-sm" rows={6} value={message} onChange={(e) => setMessage(e.target.value)} />
-              <p className="text-[11px] text-slate-500 mt-1">{"{nom}"}, {"{ville}"} et {"{jour}"} se remplissent tout seuls pour chaque client.</p>
+              <p className="text-[11px] text-slate-500 mt-1">{"{nom}"}, {"{ville}"}, {"{jour}"} et {"{lien}"} (ton catalogue de prix selon le type du client) se remplissent tout seuls.</p>
               {exemple && (
                 <div className="mt-2 text-xs text-slate-300 bg-[var(--surface-2)] rounded-lg px-3 py-2 whitespace-pre-line" dir="auto">
                   <span className="text-slate-500">Exemple pour {choisis[0].nom} :</span>{"\n"}{exemple}

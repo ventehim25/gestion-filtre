@@ -13,6 +13,7 @@ import { coutCreditParFournisseur, setBonRembourse } from "@/lib/dinoun";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { addPending, getPending, syncPending } from "@/lib/offlineSales";
 import { buildReceipt, sendWhatsApp } from "@/lib/whatsapp";
+import { POURCENTAGES_DEFAUT, catalogueDuClient, chargerPourcentages, infoCatalogue, prixPour, type Pourcentages, type PrixManuels } from "@/lib/prixCatalogues";
 
 type LastSale = {
   clientNom: string; clientTel: string | null; ville: string; date: string;
@@ -36,7 +37,10 @@ export default function VentesPage() {
   const [impayesOnly, setImpayesOnly] = useState(false);
   // Réfs des variantes de marque (Wix, Flag…) pour la recherche d'article
   const [brandVariants, setBrandVariants] = useState<PickerVariant[]>([]);
-  const [variants, setVariants] = useState<Record<string, { marque: string; reference: string; prix: number; prix_achat: number; stock: number; equivalence_id: string | null }[]>>({});
+  const [variants, setVariants] = useState<Record<string, (PrixManuels & { marque: string; reference: string; prix: number; prix_achat: number; stock: number; equivalence_id: string | null })[]>>({});
+  // Pourcentages des 4 catalogues (particulier / location / magasin), BIBLE §8.18
+  const [pct, setPct] = useState<Pourcentages>(POURCENTAGES_DEFAUT);
+  useEffect(() => { chargerPourcentages().then(setPct); }, []);
   const [showForm, setShowForm] = useState(false);
   const [clientId, setClientId] = useState("");
   const [lines, setLines] = useState<LineItem[]>([]);
@@ -146,15 +150,29 @@ export default function VentesPage() {
     setLines(updated);
   }
 
-  // Applique la remise % du client sélectionné (Bible §4.1) — arrondi à l'entier, modifiable à la main ensuite
-  function withRemise(price: number) {
-    const pct = clients.find(c => c.id === clientId)?.remise_pct ?? 0;
-    return pct > 0 ? Math.round(price * (1 - pct / 100)) : price;
+  // Prix pour le client choisi : catalogue de son type (garage, particulier +30 %, location +15 %, magasin −5 %,
+  // ou prix corrigé à la main), puis sa remise % (Bible §4.1). Arrondi à l'entier, modifiable à la main ensuite.
+  function prixClient(base: number, manuels?: PrixManuels | null, cid = clientId) {
+    const c = clients.find(x => x.id === cid);
+    const prix = prixPour(catalogueDuClient(c?.type), base, manuels, pct);
+    const remise = c?.remise_pct ?? 0;
+    return remise > 0 ? Math.round(prix * (1 - remise / 100)) : prix;
+  }
+
+  // Changement de client : les prix déjà au panier suivent son catalogue
+  function changerClient(cid: string) {
+    setClientId(cid); setUseAvoir(false);
+    setLines(prev => prev.map(l => {
+      const p = products.find(x => x.id === l.product_id);
+      if (!p) return l;
+      const v = l.equivalence_id ? (variants[l.product_id] || []).find(x => x.equivalence_id === l.equivalence_id) : null;
+      return { ...l, prix_unitaire: v ? prixClient(v.prix, v, cid) : prixClient(p.prix_vente, p, cid) };
+    }));
   }
 
   function setLineProduct(i: number, p: Product) {
     const updated = [...lines];
-    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: withRemise(p.prix_vente), nom: p.reference, variant: "Filtron", equivalence_id: null, cout_unitaire: p.prix_achat };
+    updated[i] = { ...updated[i], product_id: p.id, prix_unitaire: prixClient(p.prix_vente, p), nom: p.reference, variant: "Filtron", equivalence_id: null, cout_unitaire: p.prix_achat };
     setLines(updated);
     fetchCrossSell(p);
     loadVariants(p);
@@ -163,12 +181,15 @@ export default function VentesPage() {
   // Charge les variantes d'un produit (Filtron + équivalences enregistrées avec un prix)
   async function loadVariants(p: Product) {
     if (variants[p.id]) return variants[p.id];
-    const { data } = await supabase.from("equivalences").select("id, marque, reference, prix, prix_achat, stock").eq("product_id", p.id);
+    // select("*") : prend aussi les prix corrigés par catalogue quand les colonnes existent
+    const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
     const list = [
-      { marque: "Filtron", reference: p.reference, prix: p.prix_vente, prix_achat: p.prix_achat, stock: p.stock, equivalence_id: null as string | null },
-      ...((data ?? []) as { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null }[])
+      { marque: "Filtron", reference: p.reference, prix: p.prix_vente, prix_achat: p.prix_achat, stock: p.stock, equivalence_id: null as string | null,
+        prix_particulier: p.prix_particulier, prix_location: p.prix_location, prix_magasin: p.prix_magasin },
+      ...((data ?? []) as (PrixManuels & { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null })[])
         .filter(e => e.prix != null)
-        .map(e => ({ marque: e.marque, reference: e.reference, prix: e.prix as number, prix_achat: e.prix_achat ?? 0, stock: e.stock ?? 0, equivalence_id: e.id })),
+        .map(e => ({ marque: e.marque, reference: e.reference, prix: e.prix as number, prix_achat: e.prix_achat ?? 0, stock: e.stock ?? 0, equivalence_id: e.id,
+          prix_particulier: e.prix_particulier, prix_location: e.prix_location, prix_magasin: e.prix_magasin })),
     ];
     setVariants(prev => ({ ...prev, [p.id]: list }));
     return list;
@@ -178,7 +199,7 @@ export default function VentesPage() {
   async function setLineProductVariant(i: number, p: Product, marque: string) {
     setLineProduct(i, p);
     const v = (await loadVariants(p)).find(x => x.marque === marque);
-    if (v) setLines(prev => prev.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: withRemise(v.prix), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
+    if (v) setLines(prev => prev.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: prixClient(v.prix, v), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
   }
 
   // Applique une marque à une ligne : prix de vente auto + coût figé + libellé "réf (marque)"
@@ -186,7 +207,7 @@ export default function VentesPage() {
     const l = lines[i];
     const v = (variants[l.product_id] || []).find(x => x.marque === marque);
     if (!v) return;
-    setLines(lines.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: withRemise(v.prix), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
+    setLines(lines.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: prixClient(v.prix, v), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
   }
 
   // Vente croisée : autres filtres (catégories différentes) compatibles avec le même véhicule
@@ -222,7 +243,7 @@ export default function VentesPage() {
         u[idx] = { ...u[idx], quantite: u[idx].quantite + 1 };
         return u;
       }
-      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: withRemise(p.prix_vente), nom: p.reference }];
+      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: prixClient(p.prix_vente, p), nom: p.reference }];
     });
     flash(`${p.reference} ajouté ✓`);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
@@ -252,11 +273,11 @@ export default function VentesPage() {
   }
 
   // Ajoute au panier une variante de marque scannée (prix/coût/equivalence pré-réglés)
-  function addVariantToCart(p: Product, e: { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null }) {
+  function addVariantToCart(p: Product, e: PrixManuels & { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null }) {
     setLines(prev => {
       const idx = prev.findIndex(l => l.product_id === p.id && l.equivalence_id === e.id);
       if (idx >= 0) { const u = [...prev]; u[idx] = { ...u[idx], quantite: u[idx].quantite + 1 }; return u; }
-      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: withRemise(e.prix ?? p.prix_vente), cout_unitaire: e.prix_achat ?? undefined, equivalence_id: e.id, variant: e.marque, nom: `${e.reference} (${e.marque})` }];
+      return [...prev, { product_id: p.id, quantite: 1, prix_unitaire: e.prix != null ? prixClient(e.prix, e) : prixClient(p.prix_vente, p), cout_unitaire: e.prix_achat ?? undefined, equivalence_id: e.id, variant: e.marque, nom: `${e.reference} (${e.marque})` }];
     });
     flash(`${e.reference} (${e.marque}) ajouté ✓`);
     if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(40);
@@ -616,12 +637,15 @@ export default function VentesPage() {
             <h3 className="font-semibold text-slate-800 mb-4">{editingSale ? "Modifier la vente" : t("addSale")}</h3>
             <div className="mb-4">
               <label className="text-xs text-slate-500 mb-1 block">{t("clients")}</label>
-              <select className="input" value={clientId} onChange={e => { setClientId(e.target.value); setUseAvoir(false); }}>
+              <select className="input" value={clientId} onChange={e => changerClient(e.target.value)}>
                 <option value="">-- Choisir client --</option>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.nom} — {c.ville}</option>)}
               </select>
               {selectedClient && (
                 <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                  {catalogueDuClient(selectedClient.type) !== "garage" && (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-300">Prix {infoCatalogue(catalogueDuClient(selectedClient.type)).libelle}</span>
+                  )}
                   {(selectedClient.remise_pct ?? 0) > 0 && (
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400">Remise {selectedClient.remise_pct}% appliquée</span>
                   )}

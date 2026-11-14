@@ -21,17 +21,17 @@ export function relanceDueDate(lastSale: string | null, lastRelance: string | nu
 }
 
 export type RelanceClient = {
-  id: string; nom: string; telephone: string | null;
+  id: string; nom: string; telephone: string | null; type?: string | null;
   lastSale: string | null; derniereRelance: string | null; due: string; jours: number;
 };
 
 // Charge tous les clients « à relancer aujourd'hui ». Paginé. Repli si la colonne
 // derniere_relance_catalogue n'existe pas encore (SQL non collé) → traitée comme null.
 export async function loadRelancesCatalogue(today = new Date().toISOString().slice(0, 10)): Promise<RelanceClient[]> {
-  type Cl = { id: string; nom: string; telephone: string | null; derniere_relance_catalogue?: string | null };
+  type Cl = { id: string; nom: string; telephone: string | null; type?: string | null; derniere_relance_catalogue?: string | null };
   const clients: Cl[] = [];
   for (let i = 0; i < 10; i++) {
-    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, telephone, derniere_relance_catalogue").range(i * 1000, i * 1000 + 999);
+    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, telephone, type, derniere_relance_catalogue").range(i * 1000, i * 1000 + 999);
     if (res.error) res = await supabase.from("clients").select("id, nom, telephone").range(i * 1000, i * 1000 + 999); // colonne absente
     const data = res.data as Cl[] | null;
     if (!data || data.length === 0) break;
@@ -58,7 +58,7 @@ export async function loadRelancesCatalogue(today = new Date().toISOString().sli
     const due = relanceDueDate(ls, lr);
     if (due && today >= due) {
       const jours = Math.round((new Date(today).getTime() - new Date(due).getTime()) / 86400000);
-      out.push({ id: c.id, nom: c.nom, telephone: c.telephone, lastSale: ls, derniereRelance: lr, due, jours });
+      out.push({ id: c.id, nom: c.nom, telephone: c.telephone, type: c.type, lastSale: ls, derniereRelance: lr, due, jours });
     }
   }
   out.sort((a, b) => a.due.localeCompare(b.due)); // le plus en retard d'abord

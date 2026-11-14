@@ -17,7 +17,12 @@ const LocationPicker = nextDynamic(() => import("@/components/LocationPicker"), 
 
 const empty = { nom: "", telephone: "", ville: "", quartier: "", adresse: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0, parrain_id: "", latitude: null as number | null, longitude: null as number | null };
 
-const TYPE_LABELS: Record<ClientType, string> = { comptoir: "Comptoir", garage: "Garage", gros: "Gros" };
+// Le type choisit aussi le catalogue de prix (src/lib/prixCatalogues.ts) : garage = prix de base,
+// particulier +30 %, location +15 %, magasin −5 % (réglables dans Paramètres). Comptoir = prix garage, gros = prix magasin.
+const TYPE_LABELS: Record<ClientType, string> = {
+  garage: "Garage / station", particulier: "Particulier", location: "Location de voitures", magasin: "Magasin de pièces",
+  comptoir: "Comptoir (prix garage)", gros: "Gros (prix magasin)",
+};
 
 // Badge fiabilité : basé sur l'âge de la dette EN COURS (pas d'historique de délai de paiement disponible)
 function fiabiliteBadge(oldestUnpaidDate: string | null): { emoji: string; label: string; cls: string } | null {
@@ -347,7 +352,7 @@ export default function ClientsPage() {
               <div><label className="text-xs text-slate-500 mb-1 block">Parrainé par (optionnel — 🎁 100 MAD d&apos;avoir au parrain)</label>
                 <select className="input" value={form.parrain_id} onChange={e => setForm({ ...form, parrain_id: e.target.value })}>
                   <option value="">— Personne —</option>
-                  {clients.filter(c => c.id !== editing?.id && (c.type === "garage" || c.type === "gros")).map(c => (
+                  {clients.filter(c => c.id !== editing?.id && (c.type === "garage" || c.type === "gros" || c.type === "magasin")).map(c => (
                     <option key={c.id} value={c.id}>{c.nom} — {c.ville}</option>
                   ))}
                 </select>
@@ -429,7 +434,7 @@ export default function ClientsPage() {
               <Plus size={11} /> Ancien impayé (avant l&apos;app)
             </button>
             {/* Fidélité paliers trimestriels (Bible §4.9) — suggestion à valider, jamais automatique */}
-            {(c.type === "garage" || c.type === "gros") && (() => {
+            {(c.type === "garage" || c.type === "gros" || c.type === "magasin") && (() => {
               const ca = trimCA[c.id] ?? 0;
               const suggere = palierPour(ca);
               const next = prochainPalier(ca);

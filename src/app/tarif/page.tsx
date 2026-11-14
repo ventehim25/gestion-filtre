@@ -1,11 +1,13 @@
 "use client";
 export const dynamic = "force-dynamic";
-// Catalogue de prix PRIVÉ (envoyé aux garages). Ne s'ouvre qu'avec le bon lien (?k=...).
+// Catalogue de prix PRIVÉ. Ne s'ouvre qu'avec le bon lien (?k=...) : 4 liens = 4 catalogues
+// (garages et stations, particuliers, location de voitures, magasins de pièces), src/lib/prixCatalogues.ts.
 // Toujours à jour : lit les produits en direct. Ne montre JAMAIS le prix d'achat.
 // Panier + quantités → message WhatsApp formaté « QTÉ RÉF » qui rentre dans /commandes.
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CatItem, CAT_FR, CAT_ORDER, TARIF_KEY, loadCatalogueItems, enrichTarifAliases, cachedTarifItems } from "@/lib/catalogue";
+import { CatItem, CAT_FR, CAT_ORDER, loadCatalogueItems, enrichTarifAliases, cachedTarifItems } from "@/lib/catalogue";
+import { typeDeCle, infoCatalogue } from "@/lib/prixCatalogues";
 import FilterImage from "@/components/FilterImage";
 
 const WA = "212602350290";
@@ -16,7 +18,9 @@ export default function TarifPage() {
 
 function TarifInner() {
   const params = useSearchParams();
-  const ok = params.get("k") === TARIF_KEY;
+  const type = typeDeCle(params.get("k"));
+  const ok = type !== null;
+  const info = infoCatalogue(type ?? "garage");
 
   const [items, setItems] = useState<CatItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -25,14 +29,14 @@ function TarifInner() {
   const [cart, setCart] = useState<Record<string, number>>({});
 
   useEffect(() => {
-    if (!ok) { setLoading(false); return; }
-    const c = cachedTarifItems();           // affichage instantané depuis la dernière liste connue
+    if (!type) { setLoading(false); return; }
+    const c = cachedTarifItems(type);       // affichage instantané depuis la dernière liste connue
     if (c && c.length) { setItems(c); setLoading(false); }
-    loadCatalogueItems().then(list => {
+    loadCatalogueItems(type).then(list => {
       setItems(list); setLoading(false);
-      enrichTarifAliases(list).then(setItems).catch(() => {}); // recherche multi-réfs en fond
+      enrichTarifAliases(list, type).then(setItems).catch(() => {}); // recherche multi-réfs en fond
     }).catch(() => setLoading(false));
-  }, [ok]);
+  }, [type]);
 
   const keyOf = (i: CatItem) => `${i.reference}|${i.marque}`;
   function addQty(i: CatItem, d: number) {
@@ -76,7 +80,7 @@ function TarifInner() {
       return;
     }
     // Lignes « QTÉ RÉF » → se collent directement dans la page Commandes garages
-    const lignes = ["Salam 🙏 *Commande FiltroPro* :"];
+    const lignes = [`Salam 🙏 *Commande FiltroPro* (${info.court}) :`];
     for (const i of cartItems) lignes.push(`${cart[keyOf(i)]} ${i.reference}`);
     lignes.push("", `Total indicatif : ${cartTotal} MAD`);
     window.open(`https://wa.me/${WA}?text=${encodeURIComponent(lignes.join("\n"))}`, "_blank");
@@ -159,7 +163,7 @@ function TarifInner() {
             </svg>
             <div>
               <h1>Filtro<span className="gold">Pro</span> · Tarifs</h1>
-              <p className="sub">Prix du jour · livraison aux garages · {items.length} article(s) dispo</p>
+              <p className="sub">Prix du jour · {info.libelle} · {items.length} article(s) dispo</p>
             </div>
           </div>
 

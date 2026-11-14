@@ -38,6 +38,10 @@ export type Database = {
       vin_connus: Table<VinConnu, "famille" | "confirme_le">;
       // Tournées prévues : prévenir les clients la veille (supabase/tournees_prevues.sql)
       tournees_prevues: Table<TourneePrevue, "id" | "created_at" | "message" | "envoyes">;
+      // Réglages partagés, ex. pourcentages des 4 catalogues (supabase/catalogues_huile_tournees.sql)
+      reglages: Table<{ cle: string; valeur: unknown; modifie_le: string }, "modifie_le">;
+      // Huile moteur par moteur : viscosité, norme, litres (supabase/catalogues_huile_tournees.sql)
+      huiles_moteurs: Table<HuileMoteur, "modifie_le" | "viscosites">;
     };
     Views: {
       prospects_par_jour: { Row: { jour: string; source: string; nb: number }; Relationships: [] };
@@ -175,6 +179,23 @@ export type Equivalence = {
   prix_achat: number | null;  // prix d'achat de la variante
   stock: number;              // stock de cette marque
   code_barre?: string | null; // code-barres de la boîte de cette marque
+  // Prix corrigés à la main par catalogue (vide = prix ± pourcentage, src/lib/prixCatalogues.ts)
+  prix_particulier?: number | null;
+  prix_location?: number | null;
+  prix_magasin?: number | null;
+};
+
+// Huile moteur conseillée pour un moteur (code = code moteur sans espace : « K9K » ou « K9K892 »)
+export type HuileMoteur = {
+  code: string;
+  description: string | null;
+  viscosites: string[];
+  norme: string | null;
+  acea: string | null;
+  litres: number | null;
+  source: string | null;
+  remarque: string | null;
+  modifie_le: string;
 };
 
 export type Application = {
@@ -215,9 +236,15 @@ export type Product = {
   image_url?: string | null;
   code_barre?: string | null;
   prix_promo?: number | null;
+  // Prix corrigés à la main par catalogue (vide = prix ± pourcentage, src/lib/prixCatalogues.ts)
+  prix_particulier?: number | null;
+  prix_location?: number | null;
+  prix_magasin?: number | null;
 };
 
-export type ClientType = "comptoir" | "garage" | "gros";
+// garage = garages et stations ; particulier, location (de voitures), magasin (de pièces) ont leur catalogue de prix.
+// comptoir et gros : anciens types (comptoir = prix garage, gros = prix magasin).
+export type ClientType = "comptoir" | "garage" | "gros" | "particulier" | "location" | "magasin";
 
 export type Client = {
   id: string;

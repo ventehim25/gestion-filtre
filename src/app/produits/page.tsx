@@ -17,6 +17,11 @@ import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
 import { classifyKind } from "@/lib/vehicleType";
 import VoiceButton from "@/components/VoiceButton";
+import { CATALOGUES, POURCENTAGES_DEFAUT, chargerPourcentages, prixPour, type Pourcentages, type TypeCatalogue } from "@/lib/prixCatalogues";
+
+// Prix corrigés à la main pour les 3 autres catalogues (0 = calculé avec le pourcentage)
+const MANUELS_VIDES = { prix_particulier: 0, prix_location: 0, prix_magasin: 0 };
+const COL_CAT = { particulier: "prix_particulier", location: "prix_location", magasin: "prix_magasin" } as const;
 
 const CATEGORIES: ProductCategory[] = [
   "filtre_huile", "filtre_air", "filtre_carburant",
@@ -52,6 +57,9 @@ export default function ProduitsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [form, setForm] = useState(empty);
+  const [manuels, setManuels] = useState(MANUELS_VIDES);
+  const [pctCat, setPctCat] = useState<Pourcentages>(POURCENTAGES_DEFAUT);
+  useEffect(() => { chargerPourcentages().then(setPctCat); }, []);
   const [uploading, setUploading] = useState(false);
   const [equivs, setEquivs] = useState<{ id?: string; marque: string; reference: string; prix?: number; prix_achat?: number; stock?: number; code_barre?: string }[]>([]);
   const [newEquiv, setNewEquiv] = useState({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
@@ -120,6 +128,11 @@ export default function ProduitsPage() {
       const { data: inserted } = await supabase.from("products").insert(payload).select().single();
       productId = (inserted as Product | null)?.id;
     }
+    // Prix par catalogue corrigés à la main : envoyés à part (sans effet tant que le SQL n'est pas collé)
+    if (productId) {
+      const m = { prix_particulier: manuels.prix_particulier > 0 ? manuels.prix_particulier : null, prix_location: manuels.prix_location > 0 ? manuels.prix_location : null, prix_magasin: manuels.prix_magasin > 0 ? manuels.prix_magasin : null };
+      try { await supabase.from("products").update(m).eq("id", productId); } catch { /* colonnes absentes */ }
+    }
     // Synchronise les équivalences (supprime puis réinsère)
     if (productId) {
       await supabase.from("equivalences").delete().eq("product_id", productId);
@@ -127,7 +140,7 @@ export default function ProduitsPage() {
         .map(e => ({ product_id: productId!, marque: e.marque.trim(), reference: e.reference.trim(), prix: e.prix && e.prix > 0 ? e.prix : null, prix_achat: e.prix_achat && e.prix_achat > 0 ? e.prix_achat : null, stock: e.stock ?? 0, ...(e.code_barre?.trim() ? { code_barre: e.code_barre.trim() } : {}) }));
       if (rows.length) await supabase.from("equivalences").insert(rows);
     }
-    setShowForm(false); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
+    setShowForm(false); setEditing(null); setForm(empty); setManuels(MANUELS_VIDES); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
     load();
   }
 
@@ -161,6 +174,7 @@ export default function ProduitsPage() {
   async function startEdit(p: Product) {
     setEditing(p);
     setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, marque: p.marque ?? "Filtron", categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0, code_barre: p.code_barre ?? "", image_url: p.image_url ?? "" });
+    setManuels({ prix_particulier: p.prix_particulier ?? 0, prix_location: p.prix_location ?? 0, prix_magasin: p.prix_magasin ?? 0 });
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
     setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined, prix_achat: e.prix_achat ?? undefined, stock: e.stock ?? 0, code_barre: e.code_barre ?? "" })) ?? []);
     setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
@@ -169,7 +183,7 @@ export default function ProduitsPage() {
   }
 
   function openNew() {
-    setShowForm(true); setEditing(null); setForm(empty); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" }); setShowAutoEquivs(false);
+    setShowForm(true); setEditing(null); setForm(empty); setManuels(MANUELS_VIDES); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" }); setShowAutoEquivs(false);
   }
 
   // Diffuse les produits en promo (prix_promo > 0) par WhatsApp
@@ -325,6 +339,22 @@ export default function ProduitsPage() {
               <div><label className="text-xs text-slate-500 mb-1 block">{t("buyPrice")} (MAD)</label><input type="number" className="input" value={form.prix_achat} onChange={e => setForm({ ...form, prix_achat: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("sellPrice")} (MAD)</label><input type="number" className="input" value={form.prix_vente} onChange={e => setForm({ ...form, prix_vente: +e.target.value })} /></div>
               <div><label className="text-xs text-rose-400 mb-1 block">Prix promo (MAD) — 0 = pas de promo</label><input type="number" className="input" value={form.prix_promo} onChange={e => setForm({ ...form, prix_promo: +e.target.value })} /></div>
+              {/* 4 catalogues (BIBLE §8.18) : vide = prix garage ± pourcentage (en gris), sinon ce prix-là */}
+              <div className="col-span-2">
+                <label className="text-xs text-sky-300 mb-1 block">Prix par catalogue (vide = calculé, en gris)</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {CATALOGUES.filter(c => c.type !== "garage").map(c => {
+                    const t = c.type as Exclude<TypeCatalogue, "garage">;
+                    return (
+                      <div key={t}>
+                        <span className="text-[11px] text-slate-400 block mb-0.5">{c.court} ({pctCat[t] > 0 ? "+" : ""}{pctCat[t]} %)</span>
+                        <input type="number" className="input" value={manuels[COL_CAT[t]] || ""} placeholder={form.prix_vente > 0 ? String(prixPour(t, form.prix_vente, null, pctCat)) : "—"}
+                          onChange={e => setManuels({ ...manuels, [COL_CAT[t]]: +e.target.value })} />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("stock")}</label><input type="number" className="input" value={form.stock} onChange={e => setForm({ ...form, stock: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">Stock min</label><input type="number" className="input" value={form.stock_min} onChange={e => setForm({ ...form, stock_min: +e.target.value })} /></div>
               <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">Code-barres (Filtron)</label>

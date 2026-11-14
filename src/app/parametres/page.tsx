@@ -5,6 +5,7 @@ import { useLang } from "@/context/LangContext";
 import { Bell, BellOff, Check } from "lucide-react";
 import { pushSupported, pushPermission, isSubscribed, enablePush, disablePush } from "@/lib/push";
 import CompteSection from "@/components/CompteSection";
+import CataloguesSection from "@/components/CataloguesSection";
 
 export default function ParametresPage() {
   const { t, lang, setLang } = useLang();
@@ -49,6 +50,7 @@ export default function ParametresPage() {
       <Header title="settings" />
 
       <CompteSection />
+      <CataloguesSection />
 
       <div className="card p-6 max-w-md mb-4">
         <h3 className="font-semibold text-slate-700 mb-4">{t("language")}</h3>

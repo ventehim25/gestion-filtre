@@ -2,6 +2,7 @@
 // EN DIRECT depuis les produits gérés dans /produits. Change un prix / un stock → ça suit.
 import { supabase } from "./supabase";
 import { ProductCategory } from "@/types/database";
+import { chargerPourcentages, prixPour, type PrixManuels, type TypeCatalogue } from "./prixCatalogues";
 
 // Clé du lien privé. Le catalogue de prix ne s'ouvre qu'avec ?k=<clé>.
 export const TARIF_KEY = "garages2026";
@@ -38,7 +39,9 @@ function writeCache(key: string, v: unknown) {
   try { localStorage.setItem(key, JSON.stringify(v)); } catch {}
 }
 export function cachedPublicItems(): PubItem[] | null { return readCache<PubItem[]>(PUB_CACHE); }
-export function cachedTarifItems(): CatItem[] | null { return readCache<CatItem[]>(TARIF_CACHE); }
+// Un cache par catalogue (garage, particulier, location, magasin) : les prix diffèrent
+const cacheTarif = (t: TypeCatalogue) => (t === "garage" ? TARIF_CACHE : `${TARIF_CACHE}_${t}`);
+export function cachedTarifItems(t: TypeCatalogue = "garage"): CatItem[] | null { return readCache<CatItem[]>(cacheTarif(t)); }
 
 // aliases = toutes les références connues du MÊME produit (Filtron + Mann + Bosch + OE…),
 // pour qu'un garage retrouve ton filtre en tapant n'importe laquelle.
@@ -49,9 +52,10 @@ export type CatItem = {
 };
 export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null; aliases?: string[]; productId?: string };
 
-type ProdRow = { id: string; reference: string; marque: string | null; categorie: string; stock: number; image_url: string | null; prix_vente?: number; prix_promo?: number | null };
+type ProdRow = PrixManuels & { id: string; reference: string; marque: string | null; categorie: string; stock: number; image_url: string | null; prix_vente?: number; prix_promo?: number | null };
 type ParentRow = { categorie: string | null; image_url: string | null; reference: string | null } | null;
-type EqRow = { product_id: string; marque: string; reference: string; stock: number; prix?: number | null; products?: ParentRow };
+type EqRow = PrixManuels & { product_id: string; marque: string; reference: string; stock: number; prix?: number | null; products?: ParentRow };
+const COLS_MANUELS = ", prix_particulier, prix_location, prix_magasin";
 
 // PERF — le catalogue n'affiche QUE les articles en stock (~120 lignes) alors que la
 // base contient 3200+ produits et 23000+ équivalences. On ne chargeait tout ça que pour
@@ -61,13 +65,14 @@ type EqRow = { product_id: string; marque: string; reference: string; stock: num
 //      pour les produits affichés (equivalences filtrées par product_id).
 
 // Produits en stock (quelques centaines max → 1 page en général).
-async function stockProducts(withPrice: boolean): Promise<ProdRow[]> {
+async function stockProducts(withPrice: boolean, manuels = false): Promise<ProdRow[]> {
   const cols = withPrice
-    ? "id, reference, marque, categorie, stock, image_url, prix_vente, prix_promo"
+    ? "id, reference, marque, categorie, stock, image_url, prix_vente, prix_promo" + (manuels ? COLS_MANUELS : "")
     : "id, reference, marque, categorie, stock, image_url";
   const rows: ProdRow[] = [];
   for (let i = 0; i < 10; i++) {
-    const { data } = await supabase.from("products").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
+    const { data, error } = await supabase.from("products").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
+    if (error && manuels) return stockProducts(withPrice, false); // colonnes pas encore créées (SQL pas collé)
     if (!data || data.length === 0) break;
     rows.push(...(data as unknown as ProdRow[]));
     if (data.length < 1000) break;
@@ -75,13 +80,14 @@ async function stockProducts(withPrice: boolean): Promise<ProdRow[]> {
   return rows;
 }
 // Variantes de marque en stock, avec les infos du produit parent (catégorie, photo, réf).
-async function stockEquivs(withPrice: boolean): Promise<EqRow[]> {
+async function stockEquivs(withPrice: boolean, manuels = false): Promise<EqRow[]> {
   const cols = withPrice
-    ? "product_id, marque, reference, stock, prix, products(categorie, image_url, reference)"
+    ? "product_id, marque, reference, stock, prix" + (manuels ? COLS_MANUELS : "") + ", products(categorie, image_url, reference)"
     : "product_id, marque, reference, stock, products(categorie, image_url, reference)";
   const rows: EqRow[] = [];
   for (let i = 0; i < 10; i++) {
-    const { data } = await supabase.from("equivalences").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
+    const { data, error } = await supabase.from("equivalences").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
+    if (error && manuels) return stockEquivs(withPrice, false);
     if (!data || data.length === 0) break;
     rows.push(...(data as unknown as EqRow[]));
     if (data.length < 1000) break;
@@ -136,16 +142,21 @@ export async function enrichPublicAliases(items: PubItem[]): Promise<PubItem[]> 
 }
 
 // ---- Catalogue de PRIX (privé) : avec prix de vente (jamais le prix d'achat) ----
-export async function loadCatalogueItems(): Promise<CatItem[]> {
-  const [prods, eqs] = await Promise.all([stockProducts(true), stockEquivs(true)]);
+// type = garage (prix saisi) · particulier · location · magasin (prix ± pourcentage, ou corrigé à la main)
+export async function loadCatalogueItems(type: TypeCatalogue = "garage"): Promise<CatItem[]> {
+  const autre = type !== "garage";
+  const [prods, eqs, pct] = await Promise.all([stockProducts(true, autre), stockEquivs(true, autre), chargerPourcentages()]);
   const items: CatItem[] = [];
   for (const p of prods) {
     if ((p.prix_vente ?? 0) > 0) {
-      const promo = p.prix_promo != null && p.prix_promo > 0;
+      const base = p.prix_vente as number;
+      const prixNormal = prixPour(type, base, p, pct);
+      const manuel = autre && prixNormal !== prixPour(type, base, null, pct); // prix corrigé à la main : pas de promo calculée
+      const promo = !manuel && p.prix_promo != null && p.prix_promo > 0;
       items.push({
         reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie,
-        prix: promo ? (p.prix_promo as number) : (p.prix_vente as number), promo,
-        prixAvant: promo ? p.prix_vente : undefined, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id,
+        prix: promo ? prixPour(type, p.prix_promo as number, null, pct) : prixNormal, promo,
+        prixAvant: promo ? prixNormal : undefined, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id,
       });
     }
   }
@@ -154,19 +165,19 @@ export async function loadCatalogueItems(): Promise<CatItem[]> {
       const parentRef = e.products?.reference ? [norm(e.products.reference)] : [];
       items.push({
         reference: e.reference, marque: e.marque, categorie: e.products?.categorie ?? "autre",
-        prix: e.prix, promo: false, imageUrl: e.products?.image_url ?? null,
+        prix: prixPour(type, e.prix, e, pct), promo: false, imageUrl: e.products?.image_url ?? null,
         aliases: [norm(e.reference), ...parentRef], productId: e.product_id,
       });
     }
   }
   items.sort((a, b) => catOrder(a.categorie) - catOrder(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
-  writeCache(TARIF_CACHE, items);
+  writeCache(cacheTarif(type), items);
   return items;
 }
-export async function enrichTarifAliases(items: CatItem[]): Promise<CatItem[]> {
+export async function enrichTarifAliases(items: CatItem[], type: TypeCatalogue = "garage"): Promise<CatItem[]> {
   const pids = items.map(i => i.productId).filter((x): x is string => !!x);
   if (pids.length === 0) return items;
   const out = mergeAliases(items, await aliasesFor(pids));
-  writeCache(TARIF_CACHE, out);
+  writeCache(cacheTarif(type), out);
   return out;
 }

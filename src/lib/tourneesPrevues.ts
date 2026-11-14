@@ -4,6 +4,7 @@
 // Pas d'envoi automatique : WhatsApp bannit les numéros qui envoient en masse.
 import { supabase } from "./supabase";
 import { TARIF_KEY } from "./catalogue";
+import { catalogueDuClient, lienCatalogue } from "./prixCatalogues";
 import type { TourneePrevue } from "@/types/database";
 
 export const TARIF_URL = `https://gestion-filtre.vercel.app/tarif?k=${TARIF_KEY}`;
@@ -34,17 +35,18 @@ function addJours(date: string, n: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-// Message par défaut. {nom}, {jour} et {ville} se remplissent pour chaque client.
+// Message par défaut. {nom}, {jour}, {ville} et {lien} (catalogue de prix du type du client) se remplissent pour chaque client.
 export const MESSAGE_DEFAUT = [
   "السلام عليكم {nom} 👋",
   "{jour} إن شاء الله غادي نكونو ف {ville} 🚚",
   "صيفط ليا الكوموند ديالك اليوم باش نوجدوها ليك ونجيبوها معانا.",
-  `📋 الأثمنة ديال اليوم : ${TARIF_URL}`,
+  "📋 الأثمنة ديال اليوم : {lien}",
   "FiltroPro · 📲 0602350290",
 ].join("\n");
 
-export function remplirMessage(modele: string, c: { nom: string; ville: string }, dateTournee: string): string {
+export function remplirMessage(modele: string, c: { nom: string; ville: string; type?: string | null }, dateTournee: string): string {
   return (modele || MESSAGE_DEFAUT)
+    .replaceAll("{lien}", lienCatalogue(catalogueDuClient(c.type)))
     .replaceAll("{nom}", c.nom.trim())
     .replaceAll("{ville}", c.ville.trim())
     .replaceAll("{jour}", jourDarija(dateTournee));
@@ -54,13 +56,13 @@ export function remplirMessage(modele: string, c: { nom: string; ville: string }
 export const normVille = (s: string | null | undefined) =>
   (s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
 
-export type ClientTournee = { id: string; nom: string; telephone: string | null; ville: string; quartier: string | null };
+export type ClientTournee = { id: string; nom: string; telephone: string | null; ville: string; quartier: string | null; type?: string | null };
 
 // Tous les clients (73 aujourd'hui ; paginé au cas où)
 export async function chargerClients(): Promise<ClientTournee[]> {
   const out: ClientTournee[] = [];
   for (let i = 0; i < 20; i++) {
-    const { data, error } = await supabase.from("clients").select("id, nom, telephone, ville, quartier").order("nom").range(i * 1000, i * 1000 + 999);
+    const { data, error } = await supabase.from("clients").select("id, nom, telephone, ville, quartier, type").order("nom").range(i * 1000, i * 1000 + 999);
     if (error) throw error;
     out.push(...((data ?? []) as ClientTournee[]));
     if (!data || data.length < 1000) break;

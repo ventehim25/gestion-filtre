@@ -7,11 +7,9 @@ import { useEffect, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { sendWhatsApp } from "@/lib/whatsapp";
-import { TARIF_KEY } from "@/lib/catalogue";
+import { catalogueDuClient, lienCatalogue } from "@/lib/prixCatalogues";
 import { loadRelancesCatalogue, RelanceClient } from "@/lib/relances";
 import { Send, RefreshCw } from "lucide-react";
-
-const TARIF_URL = `https://gestion-filtre.vercel.app/tarif?k=${TARIF_KEY}`;
 
 export default function RelancesCataloguePage() {
   const [list, setList] = useState<RelanceClient[]>([]);
@@ -25,7 +23,7 @@ export default function RelancesCataloguePage() {
   useEffect(() => { load(); }, []);
 
   async function envoyer(c: RelanceClient) {
-    const msg = `Salam ${c.nom} 🙏 Voici notre *catalogue à jour* (prix du jour) : ${TARIF_URL}\nDis-moi ce qu'il te faut, je te prépare ça et je te livre 👍`;
+    const msg = `Salam ${c.nom} 🙏 Voici notre *catalogue à jour* (prix du jour) : ${lienCatalogue(catalogueDuClient(c.type))}\nDis-moi ce qu'il te faut, je te prépare ça et je te livre 👍`;
     sendWhatsApp(c.telephone, msg);
     const today = new Date().toISOString().slice(0, 10);
     try { await supabase.from("clients").update({ derniere_relance_catalogue: today }).eq("id", c.id); } catch { /* colonne absente */ }
