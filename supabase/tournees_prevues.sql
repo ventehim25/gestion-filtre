@@ -21,7 +21,7 @@ create index if not exists tournees_prevues_date on public.tournees_prevues (dat
 alter table public.tournees_prevues enable row level security;
 drop policy if exists equipe on public.tournees_prevues;
 create policy equipe on public.tournees_prevues for all to authenticated
-  using (public.est_autorise()) with check (public.est_autorise());
+  using ((select public.est_autorise())) with check ((select public.est_autorise()));
 revoke all on public.tournees_prevues from anon;
 grant select, insert, update, delete on public.tournees_prevues to authenticated;
 

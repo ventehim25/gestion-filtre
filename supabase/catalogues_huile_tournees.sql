@@ -20,7 +20,7 @@ create index if not exists tournees_prevues_date on public.tournees_prevues (dat
 alter table public.tournees_prevues enable row level security;
 drop policy if exists equipe on public.tournees_prevues;
 create policy equipe on public.tournees_prevues for all to authenticated
-  using (public.est_autorise()) with check (public.est_autorise());
+  using ((select public.est_autorise())) with check ((select public.est_autorise()));
 revoke all on public.tournees_prevues from anon;
 grant select, insert, update, delete on public.tournees_prevues to authenticated;
 
@@ -34,7 +34,7 @@ create table if not exists public.reglages (
 alter table public.reglages enable row level security;
 drop policy if exists equipe on public.reglages;
 create policy equipe on public.reglages for all to authenticated
-  using (public.est_autorise()) with check (public.est_autorise());
+  using ((select public.est_autorise())) with check ((select public.est_autorise()));
 drop policy if exists lecture_publique on public.reglages;
 create policy lecture_publique on public.reglages for select to anon using (cle = 'pourcentages_catalogues');
 grant select on public.reglages to anon;
@@ -74,7 +74,7 @@ create table if not exists public.huiles_moteurs (
 alter table public.huiles_moteurs enable row level security;
 drop policy if exists equipe on public.huiles_moteurs;
 create policy equipe on public.huiles_moteurs for all to authenticated
-  using (public.est_autorise()) with check (public.est_autorise());
+  using ((select public.est_autorise())) with check ((select public.est_autorise()));
 drop policy if exists lecture_publique on public.huiles_moteurs;
 create policy lecture_publique on public.huiles_moteurs for select to anon using (true);
 grant select on public.huiles_moteurs to anon;
