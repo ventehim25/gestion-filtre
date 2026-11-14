@@ -99,6 +99,7 @@ export default function VentesPage() {
     setClients(c.data ?? []);
     setFournisseurs((fr.data as Fournisseur[]) ?? []);
     setProducts(all);
+    return all;
   }
 
   async function doSync() {
@@ -116,13 +117,16 @@ export default function VentesPage() {
         const { left } = await syncPending(supabase);
         setPendingCount(left);
       }
-      await load();
+      const all = await load();
       // Liens directs : /ventes?client=<id> (prospect qui commande) · ?nouvelle=1 (bouton Vente) · ?impayes=1 (bouton Encaisser)
+      // · ?kit=<id,id,…> (« Vendre ce kit » d’une voiture, /recherche)
       const params = new URLSearchParams(window.location.search);
       const pre = params.get("client");
-      if (pre || params.has("nouvelle")) {
+      const kit = (params.get("kit") ?? "").split(",").filter(Boolean);
+      if (pre || params.has("nouvelle") || kit.length) {
         openNew();
         if (pre) setClientId(pre);
+        for (const id of kit) { const p = all.find(x => x.id === id); if (p) addProductToCart(p); }
       }
       if (params.has("impayes")) setImpayesOnly(true);
       if ([...params.keys()].length) window.history.replaceState(null, "", "/ventes");

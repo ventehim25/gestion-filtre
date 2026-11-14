@@ -86,3 +86,34 @@ export function decouperModele(modele: string): { nom: string; periode: string }
   const i = modele.lastIndexOf(" | ");
   return i > 0 ? { nom: modele.slice(0, i), periode: modele.slice(i + 3) } : { nom: modele, periode: "" };
 }
+
+// Types de filtres qui composent un kit d'entretien (pas l'huile : elle a sa propre ligne)
+const TYPES_KIT = ["filtre_huile", "filtre_air", "filtre_habitacle", "filtre_carburant"];
+
+/** Kit d'entretien d'une voiture : un filtre par type (huile, air, habitacle, carburant). S'il y a
+ *  plusieurs choix pour un type, on garde celui en stock, puis celui qui a un prix, puis le premier. */
+export function kitDeVoiture(v: Pick<Voiture, "filtres">): ProdLite[] {
+  const kit: ProdLite[] = [];
+  for (const type of TYPES_KIT) {
+    const choix = v.filtres.filter((f) => f.categorie === type);
+    if (!choix.length) continue;
+    choix.sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0) || Number(b.prix_vente > 0) - Number(a.prix_vente > 0));
+    kit.push(choix[0]);
+  }
+  return kit;
+}
+
+/** Message WhatsApp du kit (français, prix seulement s'ils sont connus) */
+export function messageKit(v: Pick<Voiture, "marque" | "modele" | "moteur" | "code_moteur">, kit: ProdLite[]): string {
+  const total = kit.reduce((s, f) => s + (f.prix_vente > 0 ? f.prix_vente : 0), 0);
+  const toutPrix = kit.every((f) => f.prix_vente > 0);
+  return [
+    `🚗 *Kit filtres* — ${decouperModele(v.modele).nom} (${v.marque})`,
+    [v.moteur, v.code_moteur && `code ${v.code_moteur}`].filter(Boolean).join(" · "),
+    "————————————",
+    ...kit.map((f) => `• ${LIBELLE[f.categorie] ?? f.categorie} : *${f.reference}*${f.prix_vente > 0 ? ` — ${f.prix_vente} MAD` : ""}`),
+    "————————————",
+    total > 0 ? `🧮 *Total${toutPrix ? "" : " (articles avec prix)"} : ${total} MAD*` : "",
+    "📲 FiltroPro · 06 02 35 02 90",
+  ].filter(Boolean).join("\n");
+}

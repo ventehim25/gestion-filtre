@@ -1,10 +1,18 @@
 "use client";
-// Une voiture et ses filtres (huile, air, habitacle, carburant) avec prix et stock.
+// Une voiture et ses filtres (huile, air, habitacle, carburant) avec prix et stock,
+// + le « kit » (un filtre par type) à vendre ou envoyer sur WhatsApp en 1 tap (BIBLE §8.17).
+import { useRouter } from "next/navigation";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
-import { type Voiture, LIBELLE, annees } from "@/lib/voitures";
+import { type Voiture, LIBELLE, annees, kitDeVoiture, messageKit } from "@/lib/voitures";
+import { sendWhatsApp } from "@/lib/whatsapp";
+import { Package, Send } from "lucide-react";
 
 export default function VoitureCarte({ v, action }: { v: Voiture; action?: React.ReactNode }) {
+  const router = useRouter();
+  const kit = kitDeVoiture(v);
+  const total = kit.reduce((s, f) => s + (f.prix_vente > 0 ? f.prix_vente : 0), 0);
+  const sansPrix = kit.filter((f) => !(f.prix_vente > 0)).length;
   return (
     <div className="rounded-xl border border-slate-700/60 p-3">
       <div className="flex items-start justify-between gap-2 flex-wrap">
@@ -38,6 +46,25 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
         <p className="mt-2 text-xs text-slate-400">
           Filtre à carburant : aucun dans tes références pour ce moteur. Sur beaucoup de moteurs essence, il est dans le réservoir avec la pompe ; sur un diesel, vérifie dans le catalogue Filtron.
         </p>
+      )}
+
+      {/* Kit : un filtre par type (celui en stock d'abord) */}
+      {kit.length >= 2 && (
+        <div className="mt-3 flex items-center gap-2 flex-wrap rounded-lg bg-amber-500/10 border border-amber-500/20 px-3 py-2">
+          <Package size={15} className="text-amber-300 shrink-0" />
+          <div className="text-sm text-amber-200 flex-1 min-w-[10rem]">
+            Kit {kit.length} filtres{total > 0 && <> · <b>{total} MAD</b></>}
+            {sansPrix > 0 && <span className="text-xs text-slate-400"> ({sansPrix} sans prix)</span>}
+          </div>
+          <button type="button" onClick={() => router.push(`/ventes?kit=${kit.map((f) => f.id).join(",")}`)}
+            className="btn-primary text-xs flex items-center gap-1.5">
+            🧾 Vendre ce kit
+          </button>
+          <button type="button" onClick={() => sendWhatsApp(null, messageKit(v, kit))}
+            className="btn-secondary text-xs flex items-center gap-1.5" title="Choisis le contact dans WhatsApp">
+            <Send size={13} /> WhatsApp
+          </button>
+        </div>
       )}
     </div>
   );
