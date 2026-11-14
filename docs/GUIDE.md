@@ -181,6 +181,16 @@ S'il n'y a pas de filtre à carburant : sur beaucoup de moteurs essence, il est 
 
 Pour revenir en arrière, appuie sur « Marques » ou sur le nom de la marque en haut.
 
+## 12. Sauvegarde : tes données gardées pour toujours
+
+Toutes les informations (filtres, voitures de Filtron, autres marques, ventes, clients) sont dans **ta base**. Si Filtron change son site ou bloque, rien n'est perdu.
+
+En plus, **chaque jour à 13 h**, le PC fait une copie complète de la base dans le dossier `backups` du projet (un dossier par jour). Tu n'as rien à faire. Si le PC était éteint à 13 h, la copie se fait quand tu l'allumes.
+
+- Pour vérifier : ouvre `backupsjournal.log` ; la dernière ligne doit dire « TERMINÉ sans erreur ».
+- Pour avoir aussi une copie hors du PC (conseillé) : installe Google Drive sur le PC, puis demande à Claude de régler la copie vers ce dossier.
+- Si un jour des données disparaissent : demande à Claude de les remettre depuis la dernière sauvegarde. Il compare d'abord, puis remet seulement ce qui manque.
+
 ---
 
 *Généré avec Claude Code. Pour toute modif de l'app, on repart de ce guide et de la [BIBLE](BIBLE.md).*

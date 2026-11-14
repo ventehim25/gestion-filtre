@@ -970,6 +970,15 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 
 - **Fait le 13-14/11 : une ligne par version de moteur.** L'utilisateur a collé `supabase/applications_par_code_moteur.sql` (règle `applications_version_unique` vérifiée), puis `completer_filtron.mjs --tout --par-code --ecrire` sur les 3 183 références de filtres : **+54 000 lignes environ (164 965 → 218 956)**, 0 erreur, 38 références sans page chez Filtron. Filtron a bloqué l'adresse pendant environ 1 h après 180 pages à 1,5 s d'écart : le robot attend maintenant 4 s et se met en pause tout seul (3 échecs → 10 min ; 3 pauses → arrêt avec `--depuis`).
 - **Résultat (versions diesel sans filtre à carburant)** : Dacia 5/32 → **0/37** ; Renault 29/265 → 16/317 ; Peugeot 8/259 → 7/277 ; Hyundai 9/79 → 7/85. Duster I 1.5 dCi : les 5 versions (K9K 856, 896, 796, 898/884, 894) ont maintenant huile, air, habitacle et carburant.
+
+## 8.14 Sauvegarde de la base, pour toujours (14/11/2026)
+- **Question de l'utilisateur** : garder les informations de Filtron et des autres marques même si Filtron change de site ou bloque. **Réponse** : elles sont déjà dans notre base Supabase (218 956 applications, 23 876 équivalences Mann/Wix/Mahle/Purflux…). Le catalogue lit notre base, pas le site Filtron : un changement chez Filtron n'efface rien.
+- **Deuxième copie sur le PC** : `scripts/sauvegarde.mjs` copie **toutes** les tables (trouvées automatiquement, une nouvelle table est incluse sans rien changer) dans `backups/AAAA-MM-JJ/` (fichiers `.json.gz` + `manifeste.json`). Chaque fichier est relu et compté : si le nombre de lignes ne correspond pas, la sauvegarde le signale. Environ 19 Mo et 45 secondes. On garde les 14 dernières + la première de chaque mois, pour toujours. Dossier hors GitHub (prix d'achat, clients).
+- **Automatique** : tâche Windows **« FiltroPro-Sauvegarde »** chaque jour à 13 h (ou dès que le PC s'allume si elle a été manquée), cachée, sans fenêtre (`scripts/sauvegarde_quotidienne.cmd`, journal `backups/journal.log`). Première sauvegarde le 14/11 : 18 tables, 0 erreur.
+- **Remettre les données** : `scripts/restaurer.mjs` compare une sauvegarde avec la base (rien n'est écrit par défaut), puis `--ecrire` remet les lignes **manquantes** d'une table ou de toutes (`tout`). Ne supprime jamais rien. Testé le 14/11 : 0 ligne manquante.
+- **Copie hors du PC (facultatif)** : écrire `SAUVEGARDE_COPIE=<dossier>` dans `.env.local` (dossier Google Drive ou clé USB) : chaque sauvegarde y est aussi copiée.
+- **Ce qui dépend encore de MANN+HUMMEL** : les **photos** des filtres (2 599 produits ont une adresse d'image chez eux, les autres sont cherchées chez eux). Proposé : en garder une copie chez nous, utilisée seulement si leur serveur ne répond plus.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*

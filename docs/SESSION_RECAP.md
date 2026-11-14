@@ -12,6 +12,7 @@
 - **Données Filtron** : `modele` = « Nom | période » ; `code_moteur` et `annee_fin` sont souvent "" (pas null) ; les motifs comme `VW%` ramènent aussi des sous-marques (VW MARINE…), rangées à part.
 - **Robot `scripts/completer_filtron.mjs`** : remplace `scrape_filtron.mjs` (ancienne adresse 404, 250 voitures maximum). Options : essai à blanc par défaut, `--ecrire`, `--detail`, `--tout`, `--depuis N`, `--par-code` (seulement après `supabase/applications_par_code_moteur.sql`). Le 13/11 : +50 592 lignes pour les 138 filtres coupés.
 - **Fait le 14/11** : SQL `applications_par_code_moteur.sql` collé (règle `applications_version_unique`), puis `--tout --par-code --ecrire` sur 3 183 références : 218 956 applications, diesel Dacia 100 % avec filtre à carburant. Filtron bloque si on va trop vite : garder 4 s entre deux pages.
+- **Sauvegarde (14/11)** : `scripts/sauvegarde.mjs` → `backups/AAAA-MM-JJ/<table>.json.gz` + `manifeste.json` (tables trouvées par l'OpenAPI de PostgREST `/rest/v1/`, les vues sans clé primaire sont ignorées ; relecture et comptage de chaque fichier ; garde 14 + la première du mois ; copie vers `SAUVEGARDE_COPIE` si défini dans `.env.local`). Tâche Windows « FiltroPro-Sauvegarde » chaque jour à 13 h, lancée par `conhost.exe --headless` (avec une fenêtre visible, la première exécution a été coupée : code 0xC000013A). `scripts/restaurer.mjs` : comparaison par défaut, `--ecrire` = lignes manquantes seulement, `--remplacer` = écrase aussi.
 
 ---
 
