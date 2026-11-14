@@ -1013,6 +1013,7 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Rattachement** aux voitures Filtron par le **code moteur** (`src/lib/huiles.ts`) : code identique d'abord, puis code Filtron plus précis (« K9K608 » → K9K ; pour 3 signes il faut un chiffre après, donc « D4FB » Hyundai ≠ « D4F » Renault). Testé sur 280 versions : 87 avec huile, aucune fausse correspondance vue. Quand l'huile change selon le FAP, le vendeur choisit (choix automatique si le nom dit « FAP », « DPF », « Blue » ou « DI-D »).
 - **Affichage** (fiche voiture de `/recherche`) : « Huile moteur (guide Liqui Moly, moteur K9K) : viscosités possibles · litres » + les bidons **en stock** de ces viscosités (lus dans le nom : « MOTUL 5W30 5L »). Le **kit** ajoute l'huile choisie : 1 × 5 L, + des 1 L de la même huile au-delà de 5 L (`bidonsPourVidange`).
 - **Base** : table `huiles_moteurs` (code, variante, viscosités, litres min/max, voiture consultée, source), remplie par le même SQL (section D, recollable). Ajouter un moteur = une ligne de plus dans ce SQL.
+- **SQL collé le 14/11** (`catalogues_huile_tournees.sql`, « success ») et vérifié : 3 tables, 59 lignes d'huile, pourcentages lisibles par les pages publiques, tournées fermées au public. Page Particuliers en ligne : OE688/3 = 43 MAD (prix garage 33).
 - **Le Sprinter OM651 (11,5 L) n'a pas été mis** : même code que la Classe C OM651, la quantité aurait été fausse pour elle.
 
 ---
