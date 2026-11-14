@@ -6,6 +6,7 @@ import { useLang } from "@/context/LangContext";
 import { Download, Share2, FileText, Link2, Copy, Check, Printer } from "lucide-react";
 import { TARIF_KEY, CAT_FR, CAT_ORDER, loadCatalogueItems } from "@/lib/catalogue";
 import { logoPlaceholder } from "@/lib/filterPhotos";
+import { photoCopieUrl } from "@/lib/photoCopie";
 
 const GROUPS = [
   {
@@ -65,7 +66,7 @@ export default function CataloguesPage() {
       const ph = logoPlaceholder();
 
       const card = (i: (typeof items)[number]) => {
-        const cands = [...(i.imageUrl ? [`${i.imageUrl}?qlt=82&wid=320`] : []), s7(i.reference, "-1"), s7(i.reference, ""), s7(i.reference, "-2"), ph];
+        const cands = [...(i.imageUrl ? [`${i.imageUrl}?qlt=82&wid=320`] : []), s7(i.reference, "-1"), s7(i.reference, ""), s7(i.reference, "-2"), photoCopieUrl(i.reference), ph];
         return `<div class="card"><div class="ph"><img class="pimg" src="${esc(cands[0])}" data-fb="${esc(cands.slice(1).join("|"))}" onerror="fbNext(this)" alt=""></div>`
           + `<div class="ref">${esc(i.reference)}</div><div class="mk">${esc(i.marque)}</div>`
           + `<div class="pr">${i.prix} MAD${i.promo ? ' <span class="promo">PROMO</span>' : ""}</div></div>`;

@@ -14,6 +14,7 @@ function clean(value: string | undefined, fallback: string): string {
 }
 
 const supabaseUrl = clean(process.env.NEXT_PUBLIC_SUPABASE_URL, FALLBACK_URL);
+export const SUPABASE_PUBLIC_URL = supabaseUrl;
 const supabaseAnonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, FALLBACK_KEY);
 
 // Sécurité (supabase/securite.sql) : dans le NAVIGATEUR, clé publique + session de l'utilisateur connecté

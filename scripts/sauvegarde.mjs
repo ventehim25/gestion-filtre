@@ -8,7 +8,7 @@
 // - Vérifie que le nombre de lignes écrites = le nombre de lignes dans la base (sinon code de sortie 1).
 // - Garde les 14 dernières sauvegardes + la première de chaque mois (pour toujours).
 // - Si SAUVEGARDE_COPIE=<dossier> est écrit dans .env.local (ex. un dossier Google Drive ou une clé USB),
-//   la sauvegarde y est aussi copiée.
+//   la sauvegarde y est aussi copiée, avec les photos de backups/photos/ (scripts/copier_photos.mjs).
 // - Dossier backups/ hors GitHub (.gitignore) : il contient les prix d'achat et les clients.
 // Remettre des données : scripts/restaurer.mjs
 import { createClient } from "@supabase/supabase-js";
@@ -130,6 +130,13 @@ if (copie) {
     cpSync(cible, join(copie, jour), { recursive: true });
     nettoyer(copie);
     console.log(`→ copie : ${join(copie, jour)}`);
+    // Photos (scripts/copier_photos.mjs) : seulement les nouvelles, l'index est remis à jour
+    const photos = join(DOSSIER, "photos");
+    if (existsSync(photos)) {
+      cpSync(photos, join(copie, "photos"), { recursive: true, force: false, errorOnExist: false });
+      if (existsSync(join(photos, "index.json"))) cpSync(join(photos, "index.json"), join(copie, "photos", "index.json"));
+      console.log(`→ photos copiées : ${join(copie, "photos")}`);
+    }
   } catch (e) {
     problemes++;
     console.log(`✖ copie impossible vers ${copie} : ${e.message}`);

@@ -2,13 +2,9 @@
 import { useEffect, useState } from "react";
 import { cameraPlaceholder, logoPlaceholder } from "@/lib/filterPhotos";
 import { getImgIdx, setImgIdx } from "@/lib/imgMemo";
+import { s7Name, photoCopieUrl } from "@/lib/photoCopie";
 import { X } from "lucide-react";
 
-// "OP540/1" -> "OP_540.1"  (nom d'asset Scene7 Filtron / MANN+HUMMEL)
-function s7Name(ref: string) {
-  const m = ref.toUpperCase().match(/^([A-Z]+)\s*(.+)$/);
-  return m ? m[1] + "_" + m[2].replace(/\//g, ".") : ref.toUpperCase();
-}
 function s7(ref: string, suffix: string, wid: number) {
   return `https://s7g10.scene7.com/is/image/mannhummel/${s7Name(ref)}${suffix}?qlt=82&wid=${wid}`;
 }
@@ -26,6 +22,8 @@ export default function FilterImage({
     s7(reference, "-filter-with-box", wid),
     s7(reference, "-2", wid),
     s7(reference, "-3", wid),
+    // Notre copie (Supabase Storage), seulement si le serveur MANN+HUMMEL ne répond plus (BIBLE §8.14)
+    photoCopieUrl(reference),
     // Pas de vraie photo → logo (catalogues, côté client) ou appareil photo (gestion, ma vue)
     placeholder === "logo" ? logoPlaceholder() : cameraPlaceholder(),
   ];
