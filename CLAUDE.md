@@ -4,6 +4,7 @@ Plateforme de gestion + catalogue de filtres/pièces auto (commerce au Maroc).
 Stack : Next.js 15 (App Router, TS, Tailwind) + Supabase (PostgreSQL) + Vercel.
 App en ligne : https://gestion-filtre.vercel.app — GitHub : ventehim25/gestion-filtre (master).
 Travailler en **français**. Autonomie totale : agir sans demander, puis rapporter.
+**Nouvelle session : commencer par lire `docs/SESSION_RECAP.md`, section « ▶ REPRENDRE ICI »** (ce qui a été fait, ce qui est en cours, ce qui vient ensuite).
 
 ## Règle git (IMPORTANTE)
 **Commiter ET pusher après CHAQUE modification.** Un commit par changement logique.
@@ -78,4 +79,4 @@ Colonnes ajoutées (migrations dans `supabase/`) :
 
 ## Scripts (dossier scripts/, reprenables)
 completer_filtron.mjs (applications depuis le nouveau site Filtron, liste complète, sans doublons — remplace scrape_filtron.mjs dont l'adresse répond 404), scrape_images.mjs (image_url), import_filtron_catalog.mjs,
-cleanup_fakes.mjs, seed_garages.mjs, scrape_prospects_osm.mjs / scrape_prospects_gmaps.mjs (API Places, clé optionnelle) / import_gmaps_manuel.mjs / prospect_score.mjs (note /10 + envoi Supabase), prospects_quotidien.cmd (tâche Windows 9 h 30), sauvegarde.mjs (copie complète de la base dans `backups/AAAA-MM-JJ/`, tâche Windows « FiltroPro-Sauvegarde » 13 h via sauvegarde_quotidienne.cmd) / restaurer.mjs (compare, puis `--ecrire` remet les lignes manquantes). Lancer : `node scripts/xxx.mjs`. (Scripts `_*.mjs` = vérifs jetables.)
+cleanup_fakes.mjs, seed_garages.mjs, scrape_prospects_osm.mjs / scrape_prospects_gmaps.mjs (API Places, clé optionnelle) / import_gmaps_manuel.mjs / prospect_score.mjs (note /10 + envoi Supabase), prospects_quotidien.cmd (tâche Windows 9 h 30), sauvegarde.mjs (copie complète de la base dans `backups/AAAA-MM-JJ/`, tâche Windows « FiltroPro-Sauvegarde » 13 h via sauvegarde_quotidienne.cmd) / restaurer.mjs (compare, puis `--ecrire` remet les lignes manquantes), copier_photos.mjs (copie de secours des photos Scene7 dans Storage `produits/copie/` + `backups/photos/`, reprenable). Copie Google Drive : `SAUVEGARDE_COPIE` dans `.env.local`. Lancer : `node scripts/xxx.mjs`. (Scripts `_*.mjs` = vérifs jetables.)

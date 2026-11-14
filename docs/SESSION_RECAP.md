@@ -1,11 +1,32 @@
 # 📌 Récap de session — FiltroPro
 
 > Point de reprise pour une nouvelle session. Complément de [GUIDE](GUIDE.md) et [BIBLE](BIBLE.md).
-> **Dernière session : 13/11/2026** (catalogue par marque, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
+> **Dernière session : 13→14/11/2026** (catalogue par marque, données Filtron complétées, sauvegardes, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
 
 ---
 
-## 0000. Session du 13/11/2026 — catalogue par marque
+## ▶ REPRENDRE ICI (fin de session du 14/11/2026, 20 h 45)
+
+**Fait les 13-14/11** (détails plus bas et BIBLE §8.13-8.14) :
+1. Onglet « Par marque » de `/recherche` : marque → modèle → moteur → filtres ; moteurs rangés par type puis par date.
+2. Données Filtron complétées : 114 373 → **218 956 applications**, une ligne par version de moteur ; diesel Dacia 100 % avec filtre à carburant.
+3. **Sauvegarde quotidienne** de toute la base à 13 h (tâche Windows « FiltroPro-Sauvegarde ») : sur le PC (`backups/`) **et** dans Google Drive (`G:\Mon Drive\FiltroPro-sauvegardes`, vérifié par l'utilisateur sur son téléphone).
+4. **Copie de secours des photos** : Supabase Storage `produits/copie/` + `backups/photos/` ; l'app l'affiche seulement si le serveur MANN+HUMMEL ne répond plus.
+
+**À vérifier en premier** : la copie des photos était à **2 334 / 3 176** quand la session a été fermée (coupure internet, pause automatique, puis reprise). Compter `backups/photos/*.jpg`. Si le robot ne tourne plus et que ce n'est pas fini : `node scripts/copier_photos.mjs` (reprend où il s'est arrêté, 3 à la fois). À la fin, noter le total (copiées / sans photo) dans BIBLE §8.14.
+
+**Ensuite, au choix de l'utilisateur** (lui demander) :
+- étape 2 du VIN : environ 30 vrais VIN marocains (carte grise + code moteur), test base seule puis Vincario ;
+- relier Vidani à FiltroPro (filtres exacts + litres d'huile) ;
+- tester vidani-bot sur un vrai WhatsApp ;
+- visite DINOUN ; choisir le nom Locali ou Locani ; vérifier les notifications de 8 h ;
+- avant début 2027 : remplacer l'ancienne clé publique (anon) de Supabase.
+
+**Façon de travailler avec l'utilisateur** : français simple, une étape à la fois pour ce qu'il fait lui-même (attendre « étape X ok ») ; ne jamais lui demander ni afficher une clé ou un mot de passe ; Filtron : au moins 4 s entre deux pages.
+
+---
+
+## 0000. Session du 13-14/11/2026 — catalogue par marque, données, sauvegardes
 
 - **Onglet « Par marque »** de `/recherche` (`?tab=marques`) : `src/components/CatalogueMarques.tsx`. Marque → modèles (comptage puis pages de 1000 lues en parallèle, mises en cache par marque) → moteurs (`eq marque` + `eq modele`, paginé) → filtres.
 - **Partagé** avec le bloc VIN : `src/lib/voitures.ts` (types, `COLS`, `grouper`, `annees`, `decouperModele`) et `src/components/VoitureCarte.tsx`.
