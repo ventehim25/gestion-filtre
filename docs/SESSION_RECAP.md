@@ -13,7 +13,7 @@
 3. **Sauvegarde quotidienne** de toute la base à 13 h (tâche Windows « FiltroPro-Sauvegarde ») : sur le PC (`backups/`) **et** dans Google Drive (`G:\Mon Drive\FiltroPro-sauvegardes`, vérifié par l'utilisateur sur son téléphone).
 4. **Copie de secours des photos** : Supabase Storage `produits/copie/` + `backups/photos/` ; l'app l'affiche seulement si le serveur MANN+HUMMEL ne répond plus.
 
-**À vérifier en premier** : la copie des photos était à **2 334 / 3 176** quand la session a été fermée (coupure internet, pause automatique, puis reprise). Compter `backups/photos/*.jpg`. Si le robot ne tourne plus et que ce n'est pas fini : `node scripts/copier_photos.mjs` (reprend où il s'est arrêté, 3 à la fois). À la fin, noter le total (copiées / sans photo) dans BIBLE §8.14.
+**Copie des photos : TERMINÉE** (vérifié le 14/11 à 20 h 46) : 2 616 copiées, 607 sans photo, 0 erreur ; aussi dans Google Drive (2 616). Noté en BIBLE §8.14. Pour les nouveaux produits : relancer `node scripts/copier_photos.mjs` (ne copie que ce qui manque).
 
 **Ensuite, au choix de l'utilisateur** (lui demander) :
 - étape 2 du VIN : environ 30 vrais VIN marocains (carte grise + code moteur), test base seule puis Vincario ;
