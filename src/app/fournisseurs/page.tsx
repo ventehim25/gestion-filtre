@@ -671,7 +671,7 @@ export default function FournisseursPage() {
                       {(variantsMap[l.product_id] ?? []).map(v => (
                         <option key={v.id} value={v.marque}>{v.reference} · {v.marque}</option>
                       ))}
-                      <option value="__new__">+ Autre marque (Mann, Wix, Mahle, Purflux…)</option>
+                      <option value="__new__">+ Autre marque (Mann, Wix, Mahle, Purflux, Mecafilter…)</option>
                     </select>
                   )}
                   {l.marque === "__new__" && (
