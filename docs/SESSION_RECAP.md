@@ -11,7 +11,7 @@
 - **Partagé** avec le bloc VIN : `src/lib/voitures.ts` (types, `COLS`, `grouper`, `annees`, `decouperModele`) et `src/components/VoitureCarte.tsx`.
 - **Données Filtron** : `modele` = « Nom | période » ; `code_moteur` et `annee_fin` sont souvent "" (pas null) ; les motifs comme `VW%` ramènent aussi des sous-marques (VW MARINE…), rangées à part.
 - **Robot `scripts/completer_filtron.mjs`** : remplace `scrape_filtron.mjs` (ancienne adresse 404, 250 voitures maximum). Options : essai à blanc par défaut, `--ecrire`, `--detail`, `--tout`, `--depuis N`, `--par-code` (seulement après `supabase/applications_par_code_moteur.sql`). Le 13/11 : +50 592 lignes pour les 138 filtres coupés.
-- **En attente** : SQL `applications_par_code_moteur.sql` à coller par l'utilisateur, puis `--tout --par-code --ecrire`. Ne pas lancer `--par-code --ecrire` avant le SQL (conflit refusé par la base).
+- **Fait le 14/11** : SQL `applications_par_code_moteur.sql` collé (règle `applications_version_unique`), puis `--tout --par-code --ecrire` sur 3 183 références : 218 956 applications, diesel Dacia 100 % avec filtre à carburant. Filtron bloque si on va trop vite : garder 4 s entre deux pages.
 
 ---
 
