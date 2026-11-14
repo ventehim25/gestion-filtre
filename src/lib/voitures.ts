@@ -103,15 +103,20 @@ export function kitDeVoiture(v: Pick<Voiture, "filtres">): ProdLite[] {
   return kit;
 }
 
-/** Message WhatsApp du kit (français, prix seulement s'ils sont connus) */
-export function messageKit(v: Pick<Voiture, "marque" | "modele" | "moteur" | "code_moteur">, kit: ProdLite[]): string {
-  const total = kit.reduce((s, f) => s + (f.prix_vente > 0 ? f.prix_vente : 0), 0);
-  const toutPrix = kit.every((f) => f.prix_vente > 0);
+export type LigneHuileKit = { reference: string; qte: number; prix_vente: number };
+
+/** Message WhatsApp du kit (français, prix seulement s'ils sont connus), avec l'huile si elle est choisie */
+export function messageKit(v: Pick<Voiture, "marque" | "modele" | "moteur" | "code_moteur">, kit: ProdLite[], huile?: { texte: string; lignes: LigneHuileKit[] }): string {
+  const lignesHuile = huile?.lignes ?? [];
+  const total = kit.reduce((s, f) => s + (f.prix_vente > 0 ? f.prix_vente : 0), 0) + lignesHuile.reduce((s, l) => s + (l.prix_vente > 0 ? l.prix_vente * l.qte : 0), 0);
+  const toutPrix = kit.every((f) => f.prix_vente > 0) && lignesHuile.every((l) => l.prix_vente > 0);
   return [
     `🚗 *Kit filtres* — ${decouperModele(v.modele).nom} (${v.marque})`,
     [v.moteur, v.code_moteur && `code ${v.code_moteur}`].filter(Boolean).join(" · "),
     "————————————",
     ...kit.map((f) => `• ${LIBELLE[f.categorie] ?? f.categorie} : *${f.reference}*${f.prix_vente > 0 ? ` — ${f.prix_vente} MAD` : ""}`),
+    huile ? `• Huile moteur ${huile.texte}` : "",
+    ...lignesHuile.map((l) => `   ${l.qte} × *${l.reference}*${l.prix_vente > 0 ? ` — ${l.prix_vente * l.qte} MAD` : ""}`),
     "————————————",
     total > 0 ? `🧮 *Total${toutPrix ? "" : " (articles avec prix)"} : ${total} MAD*` : "",
     "📲 FiltroPro · 06 02 35 02 90",

@@ -123,14 +123,18 @@ export default function VentesPage() {
       }
       const all = await load();
       // Liens directs : /ventes?client=<id> (prospect qui commande) · ?nouvelle=1 (bouton Vente) · ?impayes=1 (bouton Encaisser)
-      // · ?kit=<id,id,…> (« Vendre ce kit » d’une voiture, /recherche)
+      // · ?kit=<id,id*2,…> (« Vendre ce kit » d’une voiture, /recherche : filtres + bidons d’huile)
       const params = new URLSearchParams(window.location.search);
       const pre = params.get("client");
       const kit = (params.get("kit") ?? "").split(",").filter(Boolean);
       if (pre || params.has("nouvelle") || kit.length) {
         openNew();
         if (pre) setClientId(pre);
-        for (const id of kit) { const p = all.find(x => x.id === id); if (p) addProductToCart(p); }
+        // « id » ou « id*2 » (bidons d’huile : quantité pour la vidange)
+        for (const k of kit) {
+          const [id, q] = k.split("*"); const p = all.find(x => x.id === id);
+          for (let n = 0; p && n < Math.max(1, Math.min(10, Number(q) || 1)); n++) addProductToCart(p);
+        }
       }
       if (params.has("impayes")) setImpayesOnly(true);
       if ([...params.keys()].length) window.history.replaceState(null, "", "/ventes");

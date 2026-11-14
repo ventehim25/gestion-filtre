@@ -41,7 +41,7 @@ export type Database = {
       // Réglages partagés, ex. pourcentages des 4 catalogues (supabase/catalogues_huile_tournees.sql)
       reglages: Table<{ cle: string; valeur: unknown; modifie_le: string }, "modifie_le">;
       // Huile moteur par moteur : viscosité, norme, litres (supabase/catalogues_huile_tournees.sql)
-      huiles_moteurs: Table<HuileMoteur, "modifie_le" | "viscosites">;
+      huiles_moteurs: Table<HuileMoteur, "modifie_le" | "viscosites" | "variante">;
     };
     Views: {
       prospects_par_jour: { Row: { jour: string; source: string; nb: number }; Relationships: [] };
@@ -185,14 +185,16 @@ export type Equivalence = {
   prix_magasin?: number | null;
 };
 
-// Huile moteur conseillée pour un moteur (code = code moteur sans espace : « K9K » ou « K9K892 »)
+// Huile moteur conseillée pour un moteur (code du guide Liqui Moly, ex. « K9K ») et une variante
+// (« sans FAP » / « avec FAP », vide = toutes versions). supabase/catalogues_huile_tournees.sql
 export type HuileMoteur = {
   code: string;
+  variante: string;
   description: string | null;
   viscosites: string[];
   norme: string | null;
-  acea: string | null;
-  litres: number | null;
+  litres_min: number | null;
+  litres_max: number | null;
   source: string | null;
   remarque: string | null;
   modifie_le: string;
