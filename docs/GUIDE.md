@@ -188,7 +188,8 @@ Toutes les informations (filtres, voitures de Filtron, autres marques, ventes, c
 En plus, **chaque jour à 13 h**, le PC fait une copie complète de la base dans le dossier `backups` du projet (un dossier par jour). Tu n'as rien à faire. Si le PC était éteint à 13 h, la copie se fait quand tu l'allumes.
 
 - Pour vérifier : ouvre `backupsjournal.log` ; la dernière ligne doit dire « TERMINÉ sans erreur ».
-- Pour avoir aussi une copie hors du PC (conseillé) : installe Google Drive sur le PC, puis demande à Claude de régler la copie vers ce dossier.
+- Une deuxième copie part aussi dans **Google Drive**, dossier **FiltroPro-sauvegardes** (visible sur ton téléphone). Si le PC tombe en panne, rien n'est perdu. Ne synchronise jamais le dossier Downloads avec Google Drive : il contient ta clé secrète.
+- Les **photos** des filtres sont aussi copiées chez toi. Si le site de MANN+HUMMEL change, l'app affiche ta copie toute seule.
 - Si un jour des données disparaissent : demande à Claude de les remettre depuis la dernière sauvegarde. Il compare d'abord, puis remet seulement ce qui manque.
 
 ---
