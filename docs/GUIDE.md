@@ -203,6 +203,24 @@ En plus, **chaque jour à 13 h**, le PC fait une copie complète de la base dans
 
 Pourquoi pas d'envoi tout seul ? WhatsApp bloque les numéros qui envoient le même message à beaucoup de gens d'un coup. Un tap par client, c'est sûr.
 
+## 14. Kit de filtres et huile par voiture
+
+Dans **Recherche** (VIN, code moteur ou « Par marque »), chaque voiture montre :
+- ses filtres, puis la ligne **« Huile moteur »** : les viscosités possibles (ex. 5W-40 · 10W-40) et la quantité (ex. 4,4 à 4,8 L), d'après le guide Liqui Moly, avec les bidons que tu as **en stock**. Si l'huile change avec ou sans filtre à particules (FAP), touche la bonne version.
+- la barre **« Kit »** : les 4 filtres (+ l'huile) avec le total. **« 🧾 Vendre ce kit »** remplit la vente d'un coup ; **« WhatsApp »** envoie la liste et les prix au client.
+
+## 15. Tes 4 catalogues de prix
+
+Tu tapes **un seul prix** : le prix garage (comme avant). Les autres se calculent :
+- **Garages et stations** : ton prix ;
+- **Particuliers** : + 30 % ;
+- **Location de voitures** : + 15 % ;
+- **Magasins de pièces** : − 5 %.
+
+1. **Paramètres** → « Mes 4 catalogues de prix » : les 4 liens (Copier / WhatsApp / Voir) et les pourcentages à changer (« Enregistrer »).
+2. Un article à un prix spécial ? Fiche produit → « Prix par catalogue » : tape le prix (vide = calculé, en gris).
+3. Dans la **fiche client**, choisis le **type** (Garage / station, Particulier, Location de voitures, Magasin de pièces). En **Vente**, le prix suit le type du client tout seul. Les relances et le message de tournée envoient aussi le bon lien.
+
 ---
 
 *Généré avec Claude Code. Pour toute modif de l'app, on repart de ce guide et de la [BIBLE](BIBLE.md).*

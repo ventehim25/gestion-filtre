@@ -1,7 +1,7 @@
 # 📌 Récap de session — FiltroPro
 
 > Point de reprise pour une nouvelle session. Complément de [GUIDE](GUIDE.md) et [BIBLE](BIBLE.md).
-> **Dernière session : 13→14/11/2026** (catalogue par marque, données Filtron complétées, sauvegardes, marque Mecafilter, prévenir avant tournée, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
+> **Dernière session : 13→14/11/2026** (catalogue par marque, données Filtron complétées, sauvegardes, marque Mecafilter, prévenir avant tournée, kit, 4 catalogues, huile par voiture, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
 
 ---
 
@@ -18,6 +18,10 @@
 **Marque Mecafilter (14/11, soir)** : ajoutée aux listes de l'app + 122 équivalents officiels pour 95 des 120 réfs vendues (BIBLE §8.15, `supabase/equivalents_mecafilter.sql`). Si l'utilisateur le veut : étendre aux 1 646 réfs Filtron du catalogue (2 009 correspondances déjà connues), mais Vente/Réception chargeraient ≈ 2 700 variantes de plus.
 
 **Prévenir les clients la veille d'une tournée (14/11, soir)** : en ligne (BIBLE §8.16, GUIDE §13). `/tournees` → « Prévenir les clients » (date + villes) ; le cron de 9 h envoie « 🚚 Tournée demain » + bouton sur l'accueil → `/tournees/prevenir?id=…` (WhatsApp 1 tap par client, coché « Prévenu »). **À vérifier** : `supabase/tournees_prevues.sql` collé par l'utilisateur ? (sinon le bloc affiche « Pas encore activé » ; vérifier par une lecture de `tournees_prevues`, erreur PGRST205 = pas collé). Ensuite : une vraie tournée programmée → la notification de la veille arrive-t-elle ?
+
+**Kit, 4 catalogues, huile par voiture (14/11, nuit)** : en ligne (BIBLE §8.17-8.19, GUIDE §14-15). Idées d'Oscaro passées par ChatGPT (top 6 : kits, huile par norme, véhicules habituels, fiches techniques, joints/clés, populaires). Faits : kit (« Vendre ce kit » / WhatsApp), 4 catalogues (+30 / +15 / −5 %, liens dans Paramètres, prix en vente selon le type du client), huile par voiture (59 moteurs relevés dans le guide Liqui Moly : API `/fr/fr/rest/V1/recommendations/<typeId>`, types via `/rest/V1/olyslager/makes|models|types`, catégorie 2 = utilitaires comme Hilux/L200).
+**À FAIRE EN PREMIER** : l'utilisateur colle **`supabase/catalogues_huile_tournees.sql`** (un seul collage : tables tournees_prevues, reglages, huiles_moteurs + colonnes prix_* + 59 lignes d'huile). Vérifier ensuite par lecture (PGRST205 = pas collé). Sans lui : tournées « Pas encore activé », pourcentages de départ, pas d'huile affichée.
+**Pistes suivantes** : fiche technique des filtres (dimensions), joints de vidange / clés à filtre (à stocker ?), « véhicules habituels » par garage, page publique « trouve tes filtres et ton huile » pour les particuliers (catalogue particuliers), plus de moteurs d'huile.
 
 **Ensuite, au choix de l'utilisateur** (lui demander) :
 - étape 2 du VIN : environ 30 vrais VIN marocains (carte grise + code moteur), test base seule puis Vincario ;

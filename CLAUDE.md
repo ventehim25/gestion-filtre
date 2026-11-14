@@ -52,7 +52,7 @@ Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à z
 
 ## Schéma DB — détails colonnes : `src/types/database.ts`
 Tables : products, clients, sales, sale_items, vehicules, compatibilites, equivalences, applications,
-**garages**, **fournisseurs**, **receptions**, **avances**, **prospects**, rappels_vidange, demandes_manquees, push_subscriptions, vin_connus, **tournees_prevues** (veille de tournée). Vues product_vehicles, prospects_par_jour.
+**garages**, **fournisseurs**, **receptions**, **avances**, **prospects**, rappels_vidange, demandes_manquees, push_subscriptions, vin_connus, **tournees_prevues** (veille de tournée), **reglages** (pourcentages des 4 catalogues), **huiles_moteurs** (huile par code moteur, guide Liqui Moly). Vues product_vehicles, prospects_par_jour.
 RPC : `decrement_stock(p_id, qty)`, `decrement_equiv_stock(e_id, qty)` (qty négative = incrémente).
 Colonnes ajoutées (migrations dans `supabase/`) :
 - products : `prix_promo` (promos.sql)
@@ -61,6 +61,7 @@ Colonnes ajoutées (migrations dans `supabase/`) :
 - fournisseurs : `type` ('capital' = argent propre type filtropro / 'credit' = à rembourser type dinoun)
 - garages : statut ∈ {prospect, a_livrer, preparee, livre, reporte}
 - clients : `quartier`, `latitude`/`longitude` (localisation exacte), `origine` ('terrain' | 'prospection')
+- products / equivalences : `prix_particulier`, `prix_location`, `prix_magasin` (prix corrigés par catalogue, vide = prix_vente ± pourcentage de `reglages`)
 - receptions : `lignes` jsonb (détail produit/variante/qté → annulation propre)
 - avances : `sale_id` (remboursement dinoun d'un bon via le camion) · sales : `fournisseur_paye`
 - prospects : robots OSM/Google + note d'intérêt `score` /10 + `statut_prospection`
@@ -73,7 +74,8 @@ Colonnes ajoutées (migrations dans `supabase/`) :
 - `/fournisseurs` : type **capital** (filtropro = mon argent, capital qui grandit) vs **crédit** (dinoun = dette : départ + marchandise prise − avances). **Marchandise prise** : choix « Chez », scan des boîtes (+1/boîte), prix achat+vente enregistrés sur la fiche, « + Autre marque », code-barres mémorisé, **hors-ligne** (`src/lib/offlineReceptions.ts`), annulation ✕ dans l'historique. Liste « Bons à rembourser » (dinoun).
 - `/clients` : onglets **Terrain / Venus de la prospection**, quartier, localisation GPS + « Y aller » + « Ajouter à la tournée », filtres Ville/Quartier.
 - `/prospects` : prospects collectés (OSM quotidien + Google Maps à la main), note /10, suivi ; « A passé commande → créer la vente » (seule façon de devenir client).
-- `/recherche` (par référence) : clic sur la réf = déplie les **références enregistrées** (avec prix), pas les OE auto.
+- `/recherche` (par référence) : clic sur la réf = déplie les **références enregistrées** (avec prix), pas les OE auto. Chaque voiture (VIN, Par marque) : **kit** (« Vendre ce kit » → `/ventes?kit=id,id*2`, WhatsApp) + **huile moteur** (`src/lib/huiles.ts`).
+- **4 catalogues de prix** (`src/lib/prixCatalogues.ts`) : garage (prix saisi), particulier +30 %, location +15 %, magasin −5 % ; `/tarif?k=<clé>` (clés dans `CATALOGUES`), Paramètres → « Mes 4 catalogues » ; en vente le prix suit `clients.type`.
 - `/stats` : coûts/bénéfices jour/semaine/mois, par fournisseur, capital vs crédit, évolution du capital. Bénéfices basés sur `cout_unitaire` (fallback `products.prix_achat`).
 - PWA installable (bannière), `manifest.json` orientation `any`.
 
