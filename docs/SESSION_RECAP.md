@@ -1,7 +1,7 @@
 # 📌 Récap de session — FiltroPro
 
 > Point de reprise pour une nouvelle session. Complément de [GUIDE](GUIDE.md) et [BIBLE](BIBLE.md).
-> **Dernière session : 13→14/11/2026** (catalogue par marque, données Filtron complétées, sauvegardes, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
+> **Dernière session : 13→14/11/2026** (catalogue par marque, données Filtron complétées, sauvegardes, marque Mecafilter, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
 
 ---
 
@@ -14,6 +14,8 @@
 4. **Copie de secours des photos** : Supabase Storage `produits/copie/` + `backups/photos/` ; l'app l'affiche seulement si le serveur MANN+HUMMEL ne répond plus.
 
 **Copie des photos : TERMINÉE** (vérifié le 14/11 à 20 h 46) : 2 616 copiées, 607 sans photo, 0 erreur ; aussi dans Google Drive (2 616). Noté en BIBLE §8.14. Pour les nouveaux produits : relancer `node scripts/copier_photos.mjs` (ne copie que ce qui manque).
+
+**Marque Mecafilter (14/11, soir)** : ajoutée aux listes de l'app + 122 équivalents officiels pour 95 des 120 réfs vendues (BIBLE §8.15, `supabase/equivalents_mecafilter.sql`). Si l'utilisateur le veut : étendre aux 1 646 réfs Filtron du catalogue (2 009 correspondances déjà connues), mais Vente/Réception chargeraient ≈ 2 700 variantes de plus.
 
 **Ensuite, au choix de l'utilisateur** (lui demander) :
 - étape 2 du VIN : environ 30 vrais VIN marocains (carte grise + code moteur), test base seule puis Vincario ;
@@ -35,6 +37,7 @@
 - **Fait le 14/11** : SQL `applications_par_code_moteur.sql` collé (règle `applications_version_unique`), puis `--tout --par-code --ecrire` sur 3 183 références : 218 956 applications, diesel Dacia 100 % avec filtre à carburant. Filtron bloque si on va trop vite : garder 4 s entre deux pages.
 - **Sauvegarde (14/11)** : `scripts/sauvegarde.mjs` → `backups/AAAA-MM-JJ/<table>.json.gz` + `manifeste.json` (tables trouvées par l'OpenAPI de PostgREST `/rest/v1/`, les vues sans clé primaire sont ignorées ; relecture et comptage de chaque fichier ; garde 14 + la première du mois ; copie vers `SAUVEGARDE_COPIE` si défini dans `.env.local`). Tâche Windows « FiltroPro-Sauvegarde » chaque jour à 13 h, lancée par `conhost.exe --headless` (avec une fenêtre visible, la première exécution a été coupée : code 0xC000013A). `scripts/restaurer.mjs` : comparaison par défaut, `--ecrire` = lignes manquantes seulement, `--remplacer` = écrase aussi.
 - **Google Drive (14/11)** : `SAUVEGARDE_COPIE=G:\Mon Drive\FiltroPro-sauvegardes` dans `.env.local` (Drive pour ordinateur, rien de synchronisé depuis le PC). Les photos sont copiées en plus, seulement les nouvelles (`cpSync force:false`, index remis à jour).
+- **Mecafilter (14/11)** : API `https://filtron.eu/api/graphql/catalog-prod`, en-tête `Store: pcat_ft_fr_store_fr`, requête `search_crossreference_no(search, currentPage, pageSize)` → `external_number`, `int_product_identifier` (« OE649/8_FILTRON »), `ext_brand_name` (MECAFILTER). La recherche est « contient » : « ELP » ramène aussi DELPHI. Préfixes balayés : ELH, ELG, ELR, ELP + EL[A-Z]. Réfs écrites « ELH 4359 » (Filtron mélange avec ou sans espace ; la recherche de l'app ignore les espaces). Filtron a coupé l'accès quelques minutes avec `pageSize` 1000 et 4 s d'écart : prendre 8 s.
 - **Photos (14/11)** : `scripts/copier_photos.mjs` → Storage `produits/copie/<s7Name>.jpg` (public, `cacheControl` 1 an) + `backups/photos/`. Scene7 répond **403** pour une photo absente. `src/lib/photoCopie.ts` (`s7Name`, `photoCopieUrl`) ; `FilterImage` met la copie juste avant le logo (le mémo d'images change de clé car le nombre d'essais change). Supabase répond 400 pour une copie absente.
 
 ---

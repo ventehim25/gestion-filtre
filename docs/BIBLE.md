@@ -980,6 +980,13 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Photos des filtres (fait le 14/11)** : elles venaient toutes du serveur d'images MANN+HUMMEL (Scene7). `scripts/copier_photos.mjs` (3 téléchargements à la fois, reprend où il s'est arrêté) garde chaque photo dans Supabase Storage `produits/copie/<NOM>.jpg` et sur le PC `backups/photos/` (+ `index.json`). L'app (`src/components/FilterImage.tsx`, catalogue PDF de `/catalogues`, nom calculé par `src/lib/photoCopie.ts`) affiche notre copie **en dernier essai**, seulement si Scene7 ne répond plus : le serveur MANN+HUMMEL reste utilisé en temps normal (aucun coût chez Supabase).
 - **Copie des photos terminée (14/11, 20 h 46)** : 3 223 références → **2 616 photos copiées**, **607 sans photo** (Scene7 répond 403 : il n'en a pas), **0 erreur**. Relancer `node scripts/copier_photos.mjs` répond « 0 références à copier ». Les 2 616 photos sont aussi dans Google Drive (`G:\Mon Drive\FiltroPro-sauvegardes\photos`, avec `index.json`).
 
+## 8.15 Nouvelle marque : Mecafilter (14/11/2026)
+- **Demande de l'utilisateur** : « ajoute la marque Meca Filter ».
+- **Marque ajoutée** dans les listes de l'app : Réception, Vente, Produits (`src/lib/brands.ts`), Recherche (`src/app/recherche/page.tsx`), Stock (`src/app/stock/page.tsx`). On peut donc enregistrer une boîte Mecafilter avec son prix et son stock propres, comme Mann ou Purflux.
+- **Équivalents officiels importés** (source : catalogue filtron.eu, recherche « référence correspondante », même méthode que Mahle/Purflux) : **122 variantes Mecafilter** pour **95 des 120 réfs Filtron** de la feuille de prix (`supabase/equivalents_mecafilter.sql`, idempotent ; écrites par script, vérifiées : 122 en base, 0 doublon). Prix vides et stock 0 : le prix se met à la première réception. Exemple : OE648/8 = Mecafilter ELH 4399. Taper ou scanner une réf Mecafilter retrouve donc le filtre Filtron.
+- **Familles Mecafilter** : ELH (huile), ELG (gazole/essence), ELP (air), ELR (habitacle), plus quelques ELE, ELD, ELAA, ELCA. Au total, le catalogue Filtron donne 2 009 correspondances Mecafilter ↔ 1 646 réfs Filtron ; seules celles des réfs vendues ont été importées (pour garder Vente/Réception légères : 834 variantes de marque chargées).
+- **Sans équivalent Mecafilter chez Filtron** (25) : AP082, AP098, AP098/3, AP144/8, AP188/2, K1014A, K1243, K1285, K1295, K1325, OP526/2, OP526/3, OP538, OP540/2, OP540/4, OP540/5, OP580, OP580/1, OP580/3, OP580/4, OP617/1, OP617/3, PP839/2, PP839/3, PP976. Aucune réf inventée : si une boîte Mecafilter arrive pour l'un d'eux, « + Autre marque » à la réception.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*

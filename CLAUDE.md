@@ -42,7 +42,7 @@ Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à z
 ## Règle données
 - **Ne JAMAIS inventer de référence** de pièce. Au moindre doute, questionner.
 - Source de vérité véhicules : table `applications` (vraies données Filtron) > `compatibilites` (mapping fait main).
-- Photos produit : Scene7 via `FilterImage.tsx`. Équivalences = numéros OE (scrape Filtron) **+ variantes de marque officielles** pour les 120 réfs vendues : Mann (+EAN), Wix (catalogues mann-filter.com / wixfilters.com), Mahle & Purflux (filtron.eu, recherche « référence correspondante »). Liste des marques gérées : `src/lib/brands.ts` (FILTER_BRANDS).
+- Photos produit : Scene7 via `FilterImage.tsx`. Équivalences = numéros OE (scrape Filtron) **+ variantes de marque officielles** pour les 120 réfs vendues : Mann (+EAN), Wix (catalogues mann-filter.com / wixfilters.com), Mahle, Purflux & Mecafilter (filtron.eu, recherche « référence correspondante », API `search_crossreference_no`). Liste des marques gérées : `src/lib/brands.ts` (FILTER_BRANDS).
 
 ## Sécurité (12/11/2026) — `supabase/securite.sql` (voir GUIDE §9)
 - Une fois le SQL collé : RLS **fermé**. Chaque table a la règle `equipe` (`for all to authenticated using (public.est_autorise())`). Seuls les emails de `utilisateurs_autorises` accèdent aux données. Le public (anon) ne lit QUE products/equivalences/applications, en **colonnes limitées** (jamais `prix_achat`).
