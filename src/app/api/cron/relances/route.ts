@@ -1,11 +1,13 @@
 // Cron quotidien (Vercel) : envoie à tes appareils abonnés
 //   1) la relance CATALOGUE (cadence 15 j après vente / 5 j après relance sans vente) ;
-//   2) la relance IMPAYÉS (clients avec solde dû non relancés depuis 15 j).
+//   2) la relance IMPAYÉS (clients avec solde dû non relancés depuis 15 j) ;
+//   0) la veille d'une tournée prévue (tournees_prevues) : prévenir les clients des villes.
 // Sécurisé par CRON_SECRET.
 import webpush from "web-push";
 import { supabase } from "@/lib/supabase";
 import { loadRelancesCatalogue, loadImpayesRelance, countReapproDue, loadEndormis } from "@/lib/relances";
 import { buildBilanHebdo } from "@/lib/bilan";
+import { chargerClients, clientsDesVilles, dateMaroc, type ClientTournee } from "@/lib/tourneesPrevues";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -62,7 +64,29 @@ export async function GET(req: Request) {
     reappro_due: reappro, endormis_due: endormis.length, vendredi: isFriday,
   };
 
+  // Tournées de DEMAIN (heure du Maroc) : clients à prévenir pour qu'ils envoient leur commande
+  type TDemain = { id: string; villes: string[]; envoyes: string[] };
+  let demain: TDemain[] = [];
+  let clientsTournee: ClientTournee[] = [];
+  try {
+    const { data, error } = await supabase.from("tournees_prevues").select("id, villes, envoyes").eq("date_tournee", dateMaroc(1));
+    if (!error && data && data.length) { demain = data as TDemain[]; clientsTournee = await chargerClients(); }
+  } catch { /* table absente (tournees_prevues.sql pas collé) */ }
+  const aPrevenir = demain.map((t) => ({
+    t, nb: clientsDesVilles(clientsTournee, t.villes).filter((c) => c.telephone && !t.envoyes.includes(c.id)).length,
+  })).filter((x) => x.nb > 0);
+  result.tournees_demain = demain.length;
+
   if (list.length === 0) return Response.json({ ok: true, sent: 0, ...result, note: "aucun appareil abonné" });
+
+  // 0) VEILLE DE TOURNÉE : prévenir les clients des villes de demain
+  for (const { t, nb } of aPrevenir) {
+    result.tournee_sent = await sendToAll({
+      title: `🚚 Tournée demain : ${t.villes.join(", ")}`,
+      body: `Préviens tes ${nb} client${nb > 1 ? "s" : ""} pour qu'ils t'envoient leur commande aujourd'hui. Message prêt 👉`,
+      url: `/tournees/prevenir?id=${t.id}`, tag: `tournee-${t.id}`,
+    });
+  }
 
   // 1) Relance CATALOGUE (15 j / 5 j)
   if (cata.length > 0) {

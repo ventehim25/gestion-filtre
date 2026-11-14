@@ -11,6 +11,7 @@ import Logo from "@/components/Logo";
 import VoiceButton from "@/components/VoiceButton";
 import { getPending } from "@/lib/offlineSales";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import { chargerClients, clientsDesVilles, dateMaroc } from "@/lib/tourneesPrevues";
 
 type Stats = {
   totalVentes: number; totalClients: number; totalProduits: number;
@@ -81,10 +82,21 @@ export default function Dashboard() {
   // Montants sensibles masqués par défaut — révélés au clic
   const [showMoney, setShowMoney] = useState<{ f: boolean; b: boolean; e: boolean }>({ f: false, b: false, e: false });
   const [showVitrine, setShowVitrine] = useState(false);
+  // Tournée de demain avec des clients pas encore prévenus (tournees_prevues.sql)
+  const [tourneeDemain, setTourneeDemain] = useState<{ id: string; villes: string[]; reste: number } | null>(null);
 
   useEffect(() => {
     const tmr = setInterval(() => setIdx((i) => (i + 1) % HERO.length), 5000);
     return () => clearInterval(tmr);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase.from("tournees_prevues").select("id, villes, envoyes").eq("date_tournee", dateMaroc(1)).limit(1).maybeSingle();
+      if (error || !data) return; // pas de tournée demain, ou table pas encore créée
+      const reste = clientsDesVilles(await chargerClients(), data.villes).filter((c) => c.telephone && !data.envoyes.includes(c.id)).length;
+      if (reste > 0) setTourneeDemain({ id: data.id, villes: data.villes, reste });
+    })().catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -359,6 +371,11 @@ export default function Dashboard() {
           <button onClick={arrivages} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-green-500/15 text-green-300 border border-green-500/30 hover:bg-green-500/25 transition-colors">
             <MessageCircle size={15} /> 📣 Arrivages
           </button>
+          {tourneeDemain && (
+            <button onClick={() => router.push(`/tournees/prevenir?id=${tourneeDemain.id}`)} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30 hover:bg-sky-500/25 transition-colors">
+              🚚 Tournée demain ({tourneeDemain.villes.join(", ")}) : préviens {tourneeDemain.reste} client{tourneeDemain.reste > 1 ? "s" : ""}
+            </button>
+          )}
           {demandeHot && (
             <button onClick={() => router.push("/reappro")} className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-red-500/15 text-red-300 border border-red-500/30 hover:bg-red-500/25 transition-colors">
               🔎 {demandeHot.reference} demandé {demandeHot.count}× — à stocker

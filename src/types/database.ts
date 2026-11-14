@@ -36,6 +36,8 @@ export type Database = {
       utilisateurs_autorises: Table<{ email: string; ajoute_le: string }, "ajoute_le">;
       // Mémoire des VIN confirmés (supabase/vin_connus.sql)
       vin_connus: Table<VinConnu, "famille" | "confirme_le">;
+      // Tournées prévues : prévenir les clients la veille (supabase/tournees_prevues.sql)
+      tournees_prevues: Table<TourneePrevue, "id" | "created_at" | "message" | "envoyes">;
     };
     Views: {
       prospects_par_jour: { Row: { jour: string; source: string; nb: number }; Relationships: [] };
@@ -53,6 +55,16 @@ export type Database = {
 };
 
 // VIN confirmé par une vente : la voiture et son code moteur (données techniques, jamais le client)
+// Tournée prévue (supabase/tournees_prevues.sql) : date + villes ; envoyes = id des clients déjà prévenus
+export type TourneePrevue = {
+  id: string;
+  created_at: string;
+  date_tournee: string;
+  villes: string[];
+  message: string;
+  envoyes: string[];
+};
+
 export type VinConnu = {
   vin: string;
   famille: string;

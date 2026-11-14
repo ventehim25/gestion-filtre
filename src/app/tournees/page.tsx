@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import nextDynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/Header";
+import TourneesPrevues from "@/components/TourneesPrevues";
 import { supabase } from "@/lib/supabase";
 import type { Garage, GarageStatut } from "@/types/database";
 import {
@@ -281,6 +282,9 @@ export default function TourneesPage() {
 
         {/* Panneau de contrôle */}
         <div className="order-2 space-y-4">
+          {/* Prévenir les clients la veille de la tournée */}
+          <TourneesPrevues />
+
           {/* Circuit */}
           <div className="card p-4">
             <h3 className="font-semibold text-slate-200 mb-3 flex items-center gap-2">
