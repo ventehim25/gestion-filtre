@@ -46,7 +46,7 @@ Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à z
 
 ## Sécurité (12/11/2026) — `supabase/securite.sql` (voir GUIDE §9)
 - Une fois le SQL collé : RLS **fermé**. Chaque table a la règle `equipe` (`for all to authenticated using (public.est_autorise())`). Seuls les emails de `utilisateurs_autorises` accèdent aux données. Le public (anon) ne lit QUE products/equivalences/applications, en **colonnes limitées** (jamais `prix_achat`).
-- **Nouvelle table** → dans son SQL : `alter table … enable row level security;` + `create policy equipe on public.xxx for all to authenticated using (public.est_autorise()) with check (public.est_autorise());`. Si une page publique doit la lire : `grant select (colonnes) … to anon` + une règle `for select to anon`.
+- **Nouvelle table** → dans son SQL : `alter table … enable row level security;` + `create policy equipe on public.xxx for all to authenticated using ((select public.est_autorise())) with check ((select public.est_autorise()));` — **avec `(select …)`** : sinon la fonction est appelée pour chaque ligne et les grosses tables (applications, 219 000 lignes) dépassent le temps permis (BIBLE §8.20, `supabase/rls_rapide.sql`). Si une page publique doit la lire : `grant select (colonnes) … to anon` + une règle `for select to anon`.
 - **Pages publiques** (`/c`, `/tarif`, `/catalogue`, sitemap) : toujours lister les colonnes, jamais `select("*")`.
 - Connexion : `src/components/AuthGate.tsx` (s'active quand `utilisateurs_autorises` existe). Serveur : `SUPABASE_SERVICE_ROLE_KEY` (variable Vercel, sans `NEXT_PUBLIC_`). Scripts : `scripts/cle_supabase.mjs` (clé service lue dans `.env.local`). Ne jamais mettre la clé service dans le code ni sur GitHub.
 
