@@ -987,6 +987,14 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Familles Mecafilter** : ELH (huile), ELG (gazole/essence), ELP (air), ELR (habitacle), plus quelques ELE, ELD, ELAA, ELCA. Au total, le catalogue Filtron donne 2 009 correspondances Mecafilter ↔ 1 646 réfs Filtron ; seules celles des réfs vendues ont été importées (pour garder Vente/Réception légères : 834 variantes de marque chargées).
 - **Sans équivalent Mecafilter chez Filtron** (25) : AP082, AP098, AP098/3, AP144/8, AP188/2, K1014A, K1243, K1285, K1295, K1325, OP526/2, OP526/3, OP538, OP540/2, OP540/4, OP540/5, OP580, OP580/1, OP580/3, OP580/4, OP617/1, OP617/3, PP839/2, PP839/3, PP976. Aucune réf inventée : si une boîte Mecafilter arrive pour l'un d'eux, « + Autre marque » à la réception.
 
+## 8.16 Prévenir les clients la veille d'une tournée (14/11/2026)
+- **Demande de l'utilisateur** : la veille des tournées, un message aux clients de la ville ou des villes choisies pour qu'ils envoient leur commande.
+- **Où** : `/tournees` → bloc « Prévenir les clients » (`src/components/TourneesPrevues.tsx`) : jour + villes (tirées des fiches clients, avec le nombre) + message modifiable → « Programmer ». Liste des tournées à venir (« x/y prévenus », supprimer).
+- **La veille** : la notification de 9 h (cron `/api/cron/relances`, heure du Maroc) dit « 🚚 Tournée demain : Tanger… préviens tes N clients » ; un bouton apparaît aussi sur l'accueil. Les deux ouvrent `/tournees/prevenir?id=…` : un bouton « Envoyer » par client → WhatsApp s'ouvre avec le message prêt, le client est coché « Prévenu ».
+- **Message par défaut** (darija) : salutation avec le nom, « غدا الثلاثاء إن شاء الله غادي نكونو ف Tanger », demande d'envoyer la commande aujourd'hui, lien `/tarif` (prix du jour), numéro. {nom}, {ville}, {jour} remplis pour chaque client (`src/lib/tourneesPrevues.ts`).
+- **Décision** : pas d'envoi automatique en masse (risque de bannissement WhatsApp, et l'API WhatsApp Business est payante). Un tap par client.
+- **Base** : nouvelle table `tournees_prevues` (date, villes, message, clients prévenus), protégée par la règle `equipe` : `supabase/tournees_prevues.sql`.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*

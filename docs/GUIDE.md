@@ -192,6 +192,17 @@ En plus, **chaque jour à 13 h**, le PC fait une copie complète de la base dans
 - Les **photos** des filtres sont aussi copiées chez toi. Si le site de MANN+HUMMEL change, l'app affiche ta copie toute seule.
 - Si un jour des données disparaissent : demande à Claude de les remettre depuis la dernière sauvegarde. Il compare d'abord, puis remet seulement ce qui manque.
 
+## 13. Prévenir les clients la veille d'une tournée
+
+1. Va dans **Tournées** → bloc **« Prévenir les clients »** (en haut à droite).
+2. Choisis le **jour de la tournée**, puis touche les **villes** (le chiffre = nombre de clients). Tu peux en choisir plusieurs.
+3. (Si tu veux) **« Voir ou modifier le message »** : le message est en darija, avec le lien de tes prix. {nom}, {ville} et {jour} se remplissent tout seuls (« غدا الثلاثاء » la veille).
+4. Touche **« 📅 Programmer la tournée »**.
+5. **La veille à 9 h**, ton téléphone reçoit une notification « 🚚 Tournée demain ». Un bouton apparaît aussi sur l'accueil.
+6. Touche la notification (ou **« Envoyer le message »** dans Tournées) : la liste des clients s'affiche. Pour chacun, touche **« Envoyer »** : WhatsApp s'ouvre avec le message prêt, tu appuies sur envoyer, puis tu reviens. Le client passe en **« Prévenu ✓ »**.
+
+Pourquoi pas d'envoi tout seul ? WhatsApp bloque les numéros qui envoient le même message à beaucoup de gens d'un coup. Un tap par client, c'est sûr.
+
 ---
 
 *Généré avec Claude Code. Pour toute modif de l'app, on repart de ce guide et de la [BIBLE](BIBLE.md).*

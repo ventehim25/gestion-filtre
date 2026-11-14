@@ -1,7 +1,7 @@
 # 📌 Récap de session — FiltroPro
 
 > Point de reprise pour une nouvelle session. Complément de [GUIDE](GUIDE.md) et [BIBLE](BIBLE.md).
-> **Dernière session : 13→14/11/2026** (catalogue par marque, données Filtron complétées, sauvegardes, marque Mecafilter, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
+> **Dernière session : 13→14/11/2026** (catalogue par marque, données Filtron complétées, sauvegardes, marque Mecafilter, prévenir avant tournée, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
 
 ---
 
@@ -16,6 +16,8 @@
 **Copie des photos : TERMINÉE** (vérifié le 14/11 à 20 h 46) : 2 616 copiées, 607 sans photo, 0 erreur ; aussi dans Google Drive (2 616). Noté en BIBLE §8.14. Pour les nouveaux produits : relancer `node scripts/copier_photos.mjs` (ne copie que ce qui manque).
 
 **Marque Mecafilter (14/11, soir)** : ajoutée aux listes de l'app + 122 équivalents officiels pour 95 des 120 réfs vendues (BIBLE §8.15, `supabase/equivalents_mecafilter.sql`). Si l'utilisateur le veut : étendre aux 1 646 réfs Filtron du catalogue (2 009 correspondances déjà connues), mais Vente/Réception chargeraient ≈ 2 700 variantes de plus.
+
+**Prévenir les clients la veille d'une tournée (14/11, soir)** : en ligne (BIBLE §8.16, GUIDE §13). `/tournees` → « Prévenir les clients » (date + villes) ; le cron de 9 h envoie « 🚚 Tournée demain » + bouton sur l'accueil → `/tournees/prevenir?id=…` (WhatsApp 1 tap par client, coché « Prévenu »). **À vérifier** : `supabase/tournees_prevues.sql` collé par l'utilisateur ? (sinon le bloc affiche « Pas encore activé » ; vérifier par une lecture de `tournees_prevues`, erreur PGRST205 = pas collé). Ensuite : une vraie tournée programmée → la notification de la veille arrive-t-elle ?
 
 **Ensuite, au choix de l'utilisateur** (lui demander) :
 - étape 2 du VIN : environ 30 vrais VIN marocains (carte grise + code moteur), test base seule puis Vincario ;

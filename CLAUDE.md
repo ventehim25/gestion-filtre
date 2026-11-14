@@ -52,7 +52,7 @@ Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à z
 
 ## Schéma DB — détails colonnes : `src/types/database.ts`
 Tables : products, clients, sales, sale_items, vehicules, compatibilites, equivalences, applications,
-**garages**, **fournisseurs**, **receptions**, **avances**, **prospects**, rappels_vidange, demandes_manquees, push_subscriptions. Vues product_vehicles, prospects_par_jour.
+**garages**, **fournisseurs**, **receptions**, **avances**, **prospects**, rappels_vidange, demandes_manquees, push_subscriptions, vin_connus, **tournees_prevues** (veille de tournée). Vues product_vehicles, prospects_par_jour.
 RPC : `decrement_stock(p_id, qty)`, `decrement_equiv_stock(e_id, qty)` (qty négative = incrémente).
 Colonnes ajoutées (migrations dans `supabase/`) :
 - products : `prix_promo` (promos.sql)
@@ -67,7 +67,7 @@ Colonnes ajoutées (migrations dans `supabase/`) :
 
 ## Fonctionnalités principales (par page)
 - `/` accueil : **4 gros boutons** Réception (`/fournisseurs?reception=1`) · Vente (`/ventes?nouvelle=1`) · Encaisser (`/ventes?impayes=1`) · Mon activité (`/stats`), chiffres cliquables, montants masquables (œil), alertes, vitrine repliable.
-- `/tournees` : carte Leaflet/OSM (gratuit), garages (clic = poser), statuts colorés, circuit optimisé multi-jours, "Y aller" Google Maps. Tuiles OSM cachées hors-ligne (sw.js).
+- `/tournees` : carte Leaflet/OSM (gratuit), garages (clic = poser), statuts colorés, circuit optimisé multi-jours, "Y aller" Google Maps. Bloc « Prévenir les clients » (date + villes) → la veille à 9 h, notification + `/tournees/prevenir` (WhatsApp 1 tap par client, `src/lib/tourneesPrevues.ts`). Tuiles OSM cachées hors-ligne (sw.js).
 - `/produits` : équivalences = **variantes de marque** (Flag/Mann/Wix/Filtrex…) avec prix achat/vente/**stock par marque**. Prix promo + bouton "Promo WhatsApp".
 - `/ventes` : **source par ligne automatique** (fournisseur de la dernière réception du filtre, `receptions.lignes`) + boutons dinoun|filtropro ; marque par ligne (recherche par réf Mann/Wix/Mahle/Purflux…) ; prix auto, coût figé ; camion **« Rembourser {coût} »** (`src/lib/dinoun.ts`) ; filtre impayés ; hors-ligne.
 - `/fournisseurs` : type **capital** (filtropro = mon argent, capital qui grandit) vs **crédit** (dinoun = dette : départ + marchandise prise − avances). **Marchandise prise** : choix « Chez », scan des boîtes (+1/boîte), prix achat+vente enregistrés sur la fiche, « + Autre marque », code-barres mémorisé, **hors-ligne** (`src/lib/offlineReceptions.ts`), annulation ✕ dans l'historique. Liste « Bons à rembourser » (dinoun).
