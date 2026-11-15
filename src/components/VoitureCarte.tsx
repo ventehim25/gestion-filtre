@@ -17,11 +17,12 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
   const [huiles, setHuiles] = useState<HuileMoteur[]>([]);
   const [bidons, setBidons] = useState<BidonHuile[]>([]);
   const [variante, setVariante] = useState<string | null>(null);
+  const [huilesChargees, setHuilesChargees] = useState(false);
 
   useEffect(() => {
     chargerHuiles().then(({ huiles: toutes, bidons: b }) => {
       const lignes = huilesDuMoteur(v.code_moteur, toutes);
-      setHuiles(lignes); setBidons(b); setVariante(variantePrevue(v.moteur, lignes));
+      setHuiles(lignes); setBidons(b); setVariante(variantePrevue(v.moteur, lignes)); setHuilesChargees(toutes.length > 0);
     });
   }, [v.code_moteur, v.moteur]);
 
@@ -110,6 +111,14 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
             );
           })}
         </div>
+      )}
+
+      {/* Moteur pas encore relevé : lien vers le guide (on ne devine jamais l'huile) */}
+      {huilesChargees && huiles.length === 0 && v.filtres.length > 0 && (
+        <p className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
+          <Droplet size={12} className="text-slate-500" /> Huile moteur : pas encore relevée pour ce moteur dans FiltroPro.
+          <a href="https://www.liqui-moly.com/fr/fr/service/guide-des-huiles.html" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">Voir le guide Liqui Moly ↗</a>
+        </p>
       )}
 
       {/* Kit : un filtre par type (celui en stock d'abord) + l'huile choisie si elle est en stock */}
