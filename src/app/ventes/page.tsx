@@ -11,7 +11,7 @@ import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import { FILTER_BRANDS } from "@/lib/brands";
 import { coutCreditParFournisseur, setBonRembourse } from "@/lib/dinoun";
 import BarcodeScanner from "@/components/BarcodeScanner";
-import { addPending, getPending, syncPending } from "@/lib/offlineSales";
+import { addPending, envoyerVente, getPending, syncPending } from "@/lib/offlineSales";
 import { buildReceipt, sendWhatsApp } from "@/lib/whatsapp";
 import { POURCENTAGES_DEFAUT, catalogueDuClient, chargerPourcentages, infoCatalogue, prixPour, type Pourcentages, type PrixManuels } from "@/lib/prixCatalogues";
 
@@ -501,21 +501,21 @@ export default function VentesPage() {
     const date = new Date().toISOString().split("T")[0];
     let parrainMsg: string | undefined;
 
+    // La vente est d'abord GARDÉE SUR LE TÉLÉPHONE, puis envoyée par la même procédure que les ventes hors-ligne
+    // (src/lib/offlineSales.ts) : si le réseau coupe au milieu, elle reprend plus tard sans doublon ni perte.
+    const localId = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+    addPending({
+      localId,
+      client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
+      lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
+      total: saleTotal, statut, montant_paye: montant, notes: saleNotes || null, createdAt: Date.now(),
+    });
+
     let savedOnline = false;
     if (typeof navigator === "undefined" || navigator.onLine) {
       try {
-        const { data: sale, error } = await supabase.from("sales").insert({
-          client_id: clientId, date, total: saleTotal, montant_paye: montant, statut, notes: saleNotes || null,
-        }).select().single();
-        if (error || !sale) throw error || new Error("insert");
-        const { error: e2 } = await supabase.from("sale_items").insert(
-          validLines.map(l => ({ sale_id: sale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null }))
-        );
-        if (e2) throw e2;
-        for (const l of validLines) {
-          if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: l.quantite });
-          else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
-        }
+        // Vente + articles + stock (étape par étape, sans doublon)
+        if (!(await envoyerVente(supabase, localId))) throw new Error("pas envoyée");
         // Avoir utilisé → le retirer du crédit du client (Bible §4.15)
         if (avoirDeduit > 0) {
           await supabase.from("clients").update({ avoir: Math.max(0, (client?.avoir ?? 0) - avoirDeduit) }).eq("id", clientId);
@@ -535,16 +535,8 @@ export default function VentesPage() {
         savedOnline = true;
       } catch { savedOnline = false; }
     }
-
-    if (!savedOnline) {
-      addPending({
-        localId: (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()),
-        client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
-        lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
-        total: saleTotal, statut, montant_paye: montant, notes: saleNotes || null, createdAt: Date.now(),
-      });
-      setPendingCount(getPending().length);
-    }
+    // Pas envoyée (hors-ligne ou réseau coupé au milieu) : elle reste sur le téléphone avec son avancement
+    setPendingCount(getPending().length);
 
     setVidVehicule(""); setVidDate(new Date(Date.now() + 150 * 86400000).toISOString().slice(0, 10)); setVidSaved(false);
     setLastSale({

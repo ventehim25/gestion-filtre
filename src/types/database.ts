@@ -42,6 +42,8 @@ export type Database = {
       reglages: Table<{ cle: string; valeur: unknown; modifie_le: string }, "modifie_le">;
       // Huile moteur par moteur : viscosité, norme, litres (supabase/catalogues_huile_tournees.sql)
       huiles_moteurs: Table<HuileMoteur, "modifie_le" | "viscosites" | "variante">;
+      // Décomptes de stock déjà faits par ligne de vente (supabase/protection.sql) : jamais deux fois
+      stock_decomptes: Table<{ sale_id: string; ligne: number; cree_le: string }, "cree_le">;
     };
     Views: {
       prospects_par_jour: { Row: { jour: string; source: string; nb: number }; Relationships: [] };
@@ -52,6 +54,11 @@ export type Database = {
       decrement_equiv_stock: { Args: { e_id: string; qty: number }; Returns: undefined };
       // true si la personne connectée est dans utilisateurs_autorises
       est_autorise: { Args: Record<string, never>; Returns: boolean };
+      // supabase/protection.sql : décompte d'une ligne de vente, une seule fois (false = déjà fait)
+      decompter_stock_vente: { Args: { p_sale: string; p_ligne: number; p_product: string | null; p_equiv: string | null; p_qty: number }; Returns: boolean };
+      // supabase/protection.sql (clé serveur seulement) : taille de la base en octets, structure complète en SQL
+      taille_base: { Args: Record<string, never>; Returns: number };
+      schema_complet: { Args: Record<string, never>; Returns: string };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
