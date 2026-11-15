@@ -102,6 +102,8 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
                 <span className="text-xs text-slate-400">Viscosités possibles : </span><b className="text-amber-200">{h.viscosites.join(" · ")}</b>
                 {litresTexte(h) && <span className="text-slate-300"> — {litresTexte(h)}</span>}
                 {h.norme && <span className="text-xs text-slate-400"> · norme {h.norme}</span>}
+                {h.remarque && <div className="text-xs text-amber-300/80">{h.remarque}</div>}
+                {h.description && <div className="text-[11px] text-slate-500">Relevé sur : {h.description}</div>}
                 <div className="text-xs mt-0.5">
                   {enStock.length
                     ? <span className="text-green-400">En stock : {enStock.slice(0, 3).map((b) => `${b.reference}${b.prix_vente > 0 ? ` (${b.prix_vente} MAD)` : ""}`).join(" · ")}</span>
