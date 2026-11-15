@@ -40,6 +40,23 @@ export function familleMarque(marque: string | null | undefined): string {
   return u.split(/[\s(/-]+/)[0] ?? "";
 }
 
+// Index construit une seule fois par liste chargée (≈ 8 000 lignes) : vrais codes moteur d'un côté,
+// lignes « ~MARQUE|MODELE|… » rangées par clé de l'autre (sinon chaque carte de voiture reparcourt tout).
+type IndexHuiles = { codes: HuileMoteur[]; cles: Map<string, HuileMoteur[]> };
+const indexes = new WeakMap<HuileMoteur[], IndexHuiles>();
+function indexer(toutes: HuileMoteur[]): IndexHuiles {
+  let i = indexes.get(toutes);
+  if (!i) {
+    i = { codes: [], cles: new Map() };
+    for (const h of toutes) {
+      if (!h.code.startsWith("~")) { i.codes.push(h); continue; }
+      const l = i.cles.get(h.code) ?? []; l.push(h); i.cles.set(h.code, l);
+    }
+    indexes.set(toutes, i);
+  }
+  return i;
+}
+
 // La ligne vaut-elle pour cette marque ? (marques vides = relevé ancien, valable partout)
 function memeMarque(h: HuileMoteur, famille: string | null): boolean {
   return !famille || !h.marques?.length || h.marques.some((m) => familleMarque(m) === famille);
@@ -51,7 +68,7 @@ export function huilesDuMoteur(codeMoteur: string | null | undefined, toutes: Hu
   const m = morceaux(codeMoteur);
   if (!m.length) return [];
   const famille = marque ? familleMarque(marque) : null;
-  const notes = toutes.filter((h) => !estCleVoiture(h) && memeMarque(h, famille))
+  const notes = indexer(toutes).codes.filter((h) => memeMarque(h, famille))
     .map((h) => ({ h, n: Math.max(0, ...m.map((x) => ressemblance(normCode(h.code), x, !!famille && !!h.marques?.length))) })).filter((x) => x.n > 0);
   if (!notes.length) return [];
   const meilleure = Math.max(...notes.map((x) => x.n));
@@ -62,24 +79,49 @@ export function huilesDuMoteur(codeMoteur: string | null | undefined, toutes: Hu
   return top.filter((x) => x.h.code === codeGagnant).map((x) => x.h).sort((a, b) => a.variante.localeCompare(b.variante));
 }
 
-// ---- Sans vrai code moteur (Ford : Filtron écrit « Duratec », « Zetec », « Duratorq ») : modèle + cylindrée + carburant
-// + puissance + années. Lignes « ~FORD|FOCUS|1.6|E|77 » (BIBLE §8.22), variante = période du guide (« 2004-2011 »).
+// ---- Sans vrai code moteur (Ford : Filtron écrit « Duratec », « Zetec », « Duratorq » ; ou code inconnu du guide) :
+// modèle + cylindrée + carburant + puissance + années. Lignes « ~FORD|FOCUS|1.6|E|77 » (BIBLE §8.22-8.23),
+// variante = période du guide (« 2004-2011 »). Mêmes règles dans scripts/huiles_releve.mjs (étape « cles »).
 export const estCleVoiture = (h: Pick<HuileMoteur, "code">) => h.code.startsWith("~");
 const SECOND_MOT = /^(CONNECT|CUSTOM|COURIER)$/; // « Transit Connect » ≠ « Transit »
 const familleModele = (m: string) => {
-  const w = m.toUpperCase().replace(/[,/(|].*$/, "").split(/\s+/).map((x) => x.replace(/[^A-Z0-9-]/g, "")).filter(Boolean);
+  const w = m.toUpperCase().replace(/[,/(|].*$/, "").replace(/^([A-Z]) (\d{2,3})\b/, "$1$2") // « L 200 » → L200
+    .split(/\s+/).map((x) => x.replace(/[^A-Z0-9-]/g, "")).filter(Boolean);
   return (w[0] ?? "") + (SECOND_MOT.test(w[1] ?? "") ? " " + w[1] : "");
+};
+// « CITROEN » / « Citroën » → CITROEN ; « VW (VOLKSWAGEN) » → VW ; « MERCEDES-BENZ » → MERCEDES ; « KIA MOTORS » → KIA
+const cleMarque = (m: string) => {
+  const u = m.toUpperCase();
+  if (/CITRO/.test(u)) return "CITROEN"; if (/MERCEDES/.test(u)) return "MERCEDES"; if (/\bVW\b|VOLKSWAGEN/.test(u)) return "VW"; if (/LAND ROVER/.test(u)) return "LANDROVER";
+  return u.split(/[\s(]+/)[0];
+};
+// Diesel d'après le nom Filtron : « 1.5 dCi », « 2.0 BlueHDi », « 2.2 Multijet », « 2.5 DI-D », « 2.0 D-4D » ;
+// essence avant tout si « GDI », « TCe », « EcoBoost GTDi », « TSI »…
+const ESSENCE = /GTDI|T-?GDI|\bGDI\b|TFSI|\bTSI\b|\bFSI\b|ECOBOOST|PURETECH|\bTHP\b|\bVTI\b|\bTCE\b|\bSCE\b|\bMPI\b|VVT|DIG-T|MULTIAIR|TWINAIR|DUALJET|\bGTI\b|\bLPG\b|\bCNG\b|\bGPL\b|HYBRID/i;
+const DIESEL = /TDCI|TDDI|TDE|TDI|SDI|\bDI\b|\bD\b|\bTD\b|\bDT\b|DIESEL|ECOBLUE|DURATORQ|ECOTORQ|CRDI|DCI|HDI|CDTI|CDI|DTI|JTD|MULTIJET|MJET|D-?4D|DI-?D|\bCRD\b|DTEC|D-CAT|\bD\d\b|XDI|DDIS|BLUETEC|\bTDS\b/i;
+export const estDiesel = (texte: string) => !ESSENCE.test(texte) && DIESEL.test(texte);
+// Mercedes et BMW : Filtron n'écrit pas la cylindrée (« C 220 CDI (204.008) », « 320 d (E90) ») → désignation « C220 », « 320D »
+const designation = (cm: string, texte: string | null, modele?: string) => {
+  let u = (texte ?? "").toUpperCase();
+  if (cm === "MERCEDES" && /^\d{3}/.test(u) && modele) u = familleModele(modele).replace(/[^A-Z]/g, "") + " " + u; // Vito « 110 CDI » → VITO110
+  const m = cm === "MERCEDES" ? u.match(/^([A-Z]+)\s*(\d{3})\b/) : cm === "BMW" ? u.match(/^(\d{3})\s*([A-Z]{1,2})\b/) : null;
+  return m ? m[1] + m[2] : null;
 };
 type VoitureHuile = { marque: string; modele: string; moteur: string | null; code_moteur: string | null; annee_debut: string | null; puissance: string | null };
 /** Clés possibles de la voiture (puissance exacte d'abord, puis ± 1 et ± 2 kW : Filtron donne des ch arrondis). */
 export function clesVoiture(v: VoitureHuile): string[] {
-  const cyl = (v.moteur ?? "").match(/(\d)[.,](\d)/);
   const ch = Number((String(v.puissance ?? "").match(/\d+(?:[.,]\d+)?/) ?? [""])[0].replace(",", "."));
-  if (!cyl || !ch) return [];
-  const diesel = /TDCI|TDDI|TDE|\bTDI?\b|\bDI\b|\bD\b|DIESEL|ECOBLUE|DURATORQ|ECOTORQ|CRDI|\bDCI\b|\bHDI\b/i.test(`${v.moteur} ${v.code_moteur ?? ""}`);
+  if (!ch) return [];
+  const carb = estDiesel(`${v.moteur} ${v.code_moteur ?? ""}`) ? "D" : "E";
   const kw = Math.round(ch * 0.7355);
-  const base = `~${v.marque.toUpperCase().split(/[\s(]+/)[0]}|${familleModele(v.modele)}|${cyl[1]}.${cyl[2]}|${diesel ? "D" : "E"}|`;
-  return [0, -1, 1, -2, 2].map((d) => base + (kw + d));
+  const cm = cleMarque(v.marque);
+  const cyl = (v.moteur ?? "").match(/(\d)[.,](\d)/);
+  const des = designation(cm, v.moteur, v.modele);
+  const bases = [
+    ...(des ? [`~${cm}|=${des}|${carb}|`] : []),
+    ...(cyl ? [`~${cm}|${familleModele(v.modele)}|${cyl[1]}.${cyl[2]}|${carb}|`] : []),
+  ];
+  return bases.flatMap((b) => [0, -1, 1, -2, 2].map((d) => b + (kw + d)));
 }
 const anneeDe = (s: string | null) => { const m = (s ?? "").match(/(\d{4})/); return m ? Number(m[1]) : null; };
 // La voiture (année de début Filtron) est-elle dans la période de la ligne ? (1 an de marge)
@@ -94,8 +136,9 @@ export function huilesDeLaVoiture(v: VoitureHuile, toutes: HuileMoteur[]): Huile
   const parCode = huilesDuMoteur(v.code_moteur, toutes, v.marque);
   if (parCode.length) return parCode;
   const annee = anneeDe(v.annee_debut);
+  const { cles } = indexer(toutes);
   for (const cle of clesVoiture(v)) {
-    const l = toutes.filter((h) => h.code === cle && dansPeriode(h.variante, annee));
+    const l = (cles.get(cle) ?? []).filter((h) => dansPeriode(h.variante, annee));
     if (l.length) return l.sort((a, b) => a.variante.localeCompare(b.variante));
   }
   return [];
@@ -162,14 +205,20 @@ export function bidonsPourVidange(h: HuileMoteur, bidons: BidonHuile[]): { bidon
 }
 
 // Toutes les lignes d'huile (environ 2 600 moteurs : par paquets de 1000, la limite Supabase)
+// ≈ 8 000 lignes : la 1re page donne le total, les suivantes sont lues en même temps (ordre code + variante = unique)
 async function toutesLesHuiles(): Promise<HuileMoteur[]> {
-  const out: HuileMoteur[] = [];
-  for (let a = 0; ; a += 1000) {
-    const { data, error } = await supabase.from("huiles_moteurs").select("*").order("code").order("variante").range(a, a + 999);
-    if (error) return out; // table absente = pas encore de données
-    out.push(...((data ?? []) as HuileMoteur[]));
-    if (!data || data.length < 1000) return out;
+  const page = (a: number) => supabase.from("huiles_moteurs").select("*").order("code").order("variante").range(a, a + 999);
+  const premiere = await supabase.from("huiles_moteurs").select("*", { count: "exact" }).order("code").order("variante").range(0, 999);
+  if (premiere.error) return []; // table absente = pas encore de données
+  const out = [...((premiere.data ?? []) as HuileMoteur[])];
+  const total = premiere.count ?? out.length;
+  const debuts: number[] = [];
+  for (let a = 1000; a < total; a += 1000) debuts.push(a);
+  for (const r of await Promise.all(debuts.map(page))) {
+    if (r.error) break;
+    out.push(...((r.data ?? []) as HuileMoteur[]));
   }
+  return out;
 }
 
 // Chargé une fois par page

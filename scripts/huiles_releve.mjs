@@ -237,14 +237,26 @@ async function envoi() {
 // Pour une marque où Filtron écrit un nom de famille au lieu du code (Ford). L'appli (huilesDeLaVoiture) calcule la même clé
 // à partir de la voiture Filtron (modèle, « 1.6 » du moteur, diesel ou essence, ch → kW) et garde la période qui contient l'année.
 const SECOND_MOT = /^(CONNECT|CUSTOM|COURIER)$/; // « Transit Connect » ≠ « Transit » (mêmes règles que src/lib/huiles.ts)
-const familleModele = (m) => { const w = m.toUpperCase().replace(/[,/(|].*$/, "").split(/\s+/).map((x) => x.replace(/[^A-Z0-9-]/g, "")).filter(Boolean); return (w[0] ?? "") + (SECOND_MOT.test(w[1] ?? "") ? " " + w[1] : ""); };
-async function cles(marque) {
+const familleModele = (m) => { const w = m.toUpperCase().replace(/[,/(|].*$/, "").replace(/^([A-Z]) (\d{2,3})\b/, "$1$2").split(/\s+/).map((x) => x.replace(/[^A-Z0-9-]/g, "")).filter(Boolean); return (w[0] ?? "") + (SECOND_MOT.test(w[1] ?? "") ? " " + w[1] : ""); };
+// « Citro » / « CITROEN » → CITROEN ; « VW (VOLKSWAGEN) » / « Volkswagen » → VW ; « MERCEDES-BENZ » → MERCEDES (mêmes règles que l'appli)
+const cleMarque = (m) => { const u = m.toUpperCase(); if (/CITRO/.test(u)) return "CITROEN"; if (/MERCEDES/.test(u)) return "MERCEDES"; if (/\bVW\b|VOLKSWAGEN/.test(u)) return "VW"; if (/LAND ROVER/.test(u)) return "LANDROVER"; return u.split(/[\s(]+/)[0]; };
+// Mercedes et BMW : Filtron n'écrit pas la cylindrée (« C 220 CDI (204.008) », « 320 d (E90) ») → désignation « C220 », « 320D »
+const designation = (cm, texte, modele) => {
+  let u = (texte ?? "").toUpperCase();
+  if (cm === "MERCEDES" && /^\d{3}/.test(u) && modele) u = familleModele(modele).replace(/[^A-Z]/g, "") + " " + u; // Vito « 110 CDI » → VITO110
+  const m = cm === "MERCEDES" ? u.match(/^([A-Z]+)\s*(\d{3})\b/) : cm === "BMW" ? u.match(/^(\d{3})\s*([A-Z]{1,2})\b/) : null;
+  return m ? m[1] + m[2] : null;
+};
+let makesCache = null;
+async function cles(marque, { envoyer = false, relire = false } = {}) {
   const re = CIBLES.find(([m]) => m.toLowerCase() === (marque ?? "").toLowerCase())?.[1];
   if (!re) throw new Error("Marque inconnue dans CIBLES : " + marque);
   const brut = lire("brut.json", {}); const aLire = lire("a_lire.json", []);
-  // 1) versions du guide avec cylindrée, puissance, carburant, années
-  const makes = { 1: await json("/rest/V1/olyslager/makes/1"), 2: await json("/rest/V1/olyslager/makes/2") };
-  const types = [];
+  // 1) versions du guide avec cylindrée, puissance, carburant, années (gardées dans types_<marque>.json ; --relire pour relire)
+  let types = relire ? null : lire(`types_${marque}.json`, null);
+  if (!types) {
+  const makes = makesCache ??= { 1: await json("/rest/V1/olyslager/makes/1"), 2: await json("/rest/V1/olyslager/makes/2") };
+  types = [];
   for (const cat of [1, 2]) {
     const mk = (makes[cat] ?? []).find((m) => m.make_name.toLowerCase().startsWith(marque.toLowerCase()) && /\(EU\)/.test(m.make_name))
       ?? (makes[cat] ?? []).find((m) => m.make_name.toLowerCase().startsWith(marque.toLowerCase()) && !/USA|CAN|Japan|Australia/i.test(m.make_name));
@@ -258,6 +270,7 @@ async function cles(marque) {
     }
   }
   ecrire(`types_${marque}.json`, types);
+  }
   // 2) huile des moteurs (cylindrée, kW, carburant, année de début) pas encore lus
   const cleMoteur = (t) => `${t.cc}|${t.kw}|${t.carb}|${t.ys}`;
   const lus = new Set(aLire.filter((a) => a.marque === marque).map((a) => String(a.ty)));
@@ -275,8 +288,10 @@ async function cles(marque) {
   const parCle = new Map();
   for (const t of types) {
     const h = huileDe.get(cleMoteur(t)); if (!h) continue;
-    const cle = `~${marque.toUpperCase()}|${familleModele(t.modele)}|${(Math.round(t.cc / 100) / 10).toFixed(1)}|${t.carb}|${t.kw}`;
-    const l = parCle.get(cle) ?? []; l.push({ ...h, nom: t.nom, ys: t.ys, ye: t.ye }); parCle.set(cle, l);
+    const cm = cleMarque(marque);
+    const lesCles = [`~${cm}|${familleModele(t.modele)}|${(Math.round(t.cc / 100) / 10).toFixed(1)}|${t.carb}|${t.kw}`];
+    const des = designation(cm, t.nom, t.modele); if (des) lesCles.push(`~${cm}|=${des}|${t.carb}|${t.kw}`); // Mercedes « C 220 CDI », BMW « 320d »
+    for (const cle of lesCles) { const l = parCle.get(cle) ?? []; l.push({ ...h, nom: t.nom, ys: t.ys, ye: t.ye }); parCle.set(cle, l); }
   }
   const lignes = [];
   for (const [cle, vs] of parCle) {
@@ -290,22 +305,28 @@ async function cles(marque) {
     gs.forEach((g, i) => {
       const l = ligne(cle, libs.indexOf(libs[i]) === i ? libs[i] : `${libs[i]} · ${g.visc[0]}`, g.vs, g.visc);
       const codesMoteur = [...new Set(g.vs.map((v) => v.code).filter(Boolean))].slice(0, 3).join(", ");
-      lignes.push({ ...l, description: `${marque} ${g.vs[0].nom}${g.vs.length > 1 ? ` (+ ${g.vs.length - 1} autre${g.vs.length > 2 ? "s" : ""})` : ""}${codesMoteur ? ` · moteur ${codesMoteur}` : ""}`, marques: [marque] });
+      const nomMarque = NOM[marque] ?? marque;
+      lignes.push({ ...l, description: `${nomMarque} ${g.vs[0].nom}${g.vs.length > 1 ? ` (+ ${g.vs.length - 1} autre${g.vs.length > 2 ? "s" : ""})` : ""}${codesMoteur ? ` · moteur ${codesMoteur}` : ""}`, marques: [nomMarque] });
     });
   }
   ecrire(`cles_${marque}.json`, lignes);
-  // 4) envoi : n'ajoute que ce qui manque
-  const sb = await client(); let ajout = 0;
-  for (let i = 0; i < lignes.length; i += 500) {
-    const { error, count } = await sb.from("huiles_moteurs").upsert(lignes.slice(i, i + 500), { onConflict: "code,variante", ignoreDuplicates: true, count: "exact" });
-    if (error) throw error; ajout += count ?? 0;
+  // 4) envoi (seulement avec --envoi) : n'ajoute que ce qui manque
+  let ajout = 0;
+  if (envoyer) {
+    const sb = await client();
+    for (let i = 0; i < lignes.length; i += 500) {
+      const { error, count } = await sb.from("huiles_moteurs").upsert(lignes.slice(i, i + 500), { onConflict: "code,variante", ignoreDuplicates: true, count: "exact" });
+      if (error) throw error; ajout += count ?? 0;
+    }
   }
-  console.log(`${marque} : ${types.length} versions du guide · ${lusMaintenant} moteurs lus en plus · ${parCle.size} clés · ${lignes.length} lignes · ajoutées ${ajout}`);
+  console.log(`${marque} : ${types.length} versions du guide · ${lusMaintenant} moteurs lus en plus · ${parCle.size} clés · ${lignes.length} lignes${envoyer ? ` · ajoutées ${ajout}` : " (rien envoyé)"}`);
 }
 
 const etape = process.argv[2];
+const options = { envoyer: process.argv.includes("--envoi"), relire: process.argv.includes("--relire") };
 if (etape === "collecte") await collecte();
 else if (etape === "fusion") await fusion();
 else if (etape === "envoi") await envoi();
-else if (etape === "cles") await cles(process.argv[3]);
-else console.log("Usage : node scripts/huiles_releve.mjs collecte | fusion | envoi | cles <Marque>");
+else if (etape === "cles" && process.argv[3] === "toutes") { for (const [m] of CIBLES) await cles(m, options); }
+else if (etape === "cles") await cles(process.argv[3], options);
+else console.log("Usage : node scripts/huiles_releve.mjs collecte | fusion | envoi | cles <Marque|toutes> [--envoi] [--relire]");
