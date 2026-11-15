@@ -12,7 +12,12 @@
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 import { scoreProspect, pushProspects } from "./prospect_score.mjs";
 
-const OVERPASS = "https://overpass-api.de/api/interpreter";
+// Plusieurs serveurs publics Overpass : si l'un est en panne (« Overpass indisponible » le 13/11, délai dépassé le 14/11), on passe au suivant
+const OVERPASS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+  "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+];
 const UA = "FiltroPro-prospection/1.0";
 const OUT_DIR = "docs/prospects/osm";
 const CSV = `${OUT_DIR}/prospects_osm.csv`; // gitignoré (dépôt public = pas de contacts sur GitHub)
@@ -44,15 +49,21 @@ const SEGMENTS = [
 ];
 
 async function overpass(query) {
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const res = await fetch(OVERPASS, {
-      method: "POST",
-      headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded" },
-      body: "data=" + encodeURIComponent(query),
-    });
-    if (res.ok) return (await res.json()).elements;
-    console.warn(`Overpass HTTP ${res.status} (essai ${attempt})`);
-    await new Promise((r) => setTimeout(r, 15000 * attempt));
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    const serveur = OVERPASS[(attempt - 1) % OVERPASS.length];
+    try {
+      const res = await fetch(serveur, {
+        method: "POST",
+        headers: { "User-Agent": UA, "Content-Type": "application/x-www-form-urlencoded" },
+        body: "data=" + encodeURIComponent(query),
+        signal: AbortSignal.timeout(180000),
+      });
+      if (res.ok) return (await res.json()).elements;
+      console.warn(`Overpass HTTP ${res.status} (${new URL(serveur).hostname}, essai ${attempt})`);
+    } catch (e) {
+      console.warn(`Overpass injoignable (${new URL(serveur).hostname}, essai ${attempt}) : ${e.cause?.code ?? e.name}`);
+    }
+    await new Promise((r) => setTimeout(r, 10000 * attempt));
   }
   throw new Error("Overpass indisponible");
 }
