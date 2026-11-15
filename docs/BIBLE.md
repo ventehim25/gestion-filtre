@@ -1037,6 +1037,19 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Couverture testée sur les 218 956 lignes Filtron** (mêmes règles que l'appli) : voitures et utilitaires **56 %** avec huile (Dacia 89 %, Skoda 88 %, Seat 83 %, Renault 80 %, BMW 79 %, Peugeot 78 %, Citroën 77 %, VW 73 %, Opel 73 %, Hyundai 69 %, Kia 67 %, Mitsubishi 67 %, Nissan 63 %, Toyota 59 %, Fiat 47 %). Faibles : Ford 21 % (Filtron écrit souvent « Duratorq », « Zetec » au lieu du code), Mercedes 37 % (la marque contient les camions Actros/Atego), Mazda 2 % (le guide ne donne que des noms de famille). Camions, bus et tracteurs : pas relevés (normal).
 - **Pour refaire ou compléter le relevé** : `node scripts/huiles_releve.mjs collecte` (≈ 2 h, reprenable) → `fusion` (prépare, n'envoie rien) → `envoi` (ajoute seulement les nouveaux codes). Données du relevé gardées en local dans `backups/huiles/` (pas sur GitHub). Ajouter une marque ou un modèle = une ligne dans `CIBLES`.
 
+## 8.22 Huile moteur Ford : par modèle, cylindrée et puissance (15/11/2026)
+- **Demande de l'utilisateur** : améliorer Ford (« oui »), seulement 21 % des voitures Ford avaient leur huile.
+- **Cause** : pour Ford, Filtron écrit souvent un **nom de famille** de moteur (« Duratec », « Zetec », « Duratorq », « Sigma ») au lieu du code exact ; impossible de relier par le code.
+- **Solution** : quand le code ne donne rien, l'appli cherche par **modèle + cylindrée + carburant + puissance + années** (`huilesDeLaVoiture` dans `src/lib/huiles.ts`). Exemple : Filtron « Focus II · 1.6 16V Ti-VCT · Duratec · 115 ch · 2004 » → guide « Focus 1.6 Ti-VCT (85 kW) (2004-2011) » → 5W-30 · 5W-20, 4,1 L.
+  - lignes spéciales dans `huiles_moteurs` : code « ~FORD|FOCUS|1.6|E|85 » (jamais comparé aux codes moteur), variante = **période** du guide (« 2004-2011 ») ;
+  - la puissance Filtron est en ch arrondis : on essaie le kW exact, puis ± 1 et ± 2 kW ;
+  - **l'année de la voiture doit être dans la période** (1 an de marge) : sans ça, une Fiesta de 1977 était reliée à une Fiesta de 2002 (même cylindrée et puissance, autre moteur) — corrigé avant l'envoi ;
+  - « Transit Connect », « Transit Custom », « Transit Courier » sont séparés du « Transit » ;
+  - la fiche affiche « guide Liqui Moly, d'après le modèle, la cylindrée et la puissance » et « Relevé sur : Ford Focus 1.6 Ti-VCT… · moteur … ».
+- **Relevé complété** : S-Max, Galaxy, Escort et Grand C-Max ajoutés à la liste Ford (40 moteurs lus en plus, 22 nouveaux codes moteur). **488 lignes Ford** ajoutées (440 clés, 789 versions du guide).
+- **Résultat testé sur les 4 783 lignes Ford de Filtron** : **52 %** avec huile (avant 21 %). Exemples non reliés exprès : Transit 2.4 de 2000 annoncé à 115 ch par Filtron (le guide n'a que 75, 90, 120 et 125 ch à cette époque) ; camions Cargo (pas relevés).
+- **Refaire ou faire pareil pour une autre marque** : `node scripts/huiles_releve.mjs cles Ford` (liste les versions du guide avec cylindrée et puissance, lit les moteurs manquants, prépare et ajoute les lignes, sans rien remplacer).
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*

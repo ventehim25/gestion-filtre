@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import { type Voiture, LIBELLE, annees, kitDeVoiture, messageKit } from "@/lib/voitures";
-import { type BidonHuile, bidonsConvenables, bidonsPourVidange, chargerHuiles, huilesDuMoteur, litresTexte, variantePrevue, versionsFap } from "@/lib/huiles";
+import { type BidonHuile, bidonsConvenables, bidonsPourVidange, chargerHuiles, estCleVoiture, huilesDeLaVoiture, litresTexte, variantePrevue, versionsFap } from "@/lib/huiles";
 import type { HuileMoteur } from "@/types/database";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { Package, Send, Droplet } from "lucide-react";
@@ -21,10 +21,10 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
 
   useEffect(() => {
     chargerHuiles().then(({ huiles: toutes, bidons: b }) => {
-      const lignes = huilesDuMoteur(v.code_moteur, toutes, v.marque);
+      const lignes = huilesDeLaVoiture(v, toutes);
       setHuiles(lignes); setBidons(b); setVariante(variantePrevue(v.moteur, lignes, v.modele)); setHuilesChargees(toutes.length > 0);
     });
-  }, [v.code_moteur, v.moteur, v.marque, v.modele]);
+  }, [v.code_moteur, v.moteur, v.marque, v.modele, v.annee_debut, v.puissance]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kit = kitDeVoiture(v);
   const huile = huiles.find((h) => h.variante === variante) ?? null; // choisie (ou seule possible)
@@ -81,7 +81,9 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
       {huiles.length > 0 && (
         <div className="mt-3 rounded-lg bg-slate-800/40 px-3 py-2 text-sm">
           <div className="flex items-center gap-2 text-slate-200 font-medium">
-            <Droplet size={14} className="text-amber-300" /> Huile moteur <span className="text-xs text-slate-500 font-normal">(guide Liqui Moly, moteur {huiles[0].code})</span>
+            <Droplet size={14} className="text-amber-300" /> Huile moteur <span className="text-xs text-slate-500 font-normal">
+              (guide Liqui Moly, {estCleVoiture(huiles[0]) ? "d'après le modèle, la cylindrée et la puissance" : `moteur ${huiles[0].code}`})
+            </span>
           </div>
           {huiles.length > 1 && (
             <div className="flex flex-wrap gap-1.5 mt-1.5">

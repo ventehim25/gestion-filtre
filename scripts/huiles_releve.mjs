@@ -4,6 +4,8 @@
 //   node scripts/huiles_releve.mjs collecte   → lit le guide (≈ 6 700 versions, 2 h environ, reprenable) dans backups/huiles/
 //   node scripts/huiles_releve.mjs fusion     → regroupe par code moteur → backups/huiles/nouvelles.json (rien n'est envoyé)
 //   node scripts/huiles_releve.mjs envoi      → ajoute les lignes nouvelles (ne remplace JAMAIS une ligne déjà en base)
+//   node scripts/huiles_releve.mjs cles Ford  → marque dont Filtron ne donne pas le vrai code (« Duratec », « Zetec ») :
+//                                               lignes « ~FORD|FOCUS|1.6|E|77 » (modèle, cylindrée, carburant, kW), variante = période
 //
 // Règles (on ne devine jamais) :
 // - viscosités : seulement celles valables pour TOUTES les voitures qui ont ce code ; si le guide donne des huiles
@@ -50,7 +52,7 @@ const CIBLES = [
   ["Toyota", /^(Yaris|Corolla|Auris|RAV ?4|Land Cruiser|Hilux|C-HR|Avensis|Prado|Hiace|Fortuner|Rush|Aygo|Starlet|Proace)/],
   ["Mercedes", /(W176|W177|W169|W245|W246|W202|W203|W204|W205|W206|W210|W211|W212|W213|W124|W201|Vito|Viano|Sprinter|Citan|CLA|GLA|GLC|X156|X253|W166|W164|ML|GLE|190)/],
   ["BMW", /(E46|E90|E91|F30|F31|G20|E39|E60|F10|G30|E87|F20|F40|E84|F48|E83|F25|G01|E70|F15|G05)/],
-  ["Ford", /^(Fiesta|Focus|Kuga|Ranger|Transit|EcoSport|Fusion|Mondeo|C-Max|B-Max|Puma|Ka\b|Tourneo)/],
+  ["Ford", /^(Fiesta|Focus|Kuga|Ranger|Transit|EcoSport|Fusion|Mondeo|C-Max|B-Max|Puma|Ka\b|Tourneo|S-Max|Galaxy|Escort|Grand C-Max)/],
   ["Opel", /^(Corsa|Astra|Insignia|Combo|Mokka|Meriva|Zafira|Vectra|Crossland|Grandland|Vivaro|Movano)/],
   ["Nissan", /^(Micra|Qashqai|Juke|X-Trail|Navara|Note|Sunny|Almera|Pathfinder|NP300|Pick ?up|Kicks|Tiida|Primastar|NV200|Terrano)/],
   ["Mitsubishi", /^(L200|L 200|Pajero|ASX|Outlander|Lancer|Colt|Space Star|Attrage|Triton)/],
@@ -220,16 +222,90 @@ async function envoi() {
     const { error, count } = await sb.from("huiles_moteurs").upsert(nouvelles.slice(i, i + 500), { onConflict: "code,variante", ignoreDuplicates: true, count: "exact" });
     if (error) throw error; ajout += count ?? 0;
   }
-  let maj = 0; // lignes déjà en base sans marques : celles du relevé
-  for (const [code, marques] of Object.entries(dejaM)) {
+  let maj = 0; // lignes déjà en base sans marques : celles du relevé (seulement celles qui n'en ont pas encore)
+  const { data: sansMarques, error: e1 } = await sb.from("huiles_moteurs").select("code").is("marques", null).range(0, 4999);
+  if (e1) throw e1;
+  const aCompleter = new Set(sansMarques.map((r) => r.code));
+  for (const [code, marques] of Object.entries(dejaM).filter(([c]) => aCompleter.has(c))) {
     const { data, error } = await sb.from("huiles_moteurs").update({ marques }).eq("code", code).is("marques", null).select("code");
     if (error) throw error; maj += data.length;
   }
   console.log(`lignes ajoutées ${ajout} / ${nouvelles.length} · lignes complétées (marques) ${maj}`);
 }
 
+// ---------------------------------------------------------------- 4. CLÉS (BIBLE §8.22)
+// Pour une marque où Filtron écrit un nom de famille au lieu du code (Ford). L'appli (huilesDeLaVoiture) calcule la même clé
+// à partir de la voiture Filtron (modèle, « 1.6 » du moteur, diesel ou essence, ch → kW) et garde la période qui contient l'année.
+const SECOND_MOT = /^(CONNECT|CUSTOM|COURIER)$/; // « Transit Connect » ≠ « Transit » (mêmes règles que src/lib/huiles.ts)
+const familleModele = (m) => { const w = m.toUpperCase().replace(/[,/(|].*$/, "").split(/\s+/).map((x) => x.replace(/[^A-Z0-9-]/g, "")).filter(Boolean); return (w[0] ?? "") + (SECOND_MOT.test(w[1] ?? "") ? " " + w[1] : ""); };
+async function cles(marque) {
+  const re = CIBLES.find(([m]) => m.toLowerCase() === (marque ?? "").toLowerCase())?.[1];
+  if (!re) throw new Error("Marque inconnue dans CIBLES : " + marque);
+  const brut = lire("brut.json", {}); const aLire = lire("a_lire.json", []);
+  // 1) versions du guide avec cylindrée, puissance, carburant, années
+  const makes = { 1: await json("/rest/V1/olyslager/makes/1"), 2: await json("/rest/V1/olyslager/makes/2") };
+  const types = [];
+  for (const cat of [1, 2]) {
+    const mk = (makes[cat] ?? []).find((m) => m.make_name.toLowerCase().startsWith(marque.toLowerCase()) && /\(EU\)/.test(m.make_name))
+      ?? (makes[cat] ?? []).find((m) => m.make_name.toLowerCase().startsWith(marque.toLowerCase()) && !/USA|CAN|Japan|Australia/i.test(m.make_name));
+    if (!mk) continue;
+    for (const mo of ((await json("/rest/V1/olyslager/models/" + mk.id)) ?? []).filter((m) => re.test(m.name) && (m.year_end == null || m.year_end >= 1995))) {
+      for (const t of (await json("//rest/V1/olyslager/types/" + mo.id)) ?? []) {
+        if ((t.fuel_id !== 1 && t.fuel_id !== 2) || (t.year_end != null && t.year_end < 1995)) continue;
+        types.push({ ty: t.id, modele: mo.name, nom: t.name, cc: t.cylinder_c_c, kw: t.power_k_w, carb: t.fuel_id === 2 ? "D" : "E", ys: t.year_start, ye: t.year_end });
+      }
+      await sleep(250);
+    }
+  }
+  ecrire(`types_${marque}.json`, types);
+  // 2) huile des moteurs (cylindrée, kW, carburant, année de début) pas encore lus
+  const cleMoteur = (t) => `${t.cc}|${t.kw}|${t.carb}|${t.ys}`;
+  const lus = new Set(aLire.filter((a) => a.marque === marque).map((a) => String(a.ty)));
+  const connus = new Set(types.filter((t) => lus.has(String(t.ty))).map(cleMoteur));
+  const vus = new Set(); let lusMaintenant = 0;
+  for (const t of types) {
+    const k = cleMoteur(t); if (connus.has(k) || vus.has(k)) continue; vus.add(k);
+    try { brut[t.ty] = await lireVersion(t); aLire.push({ ty: t.ty, nom: t.nom, marque }); lusMaintenant++; } catch (e) { console.log("  ⚠", t.nom, e.message); }
+    await sleep(500);
+  }
+  ecrire("brut.json", brut); ecrire("a_lire.json", aLire);
+  // 3) lignes par clé, rangées par période (trou de plus d'un an ou plus d'huile commune = nouvelle période)
+  const lusTous = new Set(aLire.filter((a) => a.marque === marque).map((a) => String(a.ty)));
+  const huileDe = new Map(); for (const t of types) if (lusTous.has(String(t.ty)) && brut[t.ty]?.visc?.length) huileDe.set(cleMoteur(t), brut[t.ty]);
+  const parCle = new Map();
+  for (const t of types) {
+    const h = huileDe.get(cleMoteur(t)); if (!h) continue;
+    const cle = `~${marque.toUpperCase()}|${familleModele(t.modele)}|${(Math.round(t.cc / 100) / 10).toFixed(1)}|${t.carb}|${t.kw}`;
+    const l = parCle.get(cle) ?? []; l.push({ ...h, nom: t.nom, ys: t.ys, ye: t.ye }); parCle.set(cle, l);
+  }
+  const lignes = [];
+  for (const [cle, vs] of parCle) {
+    const gs = [];
+    for (const v of [...vs].sort((a, b) => a.ys - b.ys)) {
+      const g = gs.at(-1); const finG = g ? Math.max(...g.vs.map((x) => x.ye ?? 9999)) : 0;
+      if (g && v.ys <= finG + 1 && inter(g.visc, v.visc).length) { g.visc = inter(g.visc, v.visc); g.vs.push(v); } else gs.push({ visc: [...v.visc], vs: [v] });
+    }
+    if (gs.length > 4) continue;
+    const libs = gs.map((g) => `${Math.min(...g.vs.map((v) => v.ys))}-${g.vs.some((v) => !v.ye) ? "" : Math.max(...g.vs.map((v) => v.ye))}`);
+    gs.forEach((g, i) => {
+      const l = ligne(cle, libs.indexOf(libs[i]) === i ? libs[i] : `${libs[i]} · ${g.visc[0]}`, g.vs, g.visc);
+      const codesMoteur = [...new Set(g.vs.map((v) => v.code).filter(Boolean))].slice(0, 3).join(", ");
+      lignes.push({ ...l, description: `${marque} ${g.vs[0].nom}${g.vs.length > 1 ? ` (+ ${g.vs.length - 1} autre${g.vs.length > 2 ? "s" : ""})` : ""}${codesMoteur ? ` · moteur ${codesMoteur}` : ""}`, marques: [marque] });
+    });
+  }
+  ecrire(`cles_${marque}.json`, lignes);
+  // 4) envoi : n'ajoute que ce qui manque
+  const sb = await client(); let ajout = 0;
+  for (let i = 0; i < lignes.length; i += 500) {
+    const { error, count } = await sb.from("huiles_moteurs").upsert(lignes.slice(i, i + 500), { onConflict: "code,variante", ignoreDuplicates: true, count: "exact" });
+    if (error) throw error; ajout += count ?? 0;
+  }
+  console.log(`${marque} : ${types.length} versions du guide · ${lusMaintenant} moteurs lus en plus · ${parCle.size} clés · ${lignes.length} lignes · ajoutées ${ajout}`);
+}
+
 const etape = process.argv[2];
 if (etape === "collecte") await collecte();
 else if (etape === "fusion") await fusion();
 else if (etape === "envoi") await envoi();
-else console.log("Usage : node scripts/huiles_releve.mjs collecte | fusion | envoi");
+else if (etape === "cles") await cles(process.argv[3]);
+else console.log("Usage : node scripts/huiles_releve.mjs collecte | fusion | envoi | cles <Marque>");

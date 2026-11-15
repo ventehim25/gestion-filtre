@@ -51,7 +51,7 @@ export function huilesDuMoteur(codeMoteur: string | null | undefined, toutes: Hu
   const m = morceaux(codeMoteur);
   if (!m.length) return [];
   const famille = marque ? familleMarque(marque) : null;
-  const notes = toutes.filter((h) => memeMarque(h, famille))
+  const notes = toutes.filter((h) => !estCleVoiture(h) && memeMarque(h, famille))
     .map((h) => ({ h, n: Math.max(0, ...m.map((x) => ressemblance(normCode(h.code), x, !!famille && !!h.marques?.length))) })).filter((x) => x.n > 0);
   if (!notes.length) return [];
   const meilleure = Math.max(...notes.map((x) => x.n));
@@ -60,6 +60,45 @@ export function huilesDuMoteur(codeMoteur: string | null | undefined, toutes: Hu
   if (meilleure < 40 && new Set(top.map((x) => [...x.h.viscosites].sort().join(","))).size > 1) return [];
   const codeGagnant = top[0].h.code; // un seul moteur, toutes ses variantes
   return top.filter((x) => x.h.code === codeGagnant).map((x) => x.h).sort((a, b) => a.variante.localeCompare(b.variante));
+}
+
+// ---- Sans vrai code moteur (Ford : Filtron écrit « Duratec », « Zetec », « Duratorq ») : modèle + cylindrée + carburant
+// + puissance + années. Lignes « ~FORD|FOCUS|1.6|E|77 » (BIBLE §8.22), variante = période du guide (« 2004-2011 »).
+export const estCleVoiture = (h: Pick<HuileMoteur, "code">) => h.code.startsWith("~");
+const SECOND_MOT = /^(CONNECT|CUSTOM|COURIER)$/; // « Transit Connect » ≠ « Transit »
+const familleModele = (m: string) => {
+  const w = m.toUpperCase().replace(/[,/(|].*$/, "").split(/\s+/).map((x) => x.replace(/[^A-Z0-9-]/g, "")).filter(Boolean);
+  return (w[0] ?? "") + (SECOND_MOT.test(w[1] ?? "") ? " " + w[1] : "");
+};
+type VoitureHuile = { marque: string; modele: string; moteur: string | null; code_moteur: string | null; annee_debut: string | null; puissance: string | null };
+/** Clés possibles de la voiture (puissance exacte d'abord, puis ± 1 et ± 2 kW : Filtron donne des ch arrondis). */
+export function clesVoiture(v: VoitureHuile): string[] {
+  const cyl = (v.moteur ?? "").match(/(\d)[.,](\d)/);
+  const ch = Number((String(v.puissance ?? "").match(/\d+(?:[.,]\d+)?/) ?? [""])[0].replace(",", "."));
+  if (!cyl || !ch) return [];
+  const diesel = /TDCI|TDDI|TDE|\bTDI?\b|\bDI\b|\bD\b|DIESEL|ECOBLUE|DURATORQ|ECOTORQ|CRDI|\bDCI\b|\bHDI\b/i.test(`${v.moteur} ${v.code_moteur ?? ""}`);
+  const kw = Math.round(ch * 0.7355);
+  const base = `~${v.marque.toUpperCase().split(/[\s(]+/)[0]}|${familleModele(v.modele)}|${cyl[1]}.${cyl[2]}|${diesel ? "D" : "E"}|`;
+  return [0, -1, 1, -2, 2].map((d) => base + (kw + d));
+}
+const anneeDe = (s: string | null) => { const m = (s ?? "").match(/(\d{4})/); return m ? Number(m[1]) : null; };
+// La voiture (année de début Filtron) est-elle dans la période de la ligne ? (1 an de marge)
+function dansPeriode(variante: string, annee: number | null): boolean {
+  const m = variante.match(/^(\d{4})-(\d{4})?/);
+  if (!m || annee == null) return true;
+  return annee >= Number(m[1]) - 1 && annee <= (m[2] ? Number(m[2]) : 9999) + 1;
+}
+
+/** Huile d'une voiture Filtron : par le code moteur, sinon par modèle + cylindrée + puissance + années. */
+export function huilesDeLaVoiture(v: VoitureHuile, toutes: HuileMoteur[]): HuileMoteur[] {
+  const parCode = huilesDuMoteur(v.code_moteur, toutes, v.marque);
+  if (parCode.length) return parCode;
+  const annee = anneeDe(v.annee_debut);
+  for (const cle of clesVoiture(v)) {
+    const l = toutes.filter((h) => h.code === cle && dansPeriode(h.variante, annee));
+    if (l.length) return l.sort((a, b) => a.variante.localeCompare(b.variante));
+  }
+  return [];
 }
 
 /** Les versions proposées sont-elles « avec / sans FAP » (sinon : versions par modèle ou par année) ? */
