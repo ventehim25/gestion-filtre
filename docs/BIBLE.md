@@ -1050,6 +1050,17 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Résultat testé sur les 4 783 lignes Ford de Filtron** : **52 %** avec huile (avant 21 %). Exemples non reliés exprès : Transit 2.4 de 2000 annoncé à 115 ch par Filtron (le guide n'a que 75, 90, 120 et 125 ch à cette époque) ; camions Cargo (pas relevés).
 - **Refaire ou faire pareil pour une autre marque** : `node scripts/huiles_releve.mjs cles Ford` (liste les versions du guide avec cylindrée et puissance, lit les moteurs manquants, prépare et ajoute les lignes, sans rien remplacer).
 
+## 8.23 Huile moteur : recherche par modèle pour toutes les marques (15/11/2026)
+- **Demande de l'utilisateur** : « recherche huile de tous les véhicules » (suite du §8.22, reprise après la fermeture de la fenêtre Chromium du guide Liqui Moly — rouverte).
+- **Fait** : la méthode Ford (modèle + cylindrée + carburant + puissance + années) marche maintenant pour **les 29 marques** du relevé, quand le code moteur ne donne rien. **5 463 lignes ajoutées** (rien remplacé) → `huiles_moteurs` = **8 799 lignes** dont 5 951 « ~… ».
+  - **Mercedes et BMW** : Filtron n'écrit pas la cylindrée (« C 220 CDI (204.008) », « 320 d (E90) ») → clé par **désignation** : « ~MERCEDES|=C220|D|125 », « ~BMW|=320D|D|130 » ; Vito « 110 CDI » → « VITO110 ».
+  - noms de marque harmonisés (`cleMarque`) : Citroën/CITROEN, VW (VOLKSWAGEN)/Volkswagen → VW, MERCEDES-BENZ → MERCEDES, LAND ROVER → LANDROVER, KIA MOTORS → KIA ;
+  - diesel / essence reconnu sur plus de noms (`estDiesel` : dCi, HDi, BlueHDi, CDTI, JTD, Multijet, D-4D, DI-D, CRDi… ; essence prioritaire si TSI, TCe, PureTech, GDI, EcoBoost…) ;
+  - « L 200 » → « L200 » pour que le modèle Filtron et le guide se ressemblent.
+- **Vitesse de l'appli** : les 8 800 lignes sont chargées **en parallèle** (1re page = total, puis les autres en même temps) et rangées une fois dans un index (`indexer()` de `src/lib/huiles.ts`) : chaque fiche voiture ne reparcourt plus toute la liste.
+- **Résultat testé sur 80 432 versions Filtron (28 marques, Ford à part)** : huile trouvée **58 % → 61 %**. Plus gros gains : Jeep 1 → 51 %, Mazda 2 → 24 %, Honda 29 → 49 %, Land Rover 22 → 41 %, SsangYong 44 → 66 %, Chevrolet 14 → 33 %, Suzuki 53 → 65 %, Fiat 47 → 56 %, Kia 67 → 75 %, Peugeot 78 → 83 %, Citroën 77 → 82 %. Mercedes voitures et utilitaires légers : 94 % (le reste de Mercedes = camions, pas relevés).
+- **Outil** : `node scripts/huiles_releve.mjs cles <Marque|toutes> [--envoi] [--relire]` — sans `--envoi` rien n'est écrit en base (essai) ; versions du guide gardées dans `backups/huiles/types_<marque>.json` (`--relire` pour les relire sur le site).
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*
