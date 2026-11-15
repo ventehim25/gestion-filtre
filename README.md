@@ -54,7 +54,7 @@ Remplir `.env.local` :
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...   (facultatif : la clé publique est déjà dans src/lib/supabase.ts)
 ```
 
 ### 5. Lancer en développement
@@ -73,5 +73,5 @@ Ouvrir [http://localhost:3000](http://localhost:3000)
 2. Aller sur [vercel.com](https://vercel.com) → **New Project** → importer le repo GitHub
 3. Ajouter les variables d'environnement dans Vercel :
    - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (facultatif) et `SUPABASE_SERVICE_ROLE_KEY` (clé secrète sb_secret_…, jamais NEXT_PUBLIC_)
 4. Cliquer **Deploy** ✓

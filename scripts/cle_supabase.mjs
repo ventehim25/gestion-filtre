@@ -6,8 +6,8 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const ANON =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHN2Z29vbG96cXp4c2d3aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTA3NzYsImV4cCI6MjA5NTgyNjc3Nn0.8z624yNoX-CQirJM5VQvYyMdeOCj5jau_0BvTaMKj1c";
+const ANON = // clé publique « publishable » (15/11/2026, remplace l'ancienne clé anon JWT)
+  "sb_publishable_9YlZnsqVPH_dQ-cmZBePug_bQgsFjt1";
 
 function lireEnvLocal() {
   const f = join(ROOT, ".env.local");

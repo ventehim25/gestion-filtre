@@ -1,11 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
 
-// Valeurs publiques (la clé anon est conçue pour être exposée côté client).
-// Utilisées en repli si la variable d'env est absente ou corrompue.
+// Valeurs publiques : la clé « publishable » est faite pour être visible côté client (ce sont les règles RLS qui protègent).
+// 15/11/2026 : nouvelle clé sb_publishable_ à la place de l'ancienne clé « anon » (JWT), que Supabase arrête début 2027.
+// L'ancienne variable Vercel NEXT_PUBLIC_SUPABASE_ANON_KEY n'est plus lue (elle contient encore l'ancienne clé).
 const FALLBACK_URL = "https://wehsvgoolozqzxsgwibb.supabase.co";
 const FALLBACK_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndlaHN2Z29vbG96cXp4c2d3aWJiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyNTA3NzYsImV4cCI6MjA5NTgyNjc3Nn0.8z624yNoX-CQirJM5VQvYyMdeOCj5jau_0BvTaMKj1c";
+  "sb_publishable_9YlZnsqVPH_dQ-cmZBePug_bQgsFjt1";
 
 // Supprime BOM / caractères hors Latin-1 qui font planter Headers.set côté navigateur.
 function clean(value: string | undefined, fallback: string): string {
@@ -15,7 +16,7 @@ function clean(value: string | undefined, fallback: string): string {
 
 const supabaseUrl = clean(process.env.NEXT_PUBLIC_SUPABASE_URL, FALLBACK_URL);
 export const SUPABASE_PUBLIC_URL = supabaseUrl;
-const supabaseAnonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, FALLBACK_KEY);
+const supabaseAnonKey = clean(process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY, FALLBACK_KEY);
 
 // Sécurité (supabase/securite.sql) : dans le NAVIGATEUR, clé publique + session de l'utilisateur connecté
 // (les règles RLS ne laissent passer que l'équipe autorisée). Sur le SERVEUR (cron des relances, pages
