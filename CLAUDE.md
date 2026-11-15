@@ -20,7 +20,7 @@ Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à z
   `$env:PATH = "C:\Program Files\nodejs;C:\Users\deux\AppData\Roaming\npm;" + $env:PATH`
 - Build : `npm run build` · Déploiement : `vercel --prod --yes`
 - next.config.ts ignore les erreurs TS/ESLint (`ignoreBuildErrors`) — normal.
-- Supabase ref `wehsvgoolozqzxsgwibb`. Clé anon JWT publique en fallback dans `src/lib/supabase.ts`.
+- Supabase ref `wehsvgoolozqzxsgwibb`. Clé **publique `sb_publishable_…`** en repli dans `src/lib/supabase.ts` et `scripts/cle_supabase.mjs` (depuis le 15/11/2026 ; l'ancienne clé anon JWT s'arrête début 2027 et n'est plus utilisée ; la variable Vercel `NEXT_PUBLIC_SUPABASE_ANON_KEY` est ignorée, la variable lue est `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, facultative). Clé serveur = `sb_secret_…`.
 
 ## DDL / migrations Supabase (IMPORTANT)
 - Le **CLI Supabase est bloqué** (Smart App Control Windows) et la **clé anon ne peut pas faire de DDL**.
@@ -52,8 +52,11 @@ Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à z
 
 ## Schéma DB — détails colonnes : `src/types/database.ts`
 Tables : products, clients, sales, sale_items, vehicules, compatibilites, equivalences, applications,
-**garages**, **fournisseurs**, **receptions**, **avances**, **prospects**, rappels_vidange, demandes_manquees, push_subscriptions, vin_connus, **tournees_prevues** (veille de tournée), **reglages** (pourcentages des 4 catalogues), **huiles_moteurs** (huile par code moteur, guide Liqui Moly ; ≈ 8 800 lignes dont ≈ 5 950 « ~… » : chargées en parallèle par paquets de 1000, index des clés dans `indexer()` ; colonne `marques` = l’huile ne vaut que pour la même famille de marques, `familleMarque()` dans `src/lib/huiles.ts` ; codes « ~MARQUE|MODELE|cyl|E/D|kW » (et « ~MERCEDES|=C220|D|kW », « ~BMW|=320D|… ») = recherche par modèle + cylindrée + puissance + période pour **toutes les marques** quand le code moteur ne donne rien, `huilesDeLaVoiture()`). Vues product_vehicles, prospects_par_jour.
-RPC : `decrement_stock(p_id, qty)`, `decrement_equiv_stock(e_id, qty)` (qty négative = incrémente).
+**garages**, **fournisseurs**, **receptions**, **avances**, **prospects**, rappels_vidange, demandes_manquees, push_subscriptions, vin_connus, **tournees_prevues** (veille de tournée), **reglages** (pourcentages des 4 catalogues + `derniere_sauvegarde`), **stock_decomptes** (décomptes de stock déjà faits par ligne de vente), **huiles_moteurs** (huile par code moteur, guide Liqui Moly ; ≈ 8 800 lignes dont ≈ 5 950 « ~… » : chargées en parallèle par paquets de 1000, index des clés dans `indexer()` ; colonne `marques` = l’huile ne vaut que pour la même famille de marques, `familleMarque()` dans `src/lib/huiles.ts` ; codes « ~MARQUE|MODELE|cyl|E/D|kW » (et « ~MERCEDES|=C220|D|kW », « ~BMW|=320D|… ») = recherche par modèle + cylindrée + puissance + période pour **toutes les marques** quand le code moteur ne donne rien, `huilesDeLaVoiture()`). Vues product_vehicles, prospects_par_jour.
+RPC : `decrement_stock(p_id, qty)`, `decrement_equiv_stock(e_id, qty)` (qty négative = incrémente) ; **`decompter_stock_vente(p_sale, p_ligne, p_product, p_equiv, p_qty)`** (une seule fois par ligne de vente, table `stock_decomptes`) ; `schema_complet()` et `taille_base()` (clé serveur seulement) — tous dans `supabase/protection.sql` (BIBLE §8.24).
+- **Ventes** : toujours `addPending` puis `envoyerVente` (`src/lib/offlineSales.ts`) — jamais d'insert direct de vente/articles/stock dans la page Ventes (sinon doublons si le réseau coupe).
+- **Sauvegarde** : `backups/AAAA-MM-JJ/` contient aussi `structure.sql` (toute la structure) ; la date est notée dans `reglages` (`cle = derniere_sauvegarde`) ; le cron alerte si > 2 jours ou si la base > 400 Mo.
+- `.gitignore` ignore `*.yml` sauf `.github/workflows/*.yml` (le jeton GitHub du PC n'a pas le droit `workflow` : un push de workflow est refusé).
 Colonnes ajoutées (migrations dans `supabase/`) :
 - products : `prix_promo` (promos.sql)
 - equivalences : `prix` (vente), `prix_achat`, `stock` (equivalences_prix.sql + equivalences_stock.sql)

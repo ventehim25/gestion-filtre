@@ -191,6 +191,9 @@ En plus, **chaque jour à 13 h**, le PC fait une copie complète de la base dans
 - Une deuxième copie part aussi dans **Google Drive**, dossier **FiltroPro-sauvegardes** (visible sur ton téléphone). Si le PC tombe en panne, rien n'est perdu. Ne synchronise jamais le dossier Downloads avec Google Drive : il contient ta clé secrète.
 - Les **photos** des filtres sont aussi copiées chez toi. Si le site de MANN+HUMMEL change, l'app affiche ta copie toute seule.
 - Si un jour des données disparaissent : demande à Claude de les remettre depuis la dernière sauvegarde. Il compare d'abord, puis remet seulement ce qui manque.
+- Depuis le 15/11, chaque sauvegarde contient aussi **`structure.sql`** : le plan complet de la base (tables, règles de sécurité, fonctions). Même si Supabase perdait tout, Claude peut tout reconstruire avec ce fichier + les données.
+- **Notifications sur ton téléphone** (le matin) : « 💾 Sauvegarde en retard » si le PC n'a pas fait de copie depuis 2 jours (allume-le vers 13 h) ; « ⚠️ Base presque pleine » si la base dépasse 400 Mo (108 Mo le 15/11, le maximum gratuit est 500 Mo).
+- **Ventes** : chaque vente est d'abord gardée dans le téléphone, puis envoyée. Si le réseau coupe au milieu, elle repart toute seule plus tard, sans doublon et sans compter le stock deux fois.
 
 ## 13. Prévenir les clients la veille d'une tournée
 
