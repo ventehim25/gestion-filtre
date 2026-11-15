@@ -48,6 +48,7 @@ wa-*.png
 chatgpt.png
 tarif.png
 *.yml
+!.github/workflows/*.yml
 
 # Prospects : contacts gardés en local (dépôt public)
 docs/prospects/*/*.csv

@@ -29,6 +29,10 @@ export async function GET(req: Request) {
     }
   }
 
+  // Garde la base Supabase éveillée (plan gratuit : pause après ~7 jours sans requête) — AVANT tout le reste,
+  // pour que la requête parte même si une variable manque plus bas.
+  await supabase.from("products").select("id", { count: "exact", head: true }).limit(1);
+
   const priv = process.env.VAPID_PRIVATE_KEY;
   if (!priv) return Response.json({ ok: false, error: "VAPID_PRIVATE_KEY manquante (à ajouter dans les variables Vercel)" }, { status: 500 });
   webpush.setVapidDetails("mailto:ventehim@gmail.com", VAPID_PUBLIC, priv);
