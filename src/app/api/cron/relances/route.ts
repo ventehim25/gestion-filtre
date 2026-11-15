@@ -146,5 +146,18 @@ export async function GET(req: Request) {
     });
   }
 
+  // 6) Base presque pleine (plan gratuit Supabase = 500 Mo ; au-delà elle passe en lecture seule : plus de ventes
+  //    enregistrées). taille_base() vient de supabase/sauvegarde_structure.sql ; absente = on ne dit rien.
+  try {
+    const t = await supabase.rpc("taille_base" as never);
+    const mo = Math.round(Number(t.data ?? 0) / 1048576);
+    if (mo > 0) result.taille_base_mo = mo;
+    if (mo > 400) result.taille_sent = await sendToAll({
+      title: "⚠️ Base FiltroPro presque pleine",
+      body: `${mo} Mo sur 500 Mo (plan gratuit Supabase). Demande à Claude de faire de la place avant qu'elle soit pleine.`,
+      url: "/", tag: "taille-base",
+    });
+  } catch { /* fonction pas encore créée */ }
+
   return Response.json({ ok: true, ...result });
 }

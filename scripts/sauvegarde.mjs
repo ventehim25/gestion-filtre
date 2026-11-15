@@ -116,6 +116,24 @@ for (const t of tables) {
   console.log(`${ok ? "✔" : "✖"} ${t.nom.padEnd(24)} ${String(relu).padStart(7)} lignes  ${(contenu.length / 1024).toFixed(0).padStart(6)} Ko${ok ? "" : `  (attendu ${total})`}`);
 }
 
+// Structure complète (tables, règles, fonctions, vues) + taille : fonctions de supabase/sauvegarde_structure.sql.
+// Tant que ce SQL n'est pas collé, on le signale sans compter d'erreur (les données sont quand même sauvegardées).
+{
+  const s = await sb.rpc("schema_complet");
+  if (!s.error && typeof s.data === "string" && s.data.includes("create table")) {
+    writeFileSync(join(temporaire, "structure.sql"), s.data, "utf8");
+    manifeste.structure = { fichier: "structure.sql", octets: Buffer.byteLength(s.data) };
+    console.log(`✔ structure.sql (${(Buffer.byteLength(s.data) / 1024).toFixed(0)} Ko : tables, règles, fonctions, vues)`);
+  } else console.log(`… structure non sauvegardée (coller supabase/sauvegarde_structure.sql) : ${s.error?.message ?? "réponse vide"}`);
+  const t = await sb.rpc("taille_base");
+  if (!t.error && Number(t.data) > 0) {
+    const mo = Math.round(Number(t.data) / 1048576);
+    manifeste.taille_base_mo = mo;
+    console.log(`${mo > 400 ? "⚠" : "✔"} taille de la base : ${mo} Mo sur 500 Mo (plan gratuit)${mo > 400 ? " — PRESQUE PLEINE" : ""}`);
+    if (mo > 400) problemes++;
+  }
+}
+
 writeFileSync(join(temporaire, "manifeste.json"), JSON.stringify(manifeste, null, 2));
 rmSync(cible, { recursive: true, force: true });
 renameSync(temporaire, cible);
