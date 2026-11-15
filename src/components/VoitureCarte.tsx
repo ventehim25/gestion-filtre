@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import { type Voiture, LIBELLE, annees, kitDeVoiture, messageKit } from "@/lib/voitures";
-import { type BidonHuile, bidonsConvenables, bidonsPourVidange, chargerHuiles, huilesDuMoteur, litresTexte, variantePrevue } from "@/lib/huiles";
+import { type BidonHuile, bidonsConvenables, bidonsPourVidange, chargerHuiles, huilesDuMoteur, litresTexte, variantePrevue, versionsFap } from "@/lib/huiles";
 import type { HuileMoteur } from "@/types/database";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { Package, Send, Droplet } from "lucide-react";
@@ -21,10 +21,10 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
 
   useEffect(() => {
     chargerHuiles().then(({ huiles: toutes, bidons: b }) => {
-      const lignes = huilesDuMoteur(v.code_moteur, toutes);
-      setHuiles(lignes); setBidons(b); setVariante(variantePrevue(v.moteur, lignes)); setHuilesChargees(toutes.length > 0);
+      const lignes = huilesDuMoteur(v.code_moteur, toutes, v.marque);
+      setHuiles(lignes); setBidons(b); setVariante(variantePrevue(v.moteur, lignes, v.modele)); setHuilesChargees(toutes.length > 0);
     });
-  }, [v.code_moteur, v.moteur]);
+  }, [v.code_moteur, v.moteur, v.marque, v.modele]);
 
   const kit = kitDeVoiture(v);
   const huile = huiles.find((h) => h.variante === variante) ?? null; // choisie (ou seule possible)
@@ -91,7 +91,9 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
                   {h.variante || "toutes versions"}
                 </button>
               ))}
-              {!variante && <span className="text-xs text-slate-400 self-center">Avec ou sans filtre à particules (FAP) ? Choisis.</span>}
+              {!variante && <span className="text-xs text-slate-400 self-center">
+                {versionsFap(huiles) ? "Avec ou sans filtre à particules (FAP) ? Choisis." : "Le guide donne une huile différente selon la version : choisis la bonne."}
+              </span>}
             </div>
           )}
           {huiles.filter((h) => !variante || h.variante === variante).map((h) => {

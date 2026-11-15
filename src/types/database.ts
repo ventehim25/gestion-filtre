@@ -197,6 +197,7 @@ export type HuileMoteur = {
   litres_max: number | null;
   source: string | null;
   remarque: string | null;
+  marques?: string[] | null; // marques où ce code a été relevé (vide = toutes), supabase/huiles_marques.sql
   modifie_le: string;
 };
 

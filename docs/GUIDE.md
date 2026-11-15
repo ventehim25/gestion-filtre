@@ -206,7 +206,8 @@ Pourquoi pas d'envoi tout seul ? WhatsApp bloque les numéros qui envoient le m�
 ## 14. Kit de filtres et huile par voiture
 
 Dans **Recherche** (VIN, code moteur ou « Par marque »), chaque voiture montre :
-- ses filtres, puis la ligne **« Huile moteur »** : les viscosités possibles (ex. 5W-40 · 10W-40) et la quantité (ex. 4,4 à 4,8 L), d'après le guide Liqui Moly, avec les bidons que tu as **en stock**. Si l'huile change avec ou sans filtre à particules (FAP), touche la bonne version.
+- ses filtres, puis la ligne **« Huile moteur »** : les viscosités possibles (ex. 5W-40 · 10W-40) et la quantité (ex. 4,4 à 4,8 L), d'après le guide Liqui Moly, avec les bidons que tu as **en stock**. Si l'huile change avec ou sans filtre à particules (FAP), ou selon la version (ex. « Euro 5 » / « Euro 6 »), touche la bonne version. Si tu lis « vérifier sur la jauge », la quantité change selon la voiture : remplis jusqu'au repère de la jauge.
+- Depuis le 15/11, l'huile est connue pour environ 2 700 moteurs (Dacia, Renault, Peugeot, Citroën, VW, Hyundai, Kia, Toyota, BMW…). Pour un moteur pas encore connu, la fiche donne un lien vers le guide Liqui Moly.
 - la barre **« Kit »** : les 4 filtres (+ l'huile) avec le total. **« 🧾 Vendre ce kit »** remplit la vente d'un coup ; **« WhatsApp »** envoie la liste et les prix au client.
 
 ## 15. Tes 4 catalogues de prix

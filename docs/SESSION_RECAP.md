@@ -5,7 +5,10 @@
 
 ---
 
-## ▶ REPRENDRE ICI (fin de session du 14/11/2026, 20 h 45)
+## ▶ REPRENDRE ICI (mis à jour le 15/11/2026)
+
+**Huile pour tous les modèles courants (15/11)** — demande « fais-le sans rien oublier » : FAIT (BIBLE §8.21). 6 715 versions lues dans le guide Liqui Moly (29 marques, voitures + utilitaires) → `huiles_moteurs` = **2 826 lignes / 2 726 codes**. Nouvelle colonne `marques` (`supabase/huiles_marques.sql`, exécutée « Success ») : l'huile ne s'affiche que pour la même famille de marques (« F4A » Ford ≠ Iveco). Codes à huiles différentes selon la version → jusqu'à 3 versions au choix (choix auto par le modèle). Couverture voitures/utilitaires 56 % (Dacia 89 %, Renault 80 %, Peugeot 78 %, VW 73 %…). Outil reprenable : `node scripts/huiles_releve.mjs collecte | fusion | envoi` (données dans `backups/huiles/`). **À faire si l'utilisateur le demande** : Ford (codes Filtron « Duratorq »/« Zetec » → relier par cylindrée et années ?), Mercedes voitures, Mazda.
+
 
 **Fait les 13-14/11** (détails plus bas et BIBLE §8.13-8.14) :
 1. Onglet « Par marque » de `/recherche` : marque → modèle → moteur → filtres ; moteurs rangés par type puis par date.
