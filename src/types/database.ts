@@ -195,10 +195,10 @@ export type HuileMoteur = {
   norme: string | null;
   litres_min: number | null;
   litres_max: number | null;
-  source: string | null;
+  source?: string | null; // pas chargée par l'appli (src/lib/huiles.ts, COLONNES)
   remarque: string | null;
   marques?: string[] | null; // marques où ce code a été relevé (vide = toutes), supabase/huiles_marques.sql
-  modifie_le: string;
+  modifie_le?: string; // idem
 };
 
 export type Application = {

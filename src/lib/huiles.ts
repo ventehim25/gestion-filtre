@@ -205,20 +205,45 @@ export function bidonsPourVidange(h: HuileMoteur, bidons: BidonHuile[]): { bidon
 }
 
 // Toutes les lignes d'huile (environ 2 600 moteurs : par paquets de 1000, la limite Supabase)
-// ≈ 8 000 lignes : la 1re page donne le total, les suivantes sont lues en même temps (ordre code + variante = unique)
+// ≈ 8 800 lignes (≈ 2,4 Mo) : gardées dans le CACHE du navigateur (Cache API, pas localStorage : celui-ci garde les
+// ventes hors-ligne et ne fait que ~5 Mo). On ne retélécharge que si la base a changé (nombre de lignes + dernière
+// modification), ou au bout de 7 jours. Sans réseau : la copie gardée sert (huile visible hors-ligne).
+const COLONNES = "code, variante, description, viscosites, norme, litres_min, litres_max, remarque, marques"; // pas source ni modifie_le (inutiles à l'écran)
+const CACHE_NOM = "filtropro-huiles-v1";
+const CACHE_URL = "/__cache/huiles.json";
+type CopieHuiles = { version: string; le: number; lignes: HuileMoteur[] };
+
+async function lireCopie(): Promise<CopieHuiles | null> {
+  try {
+    if (typeof caches === "undefined") return null;
+    const r = await (await caches.open(CACHE_NOM)).match(CACHE_URL);
+    return r ? ((await r.json()) as CopieHuiles) : null;
+  } catch { return null; }
+}
+async function garderCopie(c: CopieHuiles) {
+  try {
+    if (typeof caches === "undefined") return;
+    await (await caches.open(CACHE_NOM)).put(CACHE_URL, new Response(JSON.stringify(c), { headers: { "Content-Type": "application/json" } }));
+  } catch { /* cache plein ou refusé : tant pis, on relira la base */ }
+}
+
 async function toutesLesHuiles(): Promise<HuileMoteur[]> {
-  const page = (a: number) => supabase.from("huiles_moteurs").select("*").order("code").order("variante").range(a, a + 999);
-  const premiere = await supabase.from("huiles_moteurs").select("*", { count: "exact" }).order("code").order("variante").range(0, 999);
-  if (premiere.error) return []; // table absente = pas encore de données
-  const out = [...((premiere.data ?? []) as HuileMoteur[])];
-  const total = premiere.count ?? out.length;
+  const copie = await lireCopie();
+  // Version de la base : une seule petite requête (nombre de lignes + date de la dernière modification)
+  const v = await supabase.from("huiles_moteurs").select("modifie_le", { count: "exact" }).order("modifie_le", { ascending: false }).limit(1);
+  if (v.error) return copie?.lignes ?? []; // hors-ligne (ou table absente) : la copie gardée, sinon rien
+  const total = v.count ?? 0;
+  const version = `${total}|${(v.data?.[0] as { modifie_le?: string } | undefined)?.modifie_le ?? ""}`;
+  if (copie && copie.version === version && Date.now() - copie.le < 7 * 864e5) return copie.lignes;
+
+  // Pages de 1000 lues en même temps (ordre code + variante = unique, donc pages sans trou ni doublon)
   const debuts: number[] = [];
-  for (let a = 1000; a < total; a += 1000) debuts.push(a);
-  for (const r of await Promise.all(debuts.map(page))) {
-    if (r.error) break;
-    out.push(...((r.data ?? []) as HuileMoteur[]));
-  }
-  return out;
+  for (let a = 0; a < total; a += 1000) debuts.push(a);
+  const pages = await Promise.all(debuts.map((a) => supabase.from("huiles_moteurs").select(COLONNES).order("code").order("variante").range(a, a + 999)));
+  if (pages.some((r) => r.error)) return copie?.lignes ?? [];
+  const lignes = pages.flatMap((r) => (r.data ?? []) as unknown as HuileMoteur[]);
+  await garderCopie({ version, le: Date.now(), lignes });
+  return lignes;
 }
 
 // Chargé une fois par page
