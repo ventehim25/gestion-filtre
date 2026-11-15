@@ -116,7 +116,7 @@ for (const t of tables) {
   console.log(`${ok ? "✔" : "✖"} ${t.nom.padEnd(24)} ${String(relu).padStart(7)} lignes  ${(contenu.length / 1024).toFixed(0).padStart(6)} Ko${ok ? "" : `  (attendu ${total})`}`);
 }
 
-// Structure complète (tables, règles, fonctions, vues) + taille : fonctions de supabase/sauvegarde_structure.sql.
+// Structure complète (tables, règles, fonctions, vues) + taille : fonctions de supabase/protection.sql.
 // Tant que ce SQL n'est pas collé, on le signale sans compter d'erreur (les données sont quand même sauvegardées).
 {
   const s = await sb.rpc("schema_complet");
@@ -124,7 +124,7 @@ for (const t of tables) {
     writeFileSync(join(temporaire, "structure.sql"), s.data, "utf8");
     manifeste.structure = { fichier: "structure.sql", octets: Buffer.byteLength(s.data) };
     console.log(`✔ structure.sql (${(Buffer.byteLength(s.data) / 1024).toFixed(0)} Ko : tables, règles, fonctions, vues)`);
-  } else console.log(`… structure non sauvegardée (coller supabase/sauvegarde_structure.sql) : ${s.error?.message ?? "réponse vide"}`);
+  } else console.log(`… structure non sauvegardée (coller supabase/protection.sql) : ${s.error?.message ?? "réponse vide"}`);
   const t = await sb.rpc("taille_base");
   if (!t.error && Number(t.data) > 0) {
     const mo = Math.round(Number(t.data) / 1048576);
@@ -159,6 +159,15 @@ if (copie) {
     problemes++;
     console.log(`✖ copie impossible vers ${copie} : ${e.message}`);
   }
+}
+
+// Date de cette sauvegarde notée dans la base (reglages « derniere_sauvegarde ») : le cron du matin
+// (/api/cron/relances) prévient sur le téléphone si elle a plus de 2 jours (PC éteint, sauvegarde en panne).
+{
+  const { error } = await sb.from("reglages").upsert(
+    { cle: "derniere_sauvegarde", valeur: { le: new Date().toISOString(), jour, problemes, copie_drive: !!copie } },
+    { onConflict: "cle" });
+  if (error) console.log(`… date de sauvegarde non notée dans la base : ${error.message}`);
 }
 
 console.log(`=== ${problemes ? `ATTENTION : ${problemes} problème(s)` : "TERMINÉ sans erreur"} en ${Math.round((Date.now() - debut) / 1000)} s ===`);

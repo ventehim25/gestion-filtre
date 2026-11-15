@@ -147,9 +147,9 @@ export async function GET(req: Request) {
   }
 
   // 6) Base presque pleine (plan gratuit Supabase = 500 Mo ; au-delà elle passe en lecture seule : plus de ventes
-  //    enregistrées). taille_base() vient de supabase/sauvegarde_structure.sql ; absente = on ne dit rien.
+  //    enregistrées). taille_base() vient de supabase/protection.sql ; absente = on ne dit rien.
   try {
-    const t = await supabase.rpc("taille_base" as never);
+    const t = await supabase.rpc("taille_base");
     const mo = Math.round(Number(t.data ?? 0) / 1048576);
     if (mo > 0) result.taille_base_mo = mo;
     if (mo > 400) result.taille_sent = await sendToAll({
@@ -158,6 +158,21 @@ export async function GET(req: Request) {
       url: "/", tag: "taille-base",
     });
   } catch { /* fonction pas encore créée */ }
+
+  // 7) Sauvegarde du PC en retard (scripts/sauvegarde.mjs note sa date dans reglages « derniere_sauvegarde »)
+  try {
+    const { data } = await supabase.from("reglages").select("valeur").eq("cle", "derniere_sauvegarde").maybeSingle();
+    const le = (data?.valeur as { le?: string } | null)?.le;
+    if (le) {
+      const jours = Math.floor((Date.now() - new Date(le).getTime()) / 864e5);
+      result.sauvegarde_jours = jours;
+      if (jours >= 2) result.sauvegarde_sent = await sendToAll({
+        title: "💾 Sauvegarde FiltroPro en retard",
+        body: `Dernière copie de la base il y a ${jours} jours. Allume le PC vers 13 h (la sauvegarde se fait toute seule), ou demande à Claude de vérifier.`,
+        url: "/", tag: "sauvegarde",
+      });
+    }
+  } catch { /* pas encore de date notée */ }
 
   return Response.json({ ok: true, ...result });
 }

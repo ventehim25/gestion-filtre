@@ -1,4 +1,8 @@
--- FiltroPro — sauvegarde de la STRUCTURE de la base + taille (15/11/2026, BIBLE §8.24)
+-- FiltroPro — PROTECTION (15/11/2026, BIBLE §8.24) — un seul collage dans l'éditeur SQL Supabase.
+-- A) sauvegarde de la STRUCTURE de la base + taille ; B) ventes sans double décompte du stock.
+-- Idempotent : peut être recollé sans risque.
+--
+-- ===== A) STRUCTURE + TAILLE =====
 -- La sauvegarde quotidienne (scripts/sauvegarde.mjs) copie les DONNÉES. Si le projet Supabase était perdu,
 -- il faudrait aussi recréer les tables, règles, fonctions et vues : schema_complet() les écrit en SQL,
 -- et la sauvegarde l'enregistre chaque jour dans backups/AAAA-MM-JJ/structure.sql.
@@ -16,9 +20,38 @@ create or replace function public.schema_complet() returns text
 language plpgsql security definer set search_path = '' as $$
 declare
   sortie text := '-- Structure FiltroPro générée le ' || pg_catalog.now()::text || E' par public.schema_complet()\n'
-              || E'-- Ordre : tables, contraintes, index, fonctions, vues, déclencheurs, RLS + règles, droits, buckets photos.\n\n';
+              || E'-- Ordre : extensions, types, séquences, tables, contraintes, index, fonctions, vues, déclencheurs,\n'
+              || E'-- RLS + règles, droits, buckets photos.\n\n';
   r record;
 begin
+  -- 0a) Extensions (sauf celles toujours présentes)
+  for r in
+    select e.extname, n.nspname from pg_catalog.pg_extension e join pg_catalog.pg_namespace n on n.oid = e.extnamespace
+    where e.extname not in ('plpgsql') order by e.extname
+  loop
+    sortie := sortie || 'create extension if not exists ' || quote_ident(r.extname) || ' with schema ' || quote_ident(r.nspname) || E';\n';
+  end loop;
+
+  -- 0b) Types « liste de valeurs » (enum)
+  for r in
+    select t.typname, string_agg(quote_literal(e.enumlabel), ', ' order by e.enumsortorder) as valeurs
+    from pg_catalog.pg_type t join pg_catalog.pg_enum e on e.enumtypid = t.oid
+    where t.typnamespace = 'public'::regnamespace group by t.typname order by t.typname
+  loop
+    sortie := sortie || 'create type public.' || quote_ident(r.typname) || ' as enum (' || r.valeurs || E');\n';
+  end loop;
+
+  -- 0c) Séquences (compteurs) qui ne viennent pas d'une colonne « identity »
+  for r in
+    select c.relname from pg_catalog.pg_class c
+    where c.relnamespace = 'public'::regnamespace and c.relkind = 'S'
+      and not exists (select 1 from pg_catalog.pg_depend d where d.objid = c.oid and d.deptype = 'i')
+    order by c.relname
+  loop
+    sortie := sortie || 'create sequence if not exists public.' || quote_ident(r.relname) || E';\n';
+  end loop;
+  sortie := sortie || E'\n';
+
   -- 1) Tables et colonnes
   for r in
     select c.oid, c.relname from pg_catalog.pg_class c
@@ -133,5 +166,36 @@ begin
 end $$;
 revoke all on function public.schema_complet() from public, anon, authenticated;
 grant execute on function public.schema_complet() to service_role;
+
+
+-- ===== B) VENTES SANS DOUBLE DÉCOMPTE DU STOCK =====
+-- Le téléphone envoie la vente étape par étape (src/lib/offlineSales.ts). Si le réseau coupe juste après un décompte
+-- de stock, le téléphone ne sait pas s'il est passé : il réessaie. decompter_stock_vente() note (vente, ligne) et
+-- décompte dans la MÊME opération : le 2e envoi de la même ligne ne décompte plus rien (renvoie false).
+create table if not exists public.stock_decomptes (
+  sale_id uuid not null references public.sales(id) on delete cascade,
+  ligne integer not null,
+  cree_le timestamptz not null default now(),
+  primary key (sale_id, ligne)
+);
+alter table public.stock_decomptes enable row level security;
+drop policy if exists equipe on public.stock_decomptes;
+create policy equipe on public.stock_decomptes for all to authenticated
+  using ((select public.est_autorise())) with check ((select public.est_autorise()));
+
+create or replace function public.decompter_stock_vente(p_sale uuid, p_ligne integer, p_product uuid, p_equiv uuid, p_qty integer)
+returns boolean language plpgsql set search_path = '' as $$
+begin
+  insert into public.stock_decomptes (sale_id, ligne) values (p_sale, p_ligne) on conflict do nothing;
+  if not found then return false; end if; -- déjà décompté lors d'un envoi précédent
+  if p_equiv is not null then
+    update public.equivalences set stock = stock - p_qty where id = p_equiv;
+  else
+    update public.products set stock = stock - p_qty where id = p_product;
+  end if;
+  return true;
+end $$;
+revoke execute on function public.decompter_stock_vente(uuid, integer, uuid, uuid, integer) from public, anon;
+grant execute on function public.decompter_stock_vente(uuid, integer, uuid, uuid, integer) to authenticated;
 
 notify pgrst, 'reload schema';
