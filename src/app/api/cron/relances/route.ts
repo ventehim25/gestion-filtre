@@ -174,5 +174,21 @@ export async function GET(req: Request) {
     }
   } catch { /* pas encore de date notée */ }
 
+  // 8) Rappel : désactiver les anciennes clés Supabase (nouvelle clé publique en ligne depuis le 15/11/2026, BIBLE §8.24).
+  //    À partir du 22/11/2026, tous les 3 jours, jusqu'à ce que Claude note reglages « anciennes_cles_desactivees »
+  //    (ou jusqu'au 01/03/2027 : Supabase les aura arrêtées de toute façon).
+  try {
+    const debut = Date.parse("2026-11-22T00:00:00Z"), fin = Date.parse("2027-03-01T00:00:00Z");
+    const jours = Math.floor((Date.now() - debut) / 864e5);
+    if (jours >= 0 && Date.now() < fin && jours % 3 === 0) {
+      const { data } = await supabase.from("reglages").select("cle").eq("cle", "anciennes_cles_desactivees").maybeSingle();
+      if (!data) result.anciennes_cles_sent = await sendToAll({
+        title: "🔑 Rappel FiltroPro : ancienne clé Supabase",
+        body: "La nouvelle clé marche depuis une semaine. Ouvre FiltroPro sur chaque téléphone, puis dis à Claude « désactiver l'ancienne clé » (2 minutes, il te guide).",
+        url: "/", tag: "anciennes-cles",
+      });
+    }
+  } catch { /* rappel facultatif */ }
+
   return Response.json({ ok: true, ...result });
 }
