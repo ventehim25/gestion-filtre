@@ -6,3 +6,5 @@ set "PATH=C:\Program Files\nodejs;%PATH%"
 if not exist backups mkdir backups
 echo ===== %date% %time% >> backups\journal.log
 node scripts\sauvegarde.mjs >> backups\journal.log 2>&1
+rem Copie des voitures pour Vidani (assistant WhatsApp des garages, BIBLE 8.25) : seulement si le dossier Vidani existe
+if exist "C:\Users\deux\Desktop\Assistant WhatsApp Garages\vidani-bot\donnees" node scripts\export_vidani.mjs >> backups\journal.log 2>&1
