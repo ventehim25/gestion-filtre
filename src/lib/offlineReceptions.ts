@@ -5,7 +5,7 @@
 import { supabase } from "./supabase";
 import type { ProductCategory, ReceptionLigne } from "@/types/database";
 
-// Pièce pas encore dans l'appli (distribution : Filtron n'en fait pas) : créée à l'envoi (BIBLE §8.30)
+// Pièce pas encore dans l'appli (distribution, freinage… : Filtron n'en fait pas) : créée à l'envoi (BIBLE §8.30-8.31)
 export type NouvellePiece = { categorie: ProductCategory; marque: string; reference: string; nom: string };
 export type RecLigneAttente = {
   product_id: string; equivalence_id: string | null; quantite: number; prix_achat: number; prix_vente: number;
@@ -52,8 +52,8 @@ async function creerPieces(r: ReceptionAttente) {
         prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 1, notes: null,
       }).select("id").single();
       if (error && !/duplicate|unique/i.test(error.message)) {
-        throw /categorie_check/i.test(error.message)
-          ? new Error("Catégorie pas encore acceptée par la base : colle supabase/categories_distribution.sql dans Supabase (la réception attend, rien n'est perdu).")
+        throw /categorie_(check|fkey)/i.test(error.message)
+          ? new Error("Catégorie pas encore acceptée par la base : colle supabase/categories_produits.sql dans Supabase (la réception attend, rien n'est perdu).")
           : error;
       }
       id = (data as { id: string } | null)?.id ?? await trouver();

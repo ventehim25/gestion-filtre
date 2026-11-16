@@ -44,6 +44,8 @@ export type Database = {
       huiles_moteurs: Table<HuileMoteur, "modifie_le" | "viscosites" | "variante">;
       // Décomptes de stock déjà faits par ligne de vente (supabase/protection.sql) : jamais deux fois
       stock_decomptes: Table<{ sale_id: string; ligne: number; cree_le: string }, "cree_le">;
+      // Catégories permises (products.categorie → clé étrangère) — supabase/categories_produits.sql, BIBLE §8.31
+      categories_produits: Table<{ cle: string; famille: string; libelle: string; ajoutee_le: string }, "ajoutee_le">;
     };
     Views: {
       prospects_par_jour: { Row: { jour: string; source: string; nb: number }; Relationships: [] };
@@ -232,11 +234,44 @@ export type ProductCategory =
   | "filtre_carburant"
   | "filtre_habitacle"
   | "filtre_refroidissement"
+  | "filtration_autre"
   | "huile_moteur"
-  | "chaine_distribution"
-  | "courroie_distribution"
-  | "pompe_eau"
+  | "accessoires_vidange"
+  | "outils_vidange"
   | "kit_distribution"
+  | "kit_distribution_pompe"
+  | "courroie_distribution"
+  | "galet_distribution"
+  | "chaine_distribution"
+  | "pompe_eau"
+  | "kit_courroie_accessoire"
+  | "courroie_accessoire"
+  | "poulie"
+  | "plaquette_frein"
+  | "disque_frein"
+  | "frein_hydraulique"
+  | "frein_tambour"
+  | "capteur_cable_frein"
+  | "kit_embrayage"
+  | "accessoire_boite"
+  | "embrayage_autre"
+  | "batterie"
+  | "alternateur"
+  | "demarreur"
+  | "outil_batterie"
+  | "alterno_demarreur"
+  | "essuie_glace"
+  | "essuyage_phares"
+  | "leve_vitre"
+  | "serrure"
+  | "verin"
+  | "commande_pedalier"
+  | "electricite_habitacle"
+  | "amortisseur"
+  | "suspension_essieu"
+  | "transmission"
+  | "rotule_direction"
+  | "moyeu_roulement"
   | "autre";
 
 export type Product = {

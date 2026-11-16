@@ -4,11 +4,11 @@ import { Fragment, useEffect, useState } from "react";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
-import type { TranslationKey } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
-import { DEPART, DISTRIBUTION_BRANDS, chargerMarques, ajouterMarque, marquesPour } from "@/lib/brands";
-import { CATEGORIES, CATEGORY_KEYS as categoryKeys, estDistribution, estFiltre } from "@/lib/categories";
+import { DEPART, chargerMarques, ajouterMarque, marquesPour, marqueVarianteDefaut as varDefaut } from "@/lib/brands";
+import { CATEGORY_KEYS as categoryKeys, estFiltre, familleDe, correspondCategorie } from "@/lib/categories";
+import CategoryOptions from "@/components/CategoryOptions";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
 import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle, Camera } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
@@ -24,13 +24,9 @@ import { CATALOGUES, POURCENTAGES_DEFAUT, chargerPourcentages, prixPour, type Po
 const MANUELS_VIDES = { prix_particulier: 0, prix_location: 0, prix_magasin: 0 };
 const COL_CAT = { particulier: "prix_particulier", location: "prix_location", magasin: "prix_magasin" } as const;
 
-// Catégories : liste commune (src/lib/categories.ts), filtres + huile + distribution (BIBLE §8.30)
-// Marque proposée par défaut pour une nouvelle variante : Flag pour un filtre, la 1re marque de distribution
-// différente de la marque principale pour une pièce de distribution.
-const varDefaut = (categorie: string, marque?: string) =>
-  estDistribution(categorie) ? (DISTRIBUTION_BRANDS.find(m => m !== marque) ?? "Dayco") : "Flag";
-const ERREUR_CATEGORIE = "La base n'accepte pas encore cette catégorie.\nColle d'abord le fichier supabase/categories_distribution.sql dans l'éditeur SQL de Supabase, puis réessaie.";
-const msgErreur = (e: { message: string } | null) => e && (/categorie_check/i.test(e.message) ? ERREUR_CATEGORIE : `Erreur : ${e.message}`);
+// Catégories : liste commune en 9 familles (src/lib/categories.ts, BIBLE §8.31) ; marques par métier (src/lib/brands.ts)
+const ERREUR_CATEGORIE = "La base n'accepte pas encore cette catégorie.\nColle d'abord le fichier supabase/categories_produits.sql dans l'éditeur SQL de Supabase, puis réessaie.";
+const msgErreur = (e: { message: string } | null) => e && (/categorie_(check|fkey)/i.test(e.message) ? ERREUR_CATEGORIE : `Erreur : ${e.message}`);
 
 const empty = { nom_fr: "", nom_ar: "", reference: "", marque: "Filtron", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0, code_barre: "", image_url: "" };
 
@@ -256,12 +252,11 @@ export default function ProduitsPage() {
   const KNOWN_BRANDS = new Set([...BRANDS.filter(b => b !== "Filtron"), "OE"].map(b => b.toLowerCase()));
   // Toutes les marques possibles pour un PRODUIT (filtres + distribution + huiles moteur, produits indépendants
   // sans système de variantes) — utilisé pour le filtre de la liste.
-  const OIL_BRANDS = ["Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
-  const PRODUCT_BRANDS = [...BRANDS, ...OIL_BRANDS];
+  const PRODUCT_BRANDS = BRANDS; // filtres, huile, distribution, freinage… + marques ajoutées
   // Fiche produit : les marques du métier de la pièce (filtres ou distribution), la marque choisie toujours présente
-  const formDistribution = estDistribution(form.categorie);
-  const FORM_BRANDS = formDistribution ? marquesPour(BRANDS, true, form.marque) : [...marquesPour(BRANDS, false, form.marque), ...OIL_BRANDS.filter(b => b !== form.marque)];
-  const VARIANT_BRANDS = marquesPour(BRANDS, formDistribution, newEquiv.marque).filter(b => b !== "Filtron" && b !== form.marque);
+  const formFiltre = estFiltre(form.categorie);
+  const FORM_BRANDS = marquesPour(BRANDS, form.categorie, form.marque);
+  const VARIANT_BRANDS = marquesPour(BRANDS, form.categorie, newEquiv.marque).filter(b => b !== "Filtron" && b !== form.marque);
   const marquePrincipale = form.marque || "Filtron";
   const [brandFilter, setBrandFilter] = useState("");
   const [refSearch, setRefSearch] = useState("");
@@ -280,9 +275,9 @@ export default function ProduitsPage() {
     const refN = norm(refSearch);
     const matchRef = !refSearch || norm(p.reference).startsWith(refN) || eqs.some(e => norm(e.reference).startsWith(refN));
     const matchBrand = !brandFilter || (p.marque ?? "Filtron").toLowerCase() === brandFilter.toLowerCase();
-    const matchCat = !catFilter || p.categorie === catFilter;
+    const matchCat = correspondCategorie(catFilter, p.categorie); // une catégorie ou « toute la famille »
     // Préfixes camion = règle des références FILTRON seulement (une réf Gates/Dolz n'en dit rien)
-    const matchKind = !kindFilter || classifyKind(estDistribution(p.categorie) ? "" : p.reference, vehMap[p.id]?.makes) === kindFilter;
+    const matchKind = !kindFilter || classifyKind(estFiltre(p.categorie) ? p.reference : "", vehMap[p.id]?.makes) === kindFilter;
     return matchSearch && matchRef && matchBrand && matchCat && matchKind;
   }).sort((a, b) => {
     // Disponibles en HAUT, ruptures en BAS (un produit est « dispo » si son stock
@@ -335,7 +330,7 @@ export default function ProduitsPage() {
         </select>
         <select className="input w-44" value={catFilter} onChange={e => setCatFilter(e.target.value)}>
           <option value="">{t("category")} — tous</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{t(categoryKeys[c])}</option>)}
+          <CategoryOptions t={t} avecFamilles />
         </select>
         <button onClick={() => setShowCost(v => !v)} title={t("buyPrice")}
           className="btn-secondary flex items-center gap-2 shrink-0">
@@ -359,14 +354,12 @@ export default function ProduitsPage() {
               <div><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
                 <select className="input" value={form.categorie} onChange={e => {
                   const c = e.target.value as ProductCategory;
-                  const versDistrib = estDistribution(c) && !estDistribution(form.categorie);
-                  const versFiltre = !estDistribution(c) && estDistribution(form.categorie);
-                  // Filtron ne fait pas de distribution : on fait choisir la vraie marque (et l'inverse)
-                  const marque = versDistrib && form.marque === "Filtron" ? "" : versFiltre && !form.marque ? "Filtron" : form.marque;
+                  // Filtron ne fait que des filtres : hors filtres, on fait choisir la vraie marque (et l'inverse)
+                  const marque = !estFiltre(c) && form.marque === "Filtron" ? "" : estFiltre(c) && !form.marque ? "Filtron" : form.marque;
                   setForm({ ...form, categorie: c, marque });
-                  if (versDistrib || versFiltre) setNewEquiv(n => ({ ...n, marque: varDefaut(c, marque) }));
+                  if (familleDe(c) !== familleDe(form.categorie) || c === "huile_moteur" || form.categorie === "huile_moteur") setNewEquiv(n => ({ ...n, marque: varDefaut(c, marque) }));
                 }}>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{t(categoryKeys[c])}</option>)}
+                  <CategoryOptions t={t} />
                 </select>
               </div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("buyPrice")} (MAD)</label><input type="number" className="input" value={form.prix_achat} onChange={e => setForm({ ...form, prix_achat: +e.target.value })} /></div>
@@ -398,7 +391,7 @@ export default function ProduitsPage() {
               </div>
               {/* Photo du filtre (pour le catalogue) */}
               <div className="col-span-2">
-                <label className="text-xs text-slate-500 mb-1 block">📷 Photo {formDistribution ? "de la pièce" : "du filtre"} (catalogue)</label>
+                <label className="text-xs text-slate-500 mb-1 block">📷 Photo {formFiltre ? "du filtre" : "de la pièce"} (catalogue)</label>
                 <div className="flex items-center gap-3">
                   <FilterImage reference={form.reference || "?"} categorie={form.categorie} imageUrl={form.image_url || undefined} wid={160} zoom={false}
                     className="h-16 w-16 rounded-lg object-contain bg-white p-1 border border-slate-300 shrink-0" />

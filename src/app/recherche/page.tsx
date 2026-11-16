@@ -14,8 +14,9 @@ import VoiceButton from "@/components/VoiceButton";
 import RechercheVin from "@/components/RechercheVin";
 import CatalogueMarques from "@/components/CatalogueMarques";
 import { constructeur, anneeProbable, nettoyerVin } from "@/lib/vin";
-import { CATEGORIES, CATEGORY_KEYS, estDistribution } from "@/lib/categories";
+import { CATEGORY_KEYS, estFiltre, familleDe, type Famille } from "@/lib/categories";
 import { DEPART, chargerMarques, marquesPour } from "@/lib/brands";
+import CategoryOptions from "@/components/CategoryOptions";
 
 type Vehicule = {
   id: string;
@@ -133,12 +134,13 @@ export default function RecherchePage() {
       filtre_carburant: "bg-rose-100 text-rose-700",
       filtre_habitacle: "bg-emerald-100 text-emerald-700",
       huile_moteur: "bg-orange-100 text-orange-700",
-      chaine_distribution: "bg-violet-100 text-violet-700",
-      courroie_distribution: "bg-indigo-100 text-indigo-700",
-      pompe_eau: "bg-cyan-100 text-cyan-700",
-      kit_distribution: "bg-fuchsia-100 text-fuchsia-700",
     };
-    return map[cat] ?? "bg-slate-100 text-slate-600";
+    // Hors filtres : une couleur par famille (distribution, freinage…)
+    const parFamille: Partial<Record<Famille, string>> = {
+      distribution: "bg-violet-100 text-violet-700", freinage: "bg-red-100 text-red-700", embrayage: "bg-indigo-100 text-indigo-700",
+      train: "bg-teal-100 text-teal-700", electrique: "bg-yellow-100 text-yellow-700", essuyage: "bg-cyan-100 text-cyan-700", habitacle: "bg-fuchsia-100 text-fuchsia-700",
+    };
+    return map[cat] ?? parFamille[familleDe(cat)] ?? "bg-slate-100 text-slate-600";
   };
 
   // ---------- Recherche par référence ----------
@@ -180,7 +182,6 @@ export default function RecherchePage() {
   function toggleDetails(id: string) { setOpenDetails(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
 
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
-  const ADD_CATS = CATEGORIES;
   // Marques : celles du métier de la pièce (filtres ou distribution, BIBLE §8.30) + celles ajoutées par l'utilisateur
   const [toutesMarques, setToutesMarques] = useState<string[]>(DEPART);
   useEffect(() => { chargerMarques().then(setToutesMarques); }, []);
@@ -189,10 +190,8 @@ export default function RecherchePage() {
   const [addForm, setAddForm] = useState(emptyAdd);
   const [addSaving, setAddSaving] = useState(false);
   const [addScan, setAddScan] = useState(false);
-  const addDistrib = estDistribution(addForm.categorie);
-  const ADD_BRANDS = addDistrib
-    ? marquesPour(toutesMarques, true, addForm.marque)
-    : [...marquesPour(toutesMarques, false, addForm.marque), "OE", "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"].filter((b, i, a) => a.indexOf(b) === i);
+  const addFiltre = estFiltre(addForm.categorie);
+  const ADD_BRANDS = [...marquesPour(toutesMarques, addForm.categorie, addForm.marque), ...(addFiltre ? ["OE"] : [])];
   function openAdd() { setAddForm({ ...emptyAdd, reference: refQuery.trim().toUpperCase() }); setShowAdd(true); }
   async function saveNew() {
     const ref = addForm.reference.trim();
@@ -239,8 +238,8 @@ export default function RecherchePage() {
     const { error } = await supabase.from("products").insert(payload);
     setAddSaving(false);
     if (error) {
-      alert(/categorie_check/i.test(error.message)
-        ? "La base n'accepte pas encore cette catégorie.\nColle d'abord le fichier supabase/categories_distribution.sql dans l'éditeur SQL de Supabase, puis réessaie."
+      alert(/categorie_(check|fkey)/i.test(error.message)
+        ? "La base n'accepte pas encore cette catégorie.\nColle d'abord le fichier supabase/categories_produits.sql dans l'éditeur SQL de Supabase, puis réessaie."
         : "Erreur : " + error.message);
       return;
     }
@@ -674,9 +673,9 @@ export default function RecherchePage() {
                   {ADD_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
                 </select></div>
               {addForm.marque && addForm.marque !== "Filtron" && (
-                addDistrib ? (
+                !addFiltre ? (
                   <div className="col-span-2"><label className="text-xs text-amber-400 mb-1 block">Même pièce déjà enregistrée sous une autre marque ? <span className="text-slate-500 font-normal">(sa référence, pour rattacher comme variante)</span></label>
-                    <input className="input font-mono uppercase" placeholder="ex : la réf. Gates du même kit — laisse vide si aucune" value={addForm.filtronRef} onChange={e => setAddForm({ ...addForm, filtronRef: e.target.value.toUpperCase() })} /></div>
+                    <input className="input font-mono uppercase" placeholder="ex : la réf. de la même pièce chez une autre marque — laisse vide si aucune" value={addForm.filtronRef} onChange={e => setAddForm({ ...addForm, filtronRef: e.target.value.toUpperCase() })} /></div>
                 ) : (
                   <div className="col-span-2"><label className="text-xs text-amber-400 mb-1 block">Référence Filtron équivalente <span className="text-slate-500 font-normal">(pour rattacher sous le Filtron)</span></label>
                     <input className="input font-mono uppercase" placeholder="ex : OE667/6 — laisse vide si aucune" value={addForm.filtronRef} onChange={e => setAddForm({ ...addForm, filtronRef: e.target.value.toUpperCase() })} /></div>
@@ -685,11 +684,11 @@ export default function RecherchePage() {
               <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
                 <select className="input" value={addForm.categorie} onChange={e => {
                   const c = e.target.value as ProductCategory;
-                  // Filtron ne fait pas de distribution : on fait choisir la vraie marque (et l'inverse)
-                  const marque = estDistribution(c) && addForm.marque === "Filtron" ? "" : !estDistribution(c) && !addForm.marque ? "Filtron" : addForm.marque;
+                  // Filtron ne fait que des filtres : hors filtres, on fait choisir la vraie marque (et l'inverse)
+                  const marque = !estFiltre(c) && addForm.marque === "Filtron" ? "" : estFiltre(c) && !addForm.marque ? "Filtron" : addForm.marque;
                   setAddForm({ ...addForm, categorie: c, marque });
                 }}>
-                  {ADD_CATS.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
+                  <CategoryOptions t={t} />
                 </select></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("buyPrice")} (MAD)</label>
                 <input type="number" className="input" value={addForm.prix_achat || ""} placeholder="0" onChange={e => setAddForm({ ...addForm, prix_achat: +e.target.value })} /></div>

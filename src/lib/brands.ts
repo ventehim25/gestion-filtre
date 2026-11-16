@@ -1,6 +1,7 @@
-// Marques gérées comme « variantes de marque » (prix/stock propres) : filtres + distribution.
+// Marques gérées comme « variantes de marque » (prix/stock propres) : filtres, huile, distribution, freinage…
 // Les autres équivalences (~23 000) sont des codes OE constructeur : utiles à la recherche seulement.
 import { supabase } from "./supabase";
+import { familleDe, estFiltre, type Famille } from "./categories";
 
 // Marques de départ. 16/11/2026 : + SIMI, Meat & Doria, Gold Filter, Tech Filter, Fuji, Kraftstofffilter
 // (demande de l'utilisateur, marques vues en magasin ; « Kraftstofffilter » est le nom écrit sur ses boîtes).
@@ -12,17 +13,42 @@ export const FILTER_BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosc
 // ces noms-là sont déjà pris par ≈ 1 700 codes constructeur (OE) importés de Filtron (BIBLE §8.30).
 export const DISTRIBUTION_BRANDS = ["Gates", "Dayco", "Continental", "Dolz", "SKF", "INA", "Febi", "Valeo", "Bosch", "Aisin", "NTN-SNR", "Metelli", "Graf", "Hepu", "Saleri SIL", "Airtex", "Optibelt", "Iwis", "Ruville", "Eurorepar", "Motrio", "Renault Origine", "PSA Origine"];
 
-export const DEPART = [...FILTER_BRANDS, ...DISTRIBUTION_BRANDS.filter((m) => !FILTER_BRANDS.includes(m))];
+// Marques par famille de pièces (BIBLE §8.31) — noms de marques seulement, aucune référence créée.
+// Vérifié le 16/11 : aucun de ces noms n'est déjà porté par des codes constructeur (OE) de la base
+// (« Boge » volontairement absent : 27 codes OE portent ce nom).
+const ORIGINE = ["Eurorepar", "Motrio", "Renault Origine", "PSA Origine"];
+export const OIL_BRANDS = ["Castrol", "Total", "Motul", "Mannol", "Liqui Moly", "Shell", "Mobil", "Elf", "Petronas", "Fanfaro", "Pemko", "Kansler"];
+export const FREINAGE_BRANDS = ["Bosch", "TRW", "Brembo", "Ferodo", "ATE", "Textar", "Jurid", "Valeo", "Delphi", "Mintex", "Bendix", "ICER", ...ORIGINE];
+export const EMBRAYAGE_BRANDS = ["Valeo", "LuK", "Sachs", "Exedy", "Aisin", "SKF", "INA", "Febi", ...ORIGINE];
+export const TRAIN_BRANDS = ["Monroe", "Sachs", "KYB", "Bilstein", "TRW", "Lemförder", "Moog", "Delphi", "SKF", "FAG", "NTN-SNR", "Febi", "Meyle", "GSP", "Optimal", "Ruville", ...ORIGINE];
+export const ELECTRIQUE_BRANDS = ["Varta", "Bosch", "Exide", "Fulmen", "Tudor", "Electra", "Valeo", "Denso", "Magneti Marelli", "Hella", ...ORIGINE];
+export const ESSUYAGE_BRANDS = ["Bosch", "Valeo", "Champion", "Denso", "Hella", ...ORIGINE];
+export const HABITACLE_BRANDS = ["Valeo", "Bosch", "Febi", "Magneti Marelli", "Hella", "Stabilus", "Topran", ...ORIGINE];
 
-/** Liste de marques à proposer pour une pièce : celles de son métier (filtres ou distribution) + celles ajoutées
- *  par l'utilisateur, et toujours la marque déjà choisie (sinon le menu l'afficherait vide). */
-export function marquesPour(toutes: string[], distribution: boolean, actuelle?: string | null): string[] {
+const PAR_FAMILLE: Record<Famille, string[]> = {
+  filtres_huile: FILTER_BRANDS, distribution: DISTRIBUTION_BRANDS, freinage: FREINAGE_BRANDS, embrayage: EMBRAYAGE_BRANDS,
+  train: TRAIN_BRANDS, electrique: ELECTRIQUE_BRANDS, essuyage: ESSUYAGE_BRANDS, habitacle: HABITACLE_BRANDS, autre: FILTER_BRANDS,
+};
+/** Marques de départ du métier d'une catégorie (huile moteur : marques d'huile). */
+export const marquesBase = (categorie?: string | null): string[] =>
+  categorie === "huile_moteur" ? OIL_BRANDS : PAR_FAMILLE[familleDe(categorie)];
+
+// Toutes les marques de départ (sans doublon) : toutes reconnues comme « variantes de marque »
+export const DEPART = [FILTER_BRANDS, OIL_BRANDS, DISTRIBUTION_BRANDS, FREINAGE_BRANDS, EMBRAYAGE_BRANDS, TRAIN_BRANDS, ELECTRIQUE_BRANDS, ESSUYAGE_BRANDS, HABITACLE_BRANDS]
+  .flat().filter((m, i, a) => a.indexOf(m) === i);
+
+/** Liste de marques à proposer pour une pièce : celles de son métier + celles ajoutées par l'utilisateur,
+ *  et toujours la marque déjà choisie (sinon le menu l'afficherait vide). */
+export function marquesPour(toutes: string[], categorie?: string | null, actuelle?: string | null): string[] {
   const ajoutees = toutes.filter((m) => !DEPART.some((d) => d.toLowerCase() === m.toLowerCase()));
-  const base = distribution ? DISTRIBUTION_BRANDS : FILTER_BRANDS;
-  const out = [...base, ...ajoutees];
+  const out = [...marquesBase(categorie), ...ajoutees];
   if (actuelle && actuelle !== "__new__" && actuelle !== "__ajout__" && !out.some((m) => m.toLowerCase() === actuelle.toLowerCase())) out.push(actuelle);
   return out;
 }
+
+/** Marque proposée pour une nouvelle variante : Flag pour un filtre, sinon la 1re marque du métier ≠ marque de la fiche. */
+export const marqueVarianteDefaut = (categorie?: string | null, marque?: string | null) =>
+  estFiltre(categorie) ? "Flag" : (marquesBase(categorie).find((m) => m !== marque) ?? "Bosch");
 
 // Marques ajoutées par l'utilisateur lui-même (« ➕ Nouvelle marque… » en Réception et en Produits) :
 // gardées dans la base, réglage « marques_filtres » (table reglages), donc partout et sur tous les appareils.

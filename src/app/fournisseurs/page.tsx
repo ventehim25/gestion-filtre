@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
-import { FILTER_BRANDS, DEPART, DISTRIBUTION_BRANDS, chargerMarques, ajouterMarque, marquesPour } from "@/lib/brands";
-import { CATEGORY_KEYS, estDistribution, estFiltre } from "@/lib/categories";
+import { DEPART, chargerMarques, ajouterMarque, marquesPour, marquesBase, marqueVarianteDefaut } from "@/lib/brands";
+import { CATEGORY_KEYS, FAMILLES, familleDe, creables, estFiltre, type Famille } from "@/lib/categories";
 import { translations } from "@/lib/i18n";
 import CategoryIcon from "@/components/CategoryIcon";
 import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, donnerPortefeuille, totauxPortefeuille, insererAvance, textePaiement, marquerChequeEncaisse, type BonPortefeuille, type Paiement } from "@/lib/dinoun";
@@ -21,20 +21,10 @@ import {
 type RecLine = {
   product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; prix_vente: number; reference: string;
   code_barre: string; nouvelleMarque: string | null; nouvelleRef: string; // marque === "__new__" : variante créée à l'enregistrement
-  nouvellePiece: NouvellePiece | null; // pièce pas encore dans l'appli (distribution), créée à l'enregistrement
+  nouvellePiece: NouvellePiece | null; // pièce pas encore dans l'appli (distribution, freinage…), créée à l'enregistrement
 };
-// « Je reçois » : la famille choisie limite la recherche (et les marques) des lignes — BIBLE §8.30.
-// Filtron ne fait pas de distribution : ces pièces-là se créent directement sur la ligne (« ➕ Nouvelle pièce »).
-type Famille = "filtres" | "huile" | "distribution" | "pompe";
-const FAMILLES: { k: Famille; label: string; icone: ProductCategory }[] = [
-  { k: "filtres", label: "Filtres", icone: "filtre_huile" },
-  { k: "huile", label: "Huile", icone: "huile_moteur" },
-  { k: "distribution", label: "Distribution", icone: "kit_distribution" },
-  { k: "pompe", label: "Pompe à eau", icone: "pompe_eau" },
-];
-const familleDe = (c: string): Famille => c === "huile_moteur" ? "huile" : c === "pompe_eau" ? "pompe" : estDistribution(c) ? "distribution" : "filtres";
-// Types proposés pour une nouvelle pièce (libellés FR de l'appli)
-const TYPES_PIECE: ProductCategory[] = ["kit_distribution", "courroie_distribution", "chaine_distribution", "pompe_eau"];
+// « Je reçois » : la famille choisie (9 familles, src/lib/categories.ts) limite la recherche et les marques des lignes
+// — BIBLE §8.30-8.31. Filtron ne fait que des filtres : les autres pièces se créent sur la ligne (« ➕ Nouvelle pièce »).
 const libelleCat = (c: ProductCategory) => translations.fr[CATEGORY_KEYS[c]];
 const FAMILLE_KEY = "fp_reception_famille";
 type BonARembourser = { id: string; date: string; client: string; cout: number };
@@ -45,7 +35,7 @@ function waLink(tel: string) { return `https://wa.me/212${tel.replace(/\D/g, "")
 export default function FournisseursPage() {
   // Marques de filtres : celles de départ + celles ajoutées par l'utilisateur (« ➕ Nouvelle marque… »)
   const [marques, setMarques] = useState<string[]>(DEPART);
-  const [famille, setFamilleState] = useState<Famille>("filtres");
+  const [famille, setFamilleState] = useState<Famille>("filtres_huile");
   useEffect(() => { try { const v = localStorage.getItem(FAMILLE_KEY); if (v && FAMILLES.some(x => x.k === v)) setFamilleState(v as Famille); } catch { /* stockage bloqué */ } }, []);
   const setFamille = (k: Famille) => { setFamilleState(k); try { localStorage.setItem(FAMILLE_KEY, k); } catch { /* stockage bloqué */ } };
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
@@ -296,7 +286,7 @@ export default function FournisseursPage() {
   }
   // Réf. tapée introuvable → nouvelle pièce sur cette ligne (type selon la famille choisie, marque à choisir)
   function nouvellePieceSurLigne(i: number, reference: string) {
-    const categorie: ProductCategory = famille === "pompe" ? "pompe_eau" : "kit_distribution";
+    const categorie: ProductCategory = FAMILLES.find(f => f.k === famille)?.nouveau ?? "autre";
     setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: "", equivalence_id: null, marque: "Filtron", reference: "", nouvelleMarque: null, nouvelleRef: "",
       nouvellePiece: { categorie, marque: "", reference: reference.trim().toUpperCase().replace(/\s+/g, " "), nom: "" } } : l));
   }
@@ -312,8 +302,8 @@ export default function FournisseursPage() {
       // Un code scanné/saisi à la main (inconnu) suit la ligne ; un code déjà connu suit sa marque
       const connus = new Set([p.code_barre, ...(variantsMap[l.product_id] ?? []).map(x => x.code_barre)].filter(Boolean));
       const garde = l.code_barre && !connus.has(l.code_barre) ? l.code_barre : null;
-      // Marque proposée : Flag pour un filtre, une marque de distribution (≠ celle de la fiche) pour une pièce de distribution
-      const defaut = estDistribution(p.categorie) ? (DISTRIBUTION_BRANDS.find(m => m !== p.marque) ?? "Dayco") : FILTER_BRANDS[1];
+      // Marque proposée : Flag pour un filtre, sinon une marque du métier de la pièce (≠ celle de la fiche)
+      const defaut = marqueVarianteDefaut(p.categorie, p.marque);
       if (marque === "__new__") return { ...l, equivalence_id: null, marque: "__new__", nouvelleMarque: defaut, nouvelleRef: "", code_barre: garde ?? "" };
       if (marque === "Filtron") return { ...l, equivalence_id: null, marque: "Filtron", reference: p.reference, prix_achat: p.prix_achat, prix_vente: p.prix_vente, code_barre: garde ?? p.code_barre ?? "", nouvelleMarque: null };
       const v = (variantsMap[l.product_id] || []).find(x => x.marque === marque);
@@ -373,7 +363,8 @@ export default function FournisseursPage() {
     vs.map(v => ({ id: v.id, product_id, marque: v.marque, reference: v.reference }))), [variantsMap]);
   // Recherche limitée à la famille choisie (« Je reçois ») ; le scan, lui, reconnaît toutes les boîtes
   const produitsFamille = useMemo(() => products.filter(p => familleDe(p.categorie) === famille), [products, famille]);
-  const pieceNouvellePossible = famille === "distribution" || famille === "pompe";
+  const typesPiece = creables(famille); // tout sauf les filtres Filtron
+  const pieceNouvellePossible = typesPiece.length > 0;
   async function saveReception() {
     if (!recFor) return;
     // Nouvelle pièce dont la référence existe déjà (tapée sans la voir) : on prend la fiche existante
@@ -785,12 +776,12 @@ export default function FournisseursPage() {
             </div>
             {/* « Je reçois » : la recherche des lignes ne montre que cette famille (et ses marques) — BIBLE §8.30 */}
             <p className="text-[10px] uppercase text-slate-500 mb-1">Je reçois</p>
-            <div className="grid grid-cols-4 gap-1.5 mb-3">
+            <div className="grid grid-cols-3 gap-1.5 mb-3">
               {FAMILLES.map(x => (
                 <button key={x.k} type="button" onClick={() => setFamille(x.k)}
                   className={`flex flex-col items-center justify-center gap-1 rounded-lg py-2 px-1 text-[11px] font-semibold leading-tight text-center transition-colors ${
                     famille === x.k ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-900/40" : "bg-[var(--surface-2)] text-slate-300 hover:text-white"}`}>
-                  <CategoryIcon categorie={x.icone} size={18} /> {x.label}
+                  <CategoryIcon categorie={x.icone} size={18} /> {x.court}
                 </button>
               ))}
             </div>
@@ -805,7 +796,7 @@ export default function FournisseursPage() {
               {products.length > 0 && pieceNouvellePossible && (
                 <p className="text-[11px] text-amber-300/90">
                   {produitsFamille.length === 0 ? "Aucune pièce de ce type dans l'appli pour l'instant. " : `${produitsFamille.length} pièce(s) déjà enregistrée(s). `}
-                  Tape la réf. écrite sur la boîte : si elle n&apos;existe pas, touche « ➕ Nouvelle pièce » (créée à l&apos;enregistrement).
+                  Tape la réf. écrite sur la boîte : si elle n&apos;existe pas, touche « ➕ Nouvelle pièce » (créée à l&apos;enregistrement){famille === "filtres_huile" ? " — huile, accessoires ou outils ; un filtre se choisit toujours par sa réf. Filtron" : ""}.
                 </p>
               )}
               <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-slate-500">
@@ -823,7 +814,7 @@ export default function FournisseursPage() {
                         </div>
                       ) : (
                         <ProductPicker products={produitsFamille} variants={pickerVariants} value={l.product_id}
-                          placeholder={famille === "filtres" ? undefined : famille === "huile" ? "Réf. de l'huile…" : "Réf. Gates, Dayco, Dolz, SKF…"}
+                          placeholder={famille === "filtres_huile" ? undefined : `Réf. ${marquesBase(FAMILLES.find(f => f.k === famille)?.nouveau).slice(0, 3).join(", ")}…`}
                           onCreate={pieceNouvellePossible ? (ref) => nouvellePieceSurLigne(i, ref) : undefined}
                           onSelect={(p, v) => { setRecProduct(i, p); if (v) setRecVariant(i, v.marque); }} />
                       )}
@@ -841,7 +832,7 @@ export default function FournisseursPage() {
                     <div className="grid grid-cols-2 gap-2 mt-1">
                       <label className="text-[10px] uppercase text-slate-500">Type
                         <select className="input mt-0.5 py-1 text-xs" value={l.nouvellePiece.categorie} onChange={e => patchPiece(i, { categorie: e.target.value as ProductCategory })}>
-                          {TYPES_PIECE.map(c => <option key={c} value={c}>{libelleCat(c)}</option>)}
+                          {[...typesPiece, ...(typesPiece.includes(l.nouvellePiece.categorie) ? [] : [l.nouvellePiece.categorie])].map(c => <option key={c} value={c}>{libelleCat(c)}</option>)}
                         </select>
                       </label>
                       <label className="text-[10px] uppercase text-slate-500">Marque
@@ -855,7 +846,7 @@ export default function FournisseursPage() {
                           if (r.marque) patchPiece(i, { marque: r.marque });
                         }}>
                           {!l.nouvellePiece.marque && <option value="">— choisis —</option>}
-                          {marquesPour(marques, true, l.nouvellePiece.marque).map(b => <option key={b} value={b}>{b}</option>)}
+                          {marquesPour(marques, l.nouvellePiece.categorie, l.nouvellePiece.marque).map(b => <option key={b} value={b}>{b}</option>)}
                           <option value="__ajout__">➕ Nouvelle marque…</option>
                         </select>
                       </label>
@@ -894,7 +885,7 @@ export default function FournisseursPage() {
                         {(variantsMap[l.product_id] ?? []).map(v => (
                           <option key={v.id} value={v.marque}>{v.reference} · {v.marque}</option>
                         ))}
-                        <option value="__new__">+ Autre marque ({estDistribution(p?.categorie) ? "Gates, Dayco, Dolz, SKF…" : "Mann, Wix, Mahle, Purflux, Mecafilter…"})</option>
+                        <option value="__new__">+ Autre marque ({estFiltre(p?.categorie) ? "Mann, Wix, Mahle, Purflux, Mecafilter" : marquesBase(p?.categorie).filter(m => m !== p?.marque).slice(0, 4).join(", ")}…)</option>
                       </select>
                     );
                   })()}
@@ -911,7 +902,7 @@ export default function FournisseursPage() {
                           if (r.erreur) { alert(r.erreur); return; }
                           if (r.marque) patchLine(i, { nouvelleMarque: r.marque });
                         }}>
-                          {marquesPour(marques, estDistribution(products.find(x => x.id === l.product_id)?.categorie), l.nouvelleMarque).filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
+                          {marquesPour(marques, products.find(x => x.id === l.product_id)?.categorie, l.nouvelleMarque).filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
                           <option value="__ajout__">➕ Nouvelle marque…</option>
                         </select>
                       </label>

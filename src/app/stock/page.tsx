@@ -11,11 +11,12 @@ import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { queueStock, pendingStockCount, syncStock } from "@/lib/offlineStock";
-import { CATEGORIES, CATEGORY_KEYS as categoryKeys } from "@/lib/categories";
+import { CATEGORY_KEYS as categoryKeys, correspondCategorie } from "@/lib/categories";
 import { DEPART } from "@/lib/brands";
+import CategoryOptions from "@/components/CategoryOptions";
 
 // Catégories et marques : listes communes (filtres + huile + distribution, BIBLE §8.30)
-const BRANDS = [...DEPART, "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
+const BRANDS = DEPART;
 const PAGE_SIZE = 60;
 
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe
@@ -160,7 +161,7 @@ export default function StockPage() {
   const filtered = useMemo(() => products.filter(p => {
     const matchRef = !refSearch || p.reference.toUpperCase().includes(refSearch) || p.nom_fr.toLowerCase().includes(refSearch.toLowerCase());
     const matchBrand = !brandFilter || (p.marque ?? "Filtron").toLowerCase() === brandFilter.toLowerCase();
-    const matchCat = !catFilter || p.categorie === catFilter;
+    const matchCat = correspondCategorie(catFilter, p.categorie); // une catégorie ou « toute la famille »
     const matchOut = !onlyOut || effStock(p) <= 0;
     return matchRef && matchBrand && matchCat && matchOut;
   }).sort((a, b) => refCompare(a.reference, b.reference)),
@@ -322,7 +323,7 @@ export default function StockPage() {
         </select>
         <select className="input w-44" value={catFilter} onChange={e => setCatFilter(e.target.value)}>
           <option value="">{t("category")} — tous</option>
-          {CATEGORIES.map(c => <option key={c} value={c}>{t(categoryKeys[c])}</option>)}
+          <CategoryOptions t={t} avecFamilles />
         </select>
         <button onClick={() => setOnlyOut(v => !v)}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${

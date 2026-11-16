@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { cameraPlaceholder, logoPlaceholder } from "@/lib/filterPhotos";
 import { getImgIdx, setImgIdx } from "@/lib/imgMemo";
 import { s7Name, photoCopieUrl } from "@/lib/photoCopie";
-import { estDistribution } from "@/lib/categories";
+import { photoMann } from "@/lib/categories";
 import { X } from "lucide-react";
 
 function s7(ref: string, suffix: string, wid: number) {
@@ -16,8 +16,8 @@ function bigger(src: string) {
 export default function FilterImage({
   reference, categorie, imageUrl, className, wid = 160, zoom = true, placeholder = "camera",
 }: { reference: string; categorie: string; imageUrl?: string | null; className?: string; wid?: number; zoom?: boolean; placeholder?: "camera" | "logo" }) {
-  // Pièce de distribution (Gates, Dayco…) : pas de photo chez MANN+HUMMEL → seulement la photo prise par l'utilisateur
-  const mann = !estDistribution(categorie);
+  // Pièce qui n'est pas un filtre (distribution, train, huile…) : pas de photo chez MANN+HUMMEL → seulement la photo prise par l'utilisateur
+  const mann = photoMann(categorie);
   const candidates = [
     ...(imageUrl ? [`${imageUrl}?qlt=82&wid=${wid}`] : []),
     ...(mann ? [

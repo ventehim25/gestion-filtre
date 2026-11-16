@@ -6,16 +6,12 @@ import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Product, Application, Equivalence } from "@/types/database";
 import FilterImage from "@/components/FilterImage";
+import { libelleCategorie } from "@/lib/categories";
 
 export const revalidate = 86400; // ISR : page régénérée au plus toutes les 24 h
 
 const TEL_WA = "212602350290";
-const CAT_FR: Record<string, string> = {
-  filtre_huile: "Filtre à huile", filtre_air: "Filtre à air", filtre_carburant: "Filtre à carburant",
-  filtre_habitacle: "Filtre d'habitacle", filtre_refroidissement: "Filtre de refroidissement",
-  huile_moteur: "Huile moteur", chaine_distribution: "Chaîne de distribution", courroie_distribution: "Courroie de distribution",
-  pompe_eau: "Pompe à eau", kit_distribution: "Kit de distribution", autre: "Pièce auto",
-};
+// Libellé de la catégorie : liste commune libelleCategorie (src/lib/categories.ts, BIBLE §8.31)
 
 type Row = Product & { equivalences: Equivalence[]; applications: Application[] };
 
@@ -37,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ ref: stri
   const { ref } = await params;
   const p = await getProduct(ref);
   if (!p) return { title: "Référence introuvable — FiltroPro" };
-  const cat = CAT_FR[p.categorie] ?? "Pièce auto";
+  const cat = libelleCategorie(p.categorie);
   const vehs = (p.applications ?? []).slice(0, 3).map(a => `${a.marque} ${a.modele}`).join(", ");
   return {
     title: `${cat} ${p.reference} ${p.marque ?? "Filtron"}${vehs ? ` — compatible ${vehs.split(",")[0]}` : ""} — Maroc | FiltroPro`,
@@ -50,7 +46,7 @@ export default async function CataloguePage({ params }: { params: Promise<{ ref:
   const { ref } = await params;
   const p = await getProduct(ref);
   if (!p) notFound();
-  const cat = CAT_FR[p.categorie] ?? "Pièce auto";
+  const cat = libelleCategorie(p.categorie);
   const apps = p.applications ?? [];
   const marques = [...new Set((p.equivalences ?? []).map(e => `${e.marque} ${e.reference}`))];
   const dispo = p.stock > 0 || (p.equivalences ?? []).some(e => e.stock > 0);
