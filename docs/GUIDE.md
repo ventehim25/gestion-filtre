@@ -261,7 +261,7 @@ Tu tapes **un seul prix** : le prix garage (comme avant). Les autres se calculen
 1. Accueil → **Réception** → choisis **Chez** (dinoun / filtropro).
 2. **Je reçois** → la famille (ex. **Freinage**).
 3. Sur la ligne, tape la **réf. écrite sur la boîte**. Elle n'existe pas encore → touche **« ➕ Nouvelle pièce »**.
-4. Choisis le **Type** (ex. Plaquettes de frein) et la **Marque** : la liste suit la famille (freinage : Bosch, TRW, Brembo, Ferodo…; distribution : Gates, Dayco, Dolz…; batteries : Varta, Bosch, Exide…), ou « ➕ Nouvelle marque… ».
+4. Choisis le **Type** (ex. Plaquettes de frein) et la **Marque** : la liste suit la famille (freinage : Bosch, TRW, Brembo, Ferodo…; distribution : Gates, Dayco, Dolz…; batteries : Varta, Bosch, Exide…), ou « ➕ Nouvelle marque… » : la marque ajoutée est **rattachée à la famille** de la pièce (une marque d'huile ajoutée n'apparaît pas dans Freinage).
 5. Qté, prix d'achat, prix de vente, code-barres (scanne la boîte) → **Enregistrer**. La fiche est créée toute seule (même hors-ligne). La fois suivante, la boîte est reconnue au scan.
 - **Un filtre** se choisit toujours par sa réf. Filtron (pas de « Nouvelle pièce » pour les filtres).
 - **Même pièce chez une autre marque** : Produits → la fiche → « Variantes de marque », ou en Réception « + Autre marque » sous la ligne. Chaque marque garde son prix et son stock.
