@@ -84,8 +84,9 @@ export type CatItem = {
   reference: string; marque: string; categorie: string;
   prix: number; promo: boolean; prixAvant?: number;
   imageUrl?: string | null; aliases?: string[]; productId?: string;
+  ficheRef?: string; // réf. de la fiche produit (page publique /c/…), BIBLE §8.32
 };
-export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null; aliases?: string[]; productId?: string };
+export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null; aliases?: string[]; productId?: string; ficheRef?: string };
 
 type ProdRow = PrixManuels & { id: string; reference: string; marque: string | null; categorie: string; stock: number; image_url: string | null; prix_vente?: number; prix_promo?: number | null };
 type ParentRow = { categorie: string | null; image_url: string | null; reference: string | null } | null;
@@ -158,10 +159,10 @@ function mergeAliases<T extends { productId?: string; aliases?: string[] }>(item
 export async function loadPublicCatalogueItems(): Promise<PubItem[]> {
   const [prods, eqs] = await Promise.all([stockProducts(false), stockEquivs(false)]);
   const items: PubItem[] = [];
-  for (const p of prods) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id });
+  for (const p of prods) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id, ficheRef: p.reference });
   for (const e of eqs) {
     const parentRef = e.products?.reference ? [norm(e.products.reference)] : [];
-    items.push({ reference: e.reference, marque: e.marque, categorie: e.products?.categorie ?? "autre", imageUrl: e.products?.image_url ?? null, aliases: [norm(e.reference), ...parentRef], productId: e.product_id });
+    items.push({ reference: e.reference, marque: e.marque, categorie: e.products?.categorie ?? "autre", imageUrl: e.products?.image_url ?? null, aliases: [norm(e.reference), ...parentRef], productId: e.product_id, ficheRef: e.products?.reference ?? undefined });
   }
   items.sort((a, b) => catOrder(a.categorie) - catOrder(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
   writeCache(PUB_CACHE, items);
@@ -191,7 +192,7 @@ export async function loadCatalogueItems(type: TypeCatalogue = "garage"): Promis
       items.push({
         reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie,
         prix: promo ? prixPour(type, p.prix_promo as number, null, pct) : prixNormal, promo,
-        prixAvant: promo ? prixNormal : undefined, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id,
+        prixAvant: promo ? prixNormal : undefined, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id, ficheRef: p.reference,
       });
     }
   }
@@ -201,7 +202,7 @@ export async function loadCatalogueItems(type: TypeCatalogue = "garage"): Promis
       items.push({
         reference: e.reference, marque: e.marque, categorie: e.products?.categorie ?? "autre",
         prix: prixPour(type, e.prix, e, pct), promo: false, imageUrl: e.products?.image_url ?? null,
-        aliases: [norm(e.reference), ...parentRef], productId: e.product_id,
+        aliases: [norm(e.reference), ...parentRef], productId: e.product_id, ficheRef: e.products?.reference ?? undefined,
       });
     }
   }

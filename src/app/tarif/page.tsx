@@ -6,7 +6,9 @@ export const dynamic = "force-dynamic";
 // Panier + quantités → message WhatsApp formaté « QTÉ RÉF » qui rentre dans /commandes.
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { CatItem, CAT_FR, CAT_ORDER, loadCatalogueItems, enrichTarifAliases, cachedTarifItems } from "@/lib/catalogue";
+import { CatItem, loadCatalogueItems, enrichTarifAliases, cachedTarifItems } from "@/lib/catalogue";
+import { FamilleChips, SectionsParFamille, DetailsArticle } from "@/components/CatalogueFamilles";
+import type { Famille } from "@/lib/categories";
 import { typeDeCle, infoCatalogue } from "@/lib/prixCatalogues";
 import FilterImage from "@/components/FilterImage";
 
@@ -25,7 +27,8 @@ function TarifInner() {
   const [items, setItems] = useState<CatItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [cat, setCat] = useState<string>("");
+  const [famille, setFamille] = useState<Famille | "">(""); // familles de pièces (BIBLE §8.32)
+  const [ouvert, setOuvert] = useState<string | null>(null);  // article dont les détails sont ouverts
   const [cart, setCart] = useState<Record<string, number>>({});
 
   useEffect(() => {
@@ -50,25 +53,15 @@ function TarifInner() {
     setCart(prev => { const k = keyOf(i); const next = { ...prev }; if (n === 0) delete next[k]; else next[k] = n; return next; });
   }
 
-  const cats = useMemo(() => {
-    const present = new Set(items.map(i => i.categorie));
-    return CAT_ORDER.filter(c => present.has(c));
-  }, [items]);
-
+  // Recherche (la famille est appliquée par SectionsParFamille, qui montre aussi les rubriques sans stock)
   const filtered = useMemo(() => {
     const s = q.trim().toUpperCase().replace(/\s+/g, "");
     return items.filter(i =>
-      (!cat || i.categorie === cat) &&
-      (!s || i.reference.toUpperCase().replace(/\s+/g, "").includes(s) || i.marque.toUpperCase().includes(s)
-        || (i.aliases?.some(a => a.includes(s)) ?? false))
+      !s || i.reference.toUpperCase().replace(/\s+/g, "").includes(s) || i.marque.toUpperCase().includes(s)
+        || (i.aliases?.some(a => a.includes(s)) ?? false)
     );
-  }, [items, q, cat]);
-
-  const groups = useMemo(() => {
-    const m = new Map<string, CatItem[]>();
-    for (const i of filtered) { const a = m.get(i.categorie) ?? []; a.push(i); m.set(i.categorie, a); }
-    return CAT_ORDER.filter(c => m.has(c)).map(c => [c, m.get(c)!] as const);
-  }, [filtered]);
+  }, [items, q]);
+  const recherche = q.trim().length > 0;
 
   const cartItems = useMemo(() => items.filter(i => (cart[keyOf(i)] ?? 0) > 0), [items, cart]);
   const cartCount = useMemo(() => Object.values(cart).reduce((s, n) => s + n, 0), [cart]);
@@ -139,6 +132,21 @@ function TarifInner() {
         .tarif .empty{ text-align:center; color:var(--muted); padding:60px 20px; }
         .tarif .foot{ margin-top:30px; text-align:center; font-size:11px; color:#6f6a5f; line-height:1.7; }
         .tarif .gate{ min-height:100vh; display:grid; place-items:center; padding:24px; text-align:center; }
+        .tarif .chip.vide{ opacity:.55; }
+        .tarif .fam{ display:flex; align-items:center; gap:8px; margin:30px 0 4px; padding-bottom:8px; border-bottom:1px solid var(--line); font-size:17px; font-weight:800; color:var(--paper); }
+        .tarif .fam svg{ color:var(--gold); }
+        .tarif .rupture{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 0; padding:11px 13px; border:1px dashed var(--line); border-radius:12px; background:rgba(255,255,255,.02); }
+        .tarif .rupture .rt{ font-size:13px; font-weight:700; color:var(--paper); }
+        .tarif .rupture .rm{ font-size:12px; color:var(--gold); font-weight:600; }
+        .tarif .rupture .rl{ font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.5; }
+        .tarif .rupture .ask{ flex:0 0 auto; font-size:12px; font-weight:800; color:#04310f; background:#25D366; border-radius:999px; padding:7px 13px; text-decoration:none; white-space:nowrap; }
+        .tarif .info-btn{ background:transparent; border:0; padding:0; color:inherit; text-align:left; cursor:pointer; font-family:inherit; }
+        .tarif .info-btn .plus{ font-size:10.5px; color:var(--gold); margin-top:2px; }
+        .tarif .det{ margin:-4px 0 6px 58px; padding:10px 12px; border-left:2px solid var(--gold); background:rgba(226,197,107,.06); border-radius:0 10px 10px 0; font-size:12.5px; line-height:1.7; color:var(--paper); }
+        .tarif .det b{ color:var(--gold); font-weight:700; }
+        .tarif .det .ok{ color:#4ade80; font-weight:700; }
+        .tarif .det .mono{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12px; color:var(--muted); }
+        .tarif .det .lien{ display:inline-block; margin-top:4px; color:var(--gold); font-weight:700; text-decoration:none; }
       `}</style>
 
       {!ok ? (
@@ -169,29 +177,26 @@ function TarifInner() {
 
           <div className="bar">
             <input className="search" placeholder="Chercher une référence (ex : OE667/6, WL7510…)" value={q} onChange={e => setQ(e.target.value)} />
-            <div className="chips">
-              <button className={`chip ${cat === "" ? "on" : ""}`} onClick={() => setCat("")}>Tout</button>
-              {cats.map(c => <button key={c} className={`chip ${cat === c ? "on" : ""}`} onClick={() => setCat(c)}>{CAT_FR[c]}</button>)}
-            </div>
+            <FamilleChips items={items} famille={famille} setFamille={setFamille} />
           </div>
 
           {loading ? (
             <p className="empty">Chargement du catalogue…</p>
-          ) : filtered.length === 0 ? (
+          ) : recherche && filtered.length === 0 ? (
             <p className="empty">Aucun article trouvé.</p>
           ) : (
-            groups.map(([c, list]) => (
-              <div key={c}>
-                <div className="cat">{CAT_FR[c]}</div>
-                {list.map((i, idx) => {
+            <SectionsParFamille items={filtered} famille={famille} recherche={recherche} wa={WA} renderItem={(i, idx) => {
                   const n = cart[keyOf(i)] ?? 0;
+                  const k = keyOf(i);
                   return (
-                    <div className="item" key={c + idx}>
+                    <div key={k + idx}>
+                    <div className="item">
                       <FilterImage reference={i.reference} categorie={i.categorie} imageUrl={i.imageUrl ?? undefined} wid={110} className="thumb" placeholder="logo" />
-                      <div>
+                      <button className="info-btn" onClick={() => setOuvert(o => o === k ? null : k)} aria-expanded={ouvert === k}>
                         <div className="ref">{i.reference}</div>
                         <div className="mk">{i.marque}</div>
-                      </div>
+                        <div className="plus">{ouvert === k ? "▲ moins" : "▼ détails"}</div>
+                      </button>
                       <div className="price">
                         <div>
                           {i.promo && i.prixAvant && <span className="was">{i.prixAvant}</span>}
@@ -209,10 +214,10 @@ function TarifInner() {
                         </div>
                       )}
                     </div>
+                    {ouvert === k && <DetailsArticle item={i} extra={<div>Prix : <b>{i.prix} MAD</b>{i.promo && i.prixAvant ? <> (au lieu de {i.prixAvant} MAD)</> : null} · {info.court}</div>} />}
+                    </div>
                   );
-                })}
-              </div>
-            ))
+                }} />
           )}
 
           {!loading && (
@@ -224,9 +229,9 @@ function TarifInner() {
                   <button className="send" onClick={sendCart}>Envoyer la commande</button>
                 </div>
               </div>
-            ) : filtered.length > 0 ? (
+            ) : (
               <div className="cta"><button onClick={sendCart}>💬 Commander sur WhatsApp</button></div>
-            ) : null
+            )
           )}
 
           <p className="foot">Prix susceptibles d'évoluer · sous réserve de disponibilité<br />FiltroPro · Pièces &amp; Filtres Auto · Maroc · 06 02 35 02 90</p>
