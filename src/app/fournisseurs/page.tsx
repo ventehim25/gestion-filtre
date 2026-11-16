@@ -39,6 +39,8 @@ export default function FournisseursPage() {
   // Portefeuille dinoun (src/lib/dinoun.ts) : argent des bons mis de côté, pas encore donné → la dette ne bouge pas
   const [portefeuille, setPortefeuille] = useState<BonPortefeuille[]>([]);
   const [portefeuilleOuvert, setPortefeuilleOuvert] = useState<string | null>(null);
+  // Onglet de l'historique par fournisseur : marchandise prise ou avances
+  const [ongletHisto, setOngletHisto] = useState<Record<string, "rec" | "av">>({});
   const creditIdsDe = () => new Set(fournisseurs.filter(x => (x.type ?? "credit") === "credit").map(x => x.id));
   async function rembourserBon(f: Fournisseur, b: BonARembourser) {
     if (!confirm(`Mettre ${b.cout.toFixed(0)} MAD de côté dans le portefeuille ${f.nom} (bon ${b.client} du ${b.date}) ?\nLa dette ne baisse pas maintenant : elle baissera quand tu donneras le portefeuille à ${f.nom}.`)) return;
@@ -591,11 +593,31 @@ export default function FournisseursPage() {
                   </button>
                 </div>
 
-                {open && (
-                  <div className="mt-3 border-t border-slate-700/60 pt-2 space-y-1 max-h-60 overflow-y-auto">
-                    {histOf(f.id).length === 0 ? (
-                      <p className="text-xs text-slate-500 py-2">Aucun mouvement.</p>
-                    ) : histOf(f.id).map((h, i) => (
+                {open && (() => {
+                  // Deux historiques séparés (demande de l'utilisateur) : marchandise prise / avances (argent donné)
+                  const tout = histOf(f.id);
+                  const recs = tout.filter(h => h.type === "rec"), avs = tout.filter(h => h.type === "av");
+                  const onglet = cap ? "rec" : (ongletHisto[f.id] ?? "rec");
+                  const liste = onglet === "rec" ? recs : avs;
+                  const tot = (l: typeof tout) => l.reduce((s, h) => s + h.montant, 0);
+                  return (
+                  <div className="mt-3 border-t border-slate-700/60 pt-2">
+                    <div className="flex gap-1.5 mb-2" role="tablist">
+                      <button role="tab" aria-selected={onglet === "rec"} onClick={() => setOngletHisto(o => ({ ...o, [f.id]: "rec" }))}
+                        className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium ${onglet === "rec" ? "bg-orange-500/20 text-orange-300" : "text-slate-400 hover:text-slate-200"}`}>
+                        📦 Marchandise prise ({recs.length}) · {money(tot(recs))}
+                      </button>
+                      {!cap && (
+                        <button role="tab" aria-selected={onglet === "av"} onClick={() => setOngletHisto(o => ({ ...o, [f.id]: "av" }))}
+                          className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-medium ${onglet === "av" ? "bg-emerald-500/20 text-emerald-300" : "text-slate-400 hover:text-slate-200"}`}>
+                          💵 Avances ({avs.length}) · {money(tot(avs))}
+                        </button>
+                      )}
+                    </div>
+                  <div className="space-y-1 max-h-60 overflow-y-auto">
+                    {liste.length === 0 ? (
+                      <p className="text-xs text-slate-500 py-2">{onglet === "rec" ? "Aucune marchandise prise." : "Aucune avance."}</p>
+                    ) : liste.map((h, i) => (
                       <div key={i} className="flex items-center justify-between gap-2 text-xs py-1">
                         <span className="text-slate-400 min-w-0">{h.date} · <span className="text-slate-300">{h.text}</span></span>
                         <span className="flex items-center gap-2 shrink-0">
@@ -608,7 +630,9 @@ export default function FournisseursPage() {
                       </div>
                     ))}
                   </div>
-                )}
+                  </div>
+                  );
+                })()}
               </div>
             );
           })}
