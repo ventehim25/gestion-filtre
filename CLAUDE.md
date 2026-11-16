@@ -59,7 +59,7 @@ RPC : `decrement_stock(p_id, qty)`, `decrement_equiv_stock(e_id, qty)` (qty nég
 - **Sauvegarde** : `backups/AAAA-MM-JJ/` contient aussi `structure.sql` (toute la structure) ; la date est notée dans `reglages` (`cle = derniere_sauvegarde`) ; le cron alerte si > 2 jours ou si la base > 400 Mo.
 - `.gitignore` ignore `*.yml` sauf `.github/workflows/*.yml` (le jeton GitHub du PC n'a pas le droit `workflow` : un push de workflow est refusé).
 Colonnes ajoutées (migrations dans `supabase/`) :
-- products : `prix_promo` (promos.sql)
+- products : `prix_promo` (promos.sql) · `dimensions` = cotes Filtron pour les filtres, **nombre de dents / largeur « 141/25 »** pour kit / courroie de distribution (`avecDents`, BIBLE §8.33)
 - equivalences : `prix` (vente), `prix_achat`, `stock` (equivalences_prix.sql + equivalences_stock.sql)
 - sale_items : `fournisseur_id` (source capital/crédit), `equivalence_id` (variante de marque vendue), `cout_unitaire` (coût d'achat figé)
 - fournisseurs : `type` ('capital' = argent propre type filtropro / 'credit' = à rembourser type dinoun)

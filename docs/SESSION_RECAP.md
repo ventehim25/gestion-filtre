@@ -7,6 +7,8 @@
 
 ## ▶ REPRENDRE ICI (mis à jour le 16/11/2026)
 
+**Nombre de dents (16/11, nuit) : FAIT** (BIBLE §8.33) — kit / kit + pompe / courroie de distribution : case « 141/25 » rangée dans `products.dimensions` (`AVEC_DENTS`, `normDents`, `dentsValides`), affichée et cherchable partout. Pas de SQL.
+
 **Catalogues par famille (16/11, nuit) : FAIT** (BIBLE §8.32) — `src/components/CatalogueFamilles.tsx` : onglets familles, rubriques sans stock « 🔄 Réapprovisionnement en cours » + Demander (WhatsApp), détails d'un tap. Vérifié à 390 px sur serveur local. Marques ajoutées rattachées à leur famille (§8.31, `reglages.marques_filtres` = `[{ nom, metiers }]`).
 
 **9 familles de pièces (16/11, nuit) : FAIT, SQL collé et vérifié** (BIBLE §8.31, GUIDE §16). 44 catégories dans `src/lib/categories.ts` (`FAMILLES`), marques par famille (`marquesBase`/`marquesPour` dans `brands.ts`), menus par famille (`CategoryOptions`), « Je reçois » à 9 boutons. `supabase/categories_produits.sql` collé (« sql ok ») et vérifié (44 catégories, essais supprimés, inconnue refusée par `products_categorie_fkey`). Rangement fait : 11 pièces de « Autre » → 8 Filtron CW75x/UE730… en `filtration_autre`, 3 huiles en `huile_moteur`. Marque de « CASTROL 5W30 5L AVEC FACTURE » corrigée (Filtron → Castrol, accord de l'utilisateur). **Ensuite** : son premier kit / ses premières plaquettes en Réception. Ensuite, une nouvelle catégorie = code + une ligne dans `categories_produits` (clé serveur), sans SQL.

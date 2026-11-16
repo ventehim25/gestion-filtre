@@ -1167,6 +1167,14 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Vérifié** sur un serveur local à la taille d'un téléphone (390 px) : /catalogue (Tout, Freinage avec la plaquette Lpr 05P2187 + 4 rubriques en réapprovisionnement, détails ouverts) et /tarif?k=garages2026 (Distribution moteur : courroie Gates 6PK1198 à 75 MAD + 8 rubriques en réapprovisionnement).
 - Pas changé : les règles de présence (un article n'apparaît qu'avec stock > 0 et, sur /tarif, prix > 0), le panier et la commande WhatsApp « QTÉ RÉF ».
 
+## 8.33 Kit et courroie de distribution : le nombre de dents (16/11/2026)
+- **Demande de l'utilisateur** : « pour le kit distribution et courroie distribution, rajoute une case nombre de dents, exemple 141/25 ou 123/27 ».
+- **Où** : kit de distribution, kit de distribution + pompe à eau, courroie de distribution (`AVEC_DENTS` dans `src/lib/categories.ts`). Case **🦷 Nombre de dents / largeur** (ex. 141/25 = 141 dents, 25 mm) dans : fiche Produits, Réception → « ➕ Nouvelle pièce » (à côté de la réf. de la boîte), Recherche → « Ajouter une référence ». Facultative ; écrite « 141 / 25 », « 141x25 » ou « 141-25 » elle devient « 141/25 » (`normDents`) ; un autre format est refusé avec un exemple (`dentsValides` : 2-3 chiffres / 1-2 chiffres, une décimale permise).
+- **Stockage** : colonne existante `products.dimensions` (vide pour la distribution ; pour les filtres elle contient les cotes Filtron) → pas de SQL, déjà lisible par le public. Pièce déjà existante reçue avec un nombre de dents : complété seulement s'il était vide (`creerPieces`).
+- **Affiché** : liste Produits (sous la réf.), sélecteur de pièce de Réception et Vente, résultats de Recherche, catalogues /tarif et /catalogue (sous la marque + dans « détails »), fiche publique /c (« Nombre de dents / largeur »), fiche WhatsApp du produit.
+- **Recherche par « 141/25 »** : Produits, sélecteur de pièce (Réception, Vente), Recherche par référence (kits et courroies avec ce nombre exact), catalogues.
+- **Vérifié** : fiche d'essai « kit_distribution » 141/25 + variante Dayco : lues avec la clé publique (comme les catalogues), trouvée par 141/25, puis supprimées (0 restante). Compilation OK.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 16/11/2026)*
