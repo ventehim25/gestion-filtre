@@ -36,7 +36,8 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 | `supabase/storage_produits.sql` | Stockage des photos produits | ✅ collé |
 | `supabase/securite.sql` | **Base protégée + connexion obligatoire** (voir §9) | ✅ collé le 12/11/2026 (compte ventehim@gmail.com) |
 | `supabase/vin_connus.sql` | Mémoire des VIN confirmés (« VIN ou code moteur ») | ✅ collé le 12/11/2026 |
-| `supabase/categories_distribution.sql` | Catégories **chaîne, courroie, pompe à eau, kit de distribution** (voir §16) | ✅ collé le 16/11/2026 |
+| `supabase/categories_distribution.sql` | Catégories **chaîne, courroie, pompe à eau, kit de distribution** (voir §16) | ✅ collé le 16/11/2026 (remplacé par la ligne suivante) |
+| `supabase/categories_produits.sql` | **Les 9 familles de pièces** (freinage, embrayage, batteries…) ; ensuite plus aucun SQL pour une nouvelle catégorie (voir §16) | ⏳ **à coller** (16/11/2026) |
 
 > Règle : après un `CREATE`/`ALTER`, le SQL finit par `notify pgrst, 'reload schema';` et tu **recharges l'app**.
 
@@ -52,7 +53,7 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 
 **Dans l'app :**
 - **Marchandise prise** (accueil → **Réception**, ou Fournisseurs) → choisis **chez qui** (dinoun = dette, filtropro = ton argent), puis **scanne les boîtes** (+1 par boîte) ou tape la réf (Filtron, Wix, Mann, Mahle, Purflux, Mecafilter… reconnues). Par ligne : qté, **prix d'achat + prix de vente** (marge affichée), marque (« + Autre marque » crée Mahle/Purflux/Mecafilter/SIMI/Meat & Doria…), code-barres mémorisé. **Une marque qui n'est pas dans la liste ?** Dans la liste des marques, choisis **« ➕ Nouvelle marque… »**, écris son nom comme sur la boîte : elle est enregistrée pour toujours et proposée partout (Réception, Produits, Vente), sur tous tes appareils. Enregistrer → stock + prix sur la fiche + dette (ou capital) + catalogue à jour. **Marche hors-ligne** : envoyée au retour du réseau (bandeau jaune).
-- **Je reçois** (en haut de Marchandise prise) : touche **Filtres · Huile · Distribution · Pompe à eau** → la recherche de chaque ligne ne montre que ça (le choix est gardé). Le scan des boîtes reconnaît tout, quel que soit le choix. Détails : §16.
+- **Je reçois** (en haut de Marchandise prise) : touche la famille (**Filtres et huile · Distribution moteur · Freinage · Embrayage · Direction/Suspension · Démarrage électrique · Essuie-glaces · Habitacle · Autres**) → la recherche de chaque ligne ne montre que ça (le choix est gardé). Le scan des boîtes reconnaît tout, quel que soit le choix. Détails : §16.
 - **Erreur de réception / de paiement** → Fournisseurs → Historique → **✕** sur la ligne : la réception est annulée (stock retiré + dette corrigée) ; un paiement libre est annulé.
 - **Vente** (accueil → **Vente**) → la **source de chaque ligne se met toute seule** : celle de la **dernière réception** de ce filtre (dinoun ou filtropro ; à défaut dinoun). Un même bon peut mélanger les deux. Sous chaque ligne, 2 boutons **dinoun | filtropro** : 1 tap pour corriger.
 - **Le portefeuille dinoun** (depuis le 16/11) : quand un bon est payé, sur le bon (Ventes) bouton **🚚 👛 Mettre de côté {coût}** → devient **👛 De côté** : l'argent est dans ton portefeuille, **la dette ne baisse pas encore**. Ou dans Fournisseurs → carte dinoun → **Bons à mettre de côté**.
@@ -241,18 +242,30 @@ Tu tapes **un seul prix** : le prix garage (comme avant). Les autres se calculen
 
 ---
 
-## 16. Distribution : chaîne, courroie, pompe à eau, kit (depuis le 16/11/2026)
+## 16. Toutes les pièces, rangées en 9 familles (depuis le 16/11/2026)
 
-**SQL** `supabase/categories_distribution.sql` : ✅ collé le 16/11/2026, rien d'autre à faire. (S'il fallait un jour le recoller : éditeur SQL de Supabase, lien §2 → « Run ».)
+**Une seule fois** : colle `supabase/categories_produits.sql` dans l'éditeur SQL de Supabase (lien §2) → « Run ». Après, plus jamais de SQL pour ajouter une catégorie : tu me la demandes, je l'ajoute.
 
-**Recevoir des pièces de distribution** (Filtron n'en fait pas : la première fois, chaque pièce est à créer) :
+**Les familles** (comme les grands sites de pièces) :
+- **Filtres et huile** : filtres (huile, air, carburant, habitacle, refroidissement), autres filtrations, huile moteur, accessoires de vidange, outils de vidange.
+- **Distribution moteur** : kit de distribution, kit + pompe à eau, courroie de distribution, galet tendeur/enrouleur, kit chaîne, pompe à eau, kit et courroie d'accessoire, poulie.
+- **Freinage** : plaquettes, disques, hydraulique, freins à tambours, capteurs et câbles.
+- **Embrayage et boîte de vitesse** : embrayage et volant moteur, accessoires de boîte, autres pièces d'embrayage.
+- **Direction / Suspension / Train** : amortisseurs, suspension d'essieux, transmission, rotules/direction, moyeux et roulements.
+- **Démarrage électrique** : batteries, alternateurs, démarreurs, outils batteries, alterno-démarreurs.
+- **Essuie-glaces et pièces** : essuie-glaces, essuyage des phares.
+- **Pièces habitacle** : lève-vitres, serrure/fermeture, vérins, commandes et pédalier, électricité.
+- **Autres pièces**.
+
+**Recevoir une pièce qui n'est pas un filtre** (Filtron ne fait que des filtres : la première fois, chaque pièce est à créer) :
 1. Accueil → **Réception** → choisis **Chez** (dinoun / filtropro).
-2. **Je reçois** → **Distribution** (kit, courroie, chaîne) ou **Pompe à eau**.
-3. Sur la ligne, tape la **réf. écrite sur la boîte** (ex. K015578XS). Elle n'existe pas encore → touche **« ➕ Nouvelle pièce »**.
-4. Choisis le **Type** (Kit / Courroie / Chaîne / Pompe à eau) et la **Marque** (Gates, Dayco, Continental, Dolz, SKF, INA, Febi, Valeo, Bosch, Aisin, NTN-SNR, Metelli, Graf, Hepu, Saleri SIL, Airtex, Optibelt, Iwis, Ruville, Eurorepar, Motrio, **Renault Origine**, **PSA Origine**… ou « ➕ Nouvelle marque… »).
-5. Qté, prix d'achat, prix de vente, code-barres (scanne la boîte) → **Enregistrer**. La fiche est créée toute seule (même hors-ligne : envoyée au retour du réseau). La fois suivante, la boîte est reconnue au scan.
-- **Même pièce chez une autre marque** (ex. le même kit en Dayco et en Gates) : Produits → la fiche → « Variantes de marque » → ajoute la marque avec sa réf., ou en Réception « + Autre marque » sous la ligne. Chaque marque garde son prix et son stock.
-- **Pièce d'origine** : écris « Renault Origine » ou « PSA Origine » (pas « Renault » tout court : ce nom sert déjà aux codes constructeur, l'appli le refuse).
-- **Produits / Stock / Recherche** : les 4 types sont dans la liste des catégories (et le filtre « Catégorie ») ; dans la fiche, les marques proposées suivent le type de la pièce.
-- **Catalogues** (/tarif, /catalogue) : une pièce de distribution avec stock et prix apparaît toute seule, dans sa rubrique (Kits, Courroies, Chaînes, Pompes à eau). Photo : prends la boîte en photo dans la fiche (pas de photo automatique, ce n'est pas du Filtron).
-- **Vente** : rien ne change ; la marque affichée est la vraie (Gates…, plus « Filtron »).
+2. **Je reçois** → la famille (ex. **Freinage**).
+3. Sur la ligne, tape la **réf. écrite sur la boîte**. Elle n'existe pas encore → touche **« ➕ Nouvelle pièce »**.
+4. Choisis le **Type** (ex. Plaquettes de frein) et la **Marque** : la liste suit la famille (freinage : Bosch, TRW, Brembo, Ferodo…; distribution : Gates, Dayco, Dolz…; batteries : Varta, Bosch, Exide…), ou « ➕ Nouvelle marque… ».
+5. Qté, prix d'achat, prix de vente, code-barres (scanne la boîte) → **Enregistrer**. La fiche est créée toute seule (même hors-ligne). La fois suivante, la boîte est reconnue au scan.
+- **Un filtre** se choisit toujours par sa réf. Filtron (pas de « Nouvelle pièce » pour les filtres).
+- **Même pièce chez une autre marque** : Produits → la fiche → « Variantes de marque », ou en Réception « + Autre marque » sous la ligne. Chaque marque garde son prix et son stock.
+- **Pièce d'origine** : « Renault Origine » ou « PSA Origine » (pas « Renault » tout court : ce nom sert aux codes constructeur, l'appli le refuse).
+- **Produits / Stock** : le menu « Catégorie » est rangé par famille ; « — Freinage (tout) — » montre toute la famille d'un coup.
+- **Catalogues** (/tarif, /catalogue) : une pièce avec stock et prix apparaît toute seule dans sa rubrique. Photo : prends la boîte en photo dans la fiche (photo automatique seulement pour les filtres).
+- **Vente** : rien ne change ; la marque affichée est la vraie.
