@@ -192,7 +192,10 @@ export default function VentesPage() {
       { marque: "Filtron", reference: p.reference, prix: p.prix_vente, prix_achat: p.prix_achat, stock: p.stock, equivalence_id: null as string | null,
         prix_particulier: p.prix_particulier, prix_location: p.prix_location, prix_magasin: p.prix_magasin },
       ...((data ?? []) as (PrixManuels & { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number | null })[])
-        .filter(e => e.prix != null)
+        // Seulement les variantes avec un vrai prix (une référence d'essai à 0 DH n'est jamais proposée),
+        // et pour une même marque, celle qui a du stock d'abord (« Fc95 » avant un essai oublié)
+        .filter(e => e.prix != null && e.prix > 0)
+        .sort((a, b) => (b.stock ?? 0) - (a.stock ?? 0))
         .map(e => ({ marque: e.marque, reference: e.reference, prix: e.prix as number, prix_achat: e.prix_achat ?? 0, stock: e.stock ?? 0, equivalence_id: e.id,
           prix_particulier: e.prix_particulier, prix_location: e.prix_location, prix_magasin: e.prix_magasin })),
     ];

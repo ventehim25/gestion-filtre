@@ -135,12 +135,29 @@ export default function ProduitsPage() {
       const m = { prix_particulier: manuels.prix_particulier > 0 ? manuels.prix_particulier : null, prix_location: manuels.prix_location > 0 ? manuels.prix_location : null, prix_magasin: manuels.prix_magasin > 0 ? manuels.prix_magasin : null };
       try { await supabase.from("products").update(m).eq("id", productId); } catch { /* colonnes absentes */ }
     }
-    // Synchronise les équivalences (supprime puis réinsère)
+    // Synchronise les équivalences SANS tout effacer (16/11/2026) : avant, tout était supprimé puis recréé avec de
+    // nouveaux identifiants → les ventes perdaient la marque vendue (lien remis à vide), les réceptions ne
+    // retrouvaient plus leur variante (annulation du stock) et les prix par catalogue des variantes étaient perdus.
+    // Maintenant : on modifie seulement ce qui a changé, on supprime seulement ce qui a été retiré, on ajoute le nouveau.
     if (productId) {
-      await supabase.from("equivalences").delete().eq("product_id", productId);
-      const rows = equivs.filter(e => e.marque.trim() && e.reference.trim())
-        .map(e => ({ product_id: productId!, marque: e.marque.trim(), reference: e.reference.trim(), prix: e.prix && e.prix > 0 ? e.prix : null, prix_achat: e.prix_achat && e.prix_achat > 0 ? e.prix_achat : null, stock: e.stock ?? 0, ...(e.code_barre?.trim() ? { code_barre: e.code_barre.trim() } : {}) }));
-      if (rows.length) await supabase.from("equivalences").insert(rows);
+      const { data: avant } = await supabase.from("equivalences").select("id, marque, reference, prix, prix_achat, stock, code_barre").eq("product_id", productId);
+      const valeurs = (e: typeof equivs[number]) => ({ marque: e.marque.trim(), reference: e.reference.trim(), prix: e.prix && e.prix > 0 ? e.prix : null, prix_achat: e.prix_achat && e.prix_achat > 0 ? e.prix_achat : null, stock: e.stock ?? 0, code_barre: e.code_barre?.trim() || null });
+      const gardes = equivs.filter(e => e.marque.trim() && e.reference.trim());
+      const idsGardes = new Set(gardes.map(e => e.id).filter(Boolean));
+      const aRetirer = ((avant ?? []) as { id: string }[]).filter(a => !idsGardes.has(a.id)).map(a => a.id);
+      if (aRetirer.length) await supabase.from("equivalences").delete().in("id", aRetirer);
+      for (const e of gardes.filter(e => e.id)) {
+        const a = ((avant ?? []) as (Equivalence & { code_barre: string | null })[]).find(x => x.id === e.id);
+        if (!a) continue;
+        const v = valeurs(e);
+        const change = Object.fromEntries(Object.entries(v).filter(([k, val]) => (a as unknown as Record<string, unknown>)[k] !== val && !(k === "code_barre" && !val && !a.code_barre)));
+        if (Object.keys(change).length) await supabase.from("equivalences").update(change as Partial<Equivalence>).eq("id", e.id!);
+      }
+      const nouvelles = gardes.filter(e => !e.id).map(e => {
+        const { code_barre, ...v } = valeurs(e);
+        return { product_id: productId!, ...v, ...(code_barre ? { code_barre } : {}) };
+      });
+      if (nouvelles.length) await supabase.from("equivalences").insert(nouvelles);
     }
     setShowForm(false); setEditing(null); setForm(empty); setManuels(MANUELS_VIDES); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
     load();
