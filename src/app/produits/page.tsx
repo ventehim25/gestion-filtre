@@ -475,7 +475,7 @@ export default function ProduitsPage() {
                     // Nouvelle marque écrite par l'utilisateur : enregistrée pour toujours avec les autres
                     const nom = window.prompt("Nom de la nouvelle marque (comme sur la boîte) :");
                     if (!nom) return;
-                    const r = await ajouterMarque(nom);
+                    const r = await ajouterMarque(nom, form.categorie); // rattachée à la famille de la fiche (BIBLE §8.31)
                     setBrands(r.marques);
                     if (r.erreur) { alert(r.erreur); return; }
                     if (r.marque) setNewEquiv({ ...newEquiv, marque: r.marque });

@@ -25,24 +25,54 @@ export const ELECTRIQUE_BRANDS = ["Varta", "Bosch", "Exide", "Fulmen", "Tudor", 
 export const ESSUYAGE_BRANDS = ["Bosch", "Valeo", "Champion", "Denso", "Hella", ...ORIGINE];
 export const HABITACLE_BRANDS = ["Valeo", "Bosch", "Febi", "Magneti Marelli", "Hella", "Stabilus", "Topran", ...ORIGINE];
 
-const PAR_FAMILLE: Record<Famille, string[]> = {
-  filtres_huile: FILTER_BRANDS, distribution: DISTRIBUTION_BRANDS, freinage: FREINAGE_BRANDS, embrayage: EMBRAYAGE_BRANDS,
+// « Métier » d'une pièce = sa famille, sauf l'huile moteur qui a ses propres marques (Castrol, Total…)
+export type Metier = Famille | "huile";
+export const metierDe = (categorie?: string | null): Metier => (categorie === "huile_moteur" ? "huile" : familleDe(categorie));
+
+const PAR_METIER: Record<Metier, string[]> = {
+  filtres_huile: FILTER_BRANDS, huile: OIL_BRANDS, distribution: DISTRIBUTION_BRANDS, freinage: FREINAGE_BRANDS, embrayage: EMBRAYAGE_BRANDS,
   train: TRAIN_BRANDS, electrique: ELECTRIQUE_BRANDS, essuyage: ESSUYAGE_BRANDS, habitacle: HABITACLE_BRANDS, autre: FILTER_BRANDS,
 };
 /** Marques de départ du métier d'une catégorie (huile moteur : marques d'huile). */
-export const marquesBase = (categorie?: string | null): string[] =>
-  categorie === "huile_moteur" ? OIL_BRANDS : PAR_FAMILLE[familleDe(categorie)];
+export const marquesBase = (categorie?: string | null): string[] => PAR_METIER[metierDe(categorie)];
 
 // Toutes les marques de départ (sans doublon) : toutes reconnues comme « variantes de marque »
 export const DEPART = [FILTER_BRANDS, OIL_BRANDS, DISTRIBUTION_BRANDS, FREINAGE_BRANDS, EMBRAYAGE_BRANDS, TRAIN_BRANDS, ELECTRIQUE_BRANDS, ESSUYAGE_BRANDS, HABITACLE_BRANDS]
   .flat().filter((m, i, a) => a.indexOf(m) === i);
 
-/** Liste de marques à proposer pour une pièce : celles de son métier + celles ajoutées par l'utilisateur,
- *  et toujours la marque déjà choisie (sinon le menu l'afficherait vide). */
+// Marques ajoutées par l'utilisateur lui-même (« ➕ Nouvelle marque… » en Réception et en Produits) : gardées dans la
+// base, réglage « marques_filtres » (table reglages), donc partout et sur tous les appareils. Depuis le 16/11/2026 (BIBLE
+// §8.31), chaque marque ajoutée est RATTACHÉE au métier de la pièce où elle a été ajoutée ({ nom, metiers }) : Valvoline
+// (huile) n'apparaît plus dans Freinage. Ancien format (simple texte) = sans métier = proposée partout.
+type Ajoutee = { nom: string; metiers: Metier[] };
+const CLE = "marques_filtres";
+const egal = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+const lireStockees = async (): Promise<Ajoutee[]> => {
+  const { data } = await supabase.from("reglages").select("valeur").eq("cle", CLE).maybeSingle();
+  const v = (data as { valeur?: unknown } | null)?.valeur;
+  if (!Array.isArray(v)) return [];
+  return v.flatMap((x): Ajoutee[] => {
+    if (typeof x === "string") return x.trim() ? [{ nom: x.trim(), metiers: [] }] : [];
+    const o = x as { nom?: unknown; metiers?: unknown } | null;
+    if (!o || typeof o.nom !== "string" || !o.nom.trim()) return [];
+    return [{ nom: o.nom.trim(), metiers: Array.isArray(o.metiers) ? o.metiers.filter((m): m is Metier => typeof m === "string") : [] }];
+  });
+};
+// Métiers des marques ajoutées (rempli au chargement) : utilisé par marquesPour pour ne proposer que les bonnes
+let ajoutees: Ajoutee[] = [];
+const noms = (liste: Ajoutee[]) => liste.reduce((out, a) => (out.some((m) => egal(m, a.nom)) ? out : [...out, a.nom]), [...DEPART]);
+
+/** Liste de marques à proposer pour une pièce : celles de son métier + celles que l'utilisateur a ajoutées POUR ce
+ *  métier (ou sans métier, ancien format), et toujours la marque déjà choisie (sinon le menu l'afficherait vide).
+ *  `toutes` (liste chargée par la page) garde les marques ajoutées sur un autre appareil depuis le chargement. */
 export function marquesPour(toutes: string[], categorie?: string | null, actuelle?: string | null): string[] {
-  const ajoutees = toutes.filter((m) => !DEPART.some((d) => d.toLowerCase() === m.toLowerCase()));
-  const out = [...marquesBase(categorie), ...ajoutees];
-  if (actuelle && actuelle !== "__new__" && actuelle !== "__ajout__" && !out.some((m) => m.toLowerCase() === actuelle.toLowerCase())) out.push(actuelle);
+  const metier = metierDe(categorie);
+  const out = [...marquesBase(categorie)];
+  const ajouter = (m: string) => { if (!out.some((x) => egal(x, m))) out.push(m); };
+  for (const a of ajoutees) if (a.metiers.length === 0 || a.metiers.includes(metier)) ajouter(a.nom);
+  // Marque connue de la page mais absente de la liste du module (ne devrait pas arriver) : proposée par prudence
+  for (const m of toutes) if (!DEPART.some((d) => egal(d, m)) && !ajoutees.some((a) => egal(a.nom, m))) ajouter(m);
+  if (actuelle && actuelle !== "__new__" && actuelle !== "__ajout__") ajouter(actuelle);
   return out;
 }
 
@@ -50,43 +80,43 @@ export function marquesPour(toutes: string[], categorie?: string | null, actuell
 export const marqueVarianteDefaut = (categorie?: string | null, marque?: string | null) =>
   estFiltre(categorie) ? "Flag" : (marquesBase(categorie).find((m) => m !== marque) ?? "Bosch");
 
-// Marques ajoutées par l'utilisateur lui-même (« ➕ Nouvelle marque… » en Réception et en Produits) :
-// gardées dans la base, réglage « marques_filtres » (table reglages), donc partout et sur tous les appareils.
-const CLE = "marques_filtres";
-const fusion = (a: string[], b: string[]) => {
-  const out = [...a];
-  for (const m of b) if (!out.some((x) => x.toLowerCase() === m.toLowerCase())) out.push(m);
-  return out;
-};
-const lireStockees = async (): Promise<string[]> => {
-  const { data } = await supabase.from("reglages").select("valeur").eq("cle", CLE).maybeSingle();
-  const v = (data as { valeur?: unknown } | null)?.valeur;
-  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim().length > 0) : [];
-};
-
 let cache: Promise<string[]> | null = null;
-/** Marques de départ + marques ajoutées (lues une fois par page). En cas d'erreur : les marques de départ. */
+/** Toutes les marques (départ + ajoutées), lues une fois par page — toutes reconnues comme variantes de marque.
+ *  En cas d'erreur : les marques de départ. */
 export function chargerMarques(): Promise<string[]> {
-  cache ??= lireStockees().then((s) => fusion(DEPART, s)).catch(() => DEPART);
+  cache ??= lireStockees().then((s) => { ajoutees = s; return noms(s); }).catch(() => DEPART);
   return cache;
 }
 
-/** Ajoute une marque (si elle n'existe pas déjà, majuscules/minuscules ignorées) et renvoie la liste à jour. */
-export async function ajouterMarque(nom: string): Promise<{ marques: string[]; marque?: string; erreur?: string }> {
-  const propre = nom.trim().replace(/\s+/g, " ");
+/** Ajoute une marque pour le métier de `categorie` (si elle existe déjà ailleurs, elle est seulement rattachée à ce
+ *  métier en plus) et renvoie la liste à jour. Majuscules/minuscules ignorées ; « valvoline » → « Valvoline ». */
+export async function ajouterMarque(nom: string, categorie?: string | null): Promise<{ marques: string[]; marque?: string; erreur?: string }> {
+  let propre = nom.trim().replace(/\s+/g, " ");
+  if (propre === propre.toLowerCase()) propre = propre.charAt(0).toUpperCase() + propre.slice(1);
   if (propre.length < 2 || propre.length > 30) return { marques: await chargerMarques(), erreur: "Écris le nom de la marque (2 à 30 caractères)." };
-  if (/^(oe|__new__)$/i.test(propre)) return { marques: await chargerMarques(), erreur: "Ce nom est réservé." };
-  const stockees = await lireStockees().catch(() => [] as string[]);
-  const toutes = fusion(DEPART, stockees);
-  const deja = toutes.find((m) => m.toLowerCase() === propre.toLowerCase());
-  if (deja) { cache = Promise.resolve(toutes); return { marques: toutes, marque: deja }; }
+  if (/^(oe|__new__|__ajout__)$/i.test(propre)) return { marques: await chargerMarques(), erreur: "Ce nom est réservé." };
+  const metier = metierDe(categorie);
+  const stockees = await lireStockees().catch(() => [] as Ajoutee[]);
+  const enregistrer = async (liste: Ajoutee[], marque: string) => {
+    const { error } = await supabase.from("reglages").upsert({ cle: CLE, valeur: liste }, { onConflict: "cle" });
+    if (error) return { marques: noms(stockees), erreur: `Marque non enregistrée : ${error.message}` };
+    ajoutees = liste; const toutes = noms(liste); cache = Promise.resolve(toutes);
+    return { marques: toutes, marque };
+  };
+  // Déjà une marque de départ de ce métier, ou déjà ajoutée pour ce métier : rien à enregistrer
+  const base = marquesBase(categorie).find((m) => egal(m, propre));
+  const entree = stockees.find((a) => egal(a.nom, propre));
+  if (base) { ajoutees = stockees; const toutes = noms(stockees); cache = Promise.resolve(toutes); return { marques: toutes, marque: base }; }
+  if (entree) {
+    if (entree.metiers.length === 0 || entree.metiers.includes(metier)) { ajoutees = stockees; const toutes = noms(stockees); cache = Promise.resolve(toutes); return { marques: toutes, marque: entree.nom }; }
+    return enregistrer(stockees.map((a) => (a === entree ? { ...a, metiers: [...a.metiers, metier] } : a)), entree.nom);
+  }
+  // Marque de départ d'un AUTRE métier (ex. Valeo ajoutée en huile) : on garde son nom et on la rattache à ce métier
+  const autreMetier = DEPART.find((m) => egal(m, propre));
+  if (autreMetier) return enregistrer([...stockees, { nom: autreMetier, metiers: [metier] }], autreMetier);
   // « Renault », « Peugeot »… sont déjà les noms des codes constructeur (OE) importés : en faire une marque
   // mélangerait des centaines de codes OE avec les vraies variantes (Produits, Vente). → « Renault Origine ».
   const { count: nbOe } = await supabase.from("equivalences").select("id", { count: "exact", head: true }).ilike("marque", propre);
-  if ((nbOe ?? 0) > 30) return { marques: toutes, erreur: `« ${propre} » est déjà le nom de ${nbOe} codes constructeur (OE). Écris par exemple « ${propre} Origine ».` };
-  const { error } = await supabase.from("reglages").upsert({ cle: CLE, valeur: [...stockees, propre] }, { onConflict: "cle" });
-  if (error) return { marques: toutes, erreur: `Marque non enregistrée : ${error.message}` };
-  const nouvelles = fusion(DEPART, [...stockees, propre]);
-  cache = Promise.resolve(nouvelles);
-  return { marques: nouvelles, marque: propre };
+  if ((nbOe ?? 0) > 30) return { marques: noms(stockees), erreur: `« ${propre} » est déjà le nom de ${nbOe} codes constructeur (OE). Écris par exemple « ${propre} Origine ».` };
+  return enregistrer([...stockees, { nom: propre, metiers: [metier] }], propre);
 }

@@ -840,7 +840,7 @@ export default function FournisseursPage() {
                           if (e.target.value !== "__ajout__") { patchPiece(i, { marque: e.target.value }); return; }
                           const nom = window.prompt("Nom de la nouvelle marque (comme sur la boîte) :");
                           if (!nom) return;
-                          const r = await ajouterMarque(nom);
+                          const r = await ajouterMarque(nom, l.nouvellePiece?.categorie); // rattachée au type de la pièce (BIBLE §8.31)
                           setMarques(r.marques);
                           if (r.erreur) { alert(r.erreur); return; }
                           if (r.marque) patchPiece(i, { marque: r.marque });
@@ -897,7 +897,7 @@ export default function FournisseursPage() {
                           // Nouvelle marque écrite par l'utilisateur : enregistrée pour toujours avec les autres
                           const nom = window.prompt("Nom de la nouvelle marque (comme sur la boîte) :");
                           if (!nom) return;
-                          const r = await ajouterMarque(nom);
+                          const r = await ajouterMarque(nom, products.find(x => x.id === l.product_id)?.categorie); // rattachée à la famille de la pièce
                           setMarques(r.marques);
                           if (r.erreur) { alert(r.erreur); return; }
                           if (r.marque) patchLine(i, { nouvelleMarque: r.marque });
