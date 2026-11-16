@@ -4,10 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
-import { FILTER_BRANDS, chargerMarques, ajouterMarque } from "@/lib/brands";
+import { FILTER_BRANDS, DEPART, DISTRIBUTION_BRANDS, chargerMarques, ajouterMarque, marquesPour } from "@/lib/brands";
+import { CATEGORY_KEYS, estDistribution, estFiltre } from "@/lib/categories";
+import { translations } from "@/lib/i18n";
+import CategoryIcon from "@/components/CategoryIcon";
 import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, donnerPortefeuille, totauxPortefeuille, insererAvance, textePaiement, marquerChequeEncaisse, type BonPortefeuille, type Paiement } from "@/lib/dinoun";
-import { ajouterReception, getReceptionsAttente, syncReceptions } from "@/lib/offlineReceptions";
-import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
+import { ajouterReception, getReceptionsAttente, syncReceptions, type NouvellePiece } from "@/lib/offlineReceptions";
+import type { Fournisseur, Reception, Avance, Product, FournisseurType, ProductCategory } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import {
@@ -18,7 +21,22 @@ import {
 type RecLine = {
   product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; prix_vente: number; reference: string;
   code_barre: string; nouvelleMarque: string | null; nouvelleRef: string; // marque === "__new__" : variante créée à l'enregistrement
+  nouvellePiece: NouvellePiece | null; // pièce pas encore dans l'appli (distribution), créée à l'enregistrement
 };
+// « Je reçois » : la famille choisie limite la recherche (et les marques) des lignes — BIBLE §8.30.
+// Filtron ne fait pas de distribution : ces pièces-là se créent directement sur la ligne (« ➕ Nouvelle pièce »).
+type Famille = "filtres" | "huile" | "distribution" | "pompe";
+const FAMILLES: { k: Famille; label: string; icone: ProductCategory }[] = [
+  { k: "filtres", label: "Filtres", icone: "filtre_huile" },
+  { k: "huile", label: "Huile", icone: "huile_moteur" },
+  { k: "distribution", label: "Distribution", icone: "kit_distribution" },
+  { k: "pompe", label: "Pompe à eau", icone: "pompe_eau" },
+];
+const familleDe = (c: string): Famille => c === "huile_moteur" ? "huile" : c === "pompe_eau" ? "pompe" : estDistribution(c) ? "distribution" : "filtres";
+// Types proposés pour une nouvelle pièce (libellés FR de l'appli)
+const TYPES_PIECE: ProductCategory[] = ["kit_distribution", "courroie_distribution", "chaine_distribution", "pompe_eau"];
+const libelleCat = (c: ProductCategory) => translations.fr[CATEGORY_KEYS[c]];
+const FAMILLE_KEY = "fp_reception_famille";
 type BonARembourser = { id: string; date: string; client: string; cout: number };
 type VariantRow = { id: string; marque: string; reference: string; prix_achat: number | null; prix: number | null; code_barre: string | null };
 const todayStr = () => new Date().toISOString().split("T")[0];
@@ -26,7 +44,10 @@ function waLink(tel: string) { return `https://wa.me/212${tel.replace(/\D/g, "")
 
 export default function FournisseursPage() {
   // Marques de filtres : celles de départ + celles ajoutées par l'utilisateur (« ➕ Nouvelle marque… »)
-  const [marques, setMarques] = useState<string[]>(FILTER_BRANDS);
+  const [marques, setMarques] = useState<string[]>(DEPART);
+  const [famille, setFamilleState] = useState<Famille>("filtres");
+  useEffect(() => { try { const v = localStorage.getItem(FAMILLE_KEY); if (v && FAMILLES.some(x => x.k === v)) setFamilleState(v as Famille); } catch { /* stockage bloqué */ } }, []);
+  const setFamille = (k: Famille) => { setFamilleState(k); try { localStorage.setItem(FAMILLE_KEY, k); } catch { /* stockage bloqué */ } };
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [receptions, setReceptions] = useState<Reception[]>([]);
   const [avances, setAvances] = useState<Avance[]>([]);
@@ -259,7 +280,7 @@ export default function FournisseursPage() {
   }
 
   // ---- Réception (marchandise prise) ----
-  const emptyRecLine = (): RecLine => ({ product_id: "", equivalence_id: null, marque: "Filtron", quantite: 1, prix_achat: 0, prix_vente: 0, reference: "", code_barre: "", nouvelleMarque: null, nouvelleRef: "" });
+  const emptyRecLine = (): RecLine => ({ product_id: "", equivalence_id: null, marque: "Filtron", quantite: 1, prix_achat: 0, prix_vente: 0, reference: "", code_barre: "", nouvelleMarque: null, nouvelleRef: "", nouvellePiece: null });
   function openReception(f: Fournisseur) { setRecFor(f); setRecDate(todayStr()); setRecLines([emptyRecLine()]); setScanMsg(""); }
   // Bouton « Réception » de l'accueil (/fournisseurs?reception=1) : ouvre directement sur le fournisseur crédit
   const autoReception = useRef(false);
@@ -271,8 +292,16 @@ export default function FournisseursPage() {
     window.history.replaceState(null, "", "/fournisseurs");
   }, [fournisseurs]); // eslint-disable-line react-hooks/exhaustive-deps
   function setRecProduct(i: number, p: Product) {
-    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, prix_vente: p.prix_vente, reference: p.reference, code_barre: l.code_barre || p.code_barre || "", nouvelleMarque: null, nouvelleRef: "" } : l));
+    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, prix_vente: p.prix_vente, reference: p.reference, code_barre: l.code_barre || p.code_barre || "", nouvelleMarque: null, nouvelleRef: "", nouvellePiece: null } : l));
   }
+  // Réf. tapée introuvable → nouvelle pièce sur cette ligne (type selon la famille choisie, marque à choisir)
+  function nouvellePieceSurLigne(i: number, reference: string) {
+    const categorie: ProductCategory = famille === "pompe" ? "pompe_eau" : "kit_distribution";
+    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: "", equivalence_id: null, marque: "Filtron", reference: "", nouvelleMarque: null, nouvelleRef: "",
+      nouvellePiece: { categorie, marque: "", reference: reference.trim().toUpperCase().replace(/\s+/g, " "), nom: "" } } : l));
+  }
+  const patchPiece = (i: number, patch: Partial<NouvellePiece>) =>
+    setRecLines(prev => prev.map((l, j) => j === i && l.nouvellePiece ? { ...l, nouvellePiece: { ...l.nouvellePiece, ...patch } } : l));
   // Choix de la marque d'une ligne : Filtron (produit principal), une variante existante (Flag, Mann…)
   // ou « __new__ » = nouvelle marque créée à l'enregistrement (plus besoin de passer par Produits)
   function setRecVariant(i: number, marque: string) {
@@ -283,7 +312,9 @@ export default function FournisseursPage() {
       // Un code scanné/saisi à la main (inconnu) suit la ligne ; un code déjà connu suit sa marque
       const connus = new Set([p.code_barre, ...(variantsMap[l.product_id] ?? []).map(x => x.code_barre)].filter(Boolean));
       const garde = l.code_barre && !connus.has(l.code_barre) ? l.code_barre : null;
-      if (marque === "__new__") return { ...l, equivalence_id: null, marque: "__new__", nouvelleMarque: FILTER_BRANDS[1], nouvelleRef: "", code_barre: garde ?? "" };
+      // Marque proposée : Flag pour un filtre, une marque de distribution (≠ celle de la fiche) pour une pièce de distribution
+      const defaut = estDistribution(p.categorie) ? (DISTRIBUTION_BRANDS.find(m => m !== p.marque) ?? "Dayco") : FILTER_BRANDS[1];
+      if (marque === "__new__") return { ...l, equivalence_id: null, marque: "__new__", nouvelleMarque: defaut, nouvelleRef: "", code_barre: garde ?? "" };
       if (marque === "Filtron") return { ...l, equivalence_id: null, marque: "Filtron", reference: p.reference, prix_achat: p.prix_achat, prix_vente: p.prix_vente, code_barre: garde ?? p.code_barre ?? "", nouvelleMarque: null };
       const v = (variantsMap[l.product_id] || []).find(x => x.marque === marque);
       return v ? { ...l, equivalence_id: v.id, marque, reference: v.reference, prix_achat: v.prix_achat ?? p.prix_achat, prix_vente: v.prix ?? p.prix_vente, code_barre: garde ?? v.code_barre ?? "", nouvelleMarque: null } : l;
@@ -340,13 +371,25 @@ export default function FournisseursPage() {
   // Pour retrouver un filtre en tapant la réf d'une marque (WL7009 Wix → OE640/2, marque Wix choisie)
   const pickerVariants = useMemo(() => Object.entries(variantsMap).flatMap(([product_id, vs]) =>
     vs.map(v => ({ id: v.id, product_id, marque: v.marque, reference: v.reference }))), [variantsMap]);
+  // Recherche limitée à la famille choisie (« Je reçois ») ; le scan, lui, reconnaît toutes les boîtes
+  const produitsFamille = useMemo(() => products.filter(p => familleDe(p.categorie) === famille), [products, famille]);
+  const pieceNouvellePossible = famille === "distribution" || famille === "pompe";
   async function saveReception() {
     if (!recFor) return;
-    const valid = recLines.filter(l => l.product_id && l.quantite > 0);
+    // Nouvelle pièce dont la référence existe déjà (tapée sans la voir) : on prend la fiche existante
+    const normRef = (r: string) => r.toUpperCase().replace(/\s+/g, "");
+    const lignesOk = recLines.map(l => {
+      if (l.product_id || !l.nouvellePiece) return l;
+      const ex = products.find(p => normRef(p.reference) === normRef(l.nouvellePiece!.reference));
+      return ex ? { ...l, product_id: ex.id, reference: ex.reference, nouvellePiece: null } : l;
+    });
+    const valid = lignesOk.filter(l => (l.product_id || l.nouvellePiece) && l.quantite > 0);
     if (valid.length === 0) { alert("Ajoute au moins un produit"); return; }
+    if (valid.some(l => l.nouvellePiece && (!l.nouvellePiece.reference.trim() || !l.nouvellePiece.marque))) { alert("Nouvelle pièce : écris sa référence et choisis sa marque (Gates, Dayco, Dolz…)."); return; }
     if (valid.some(l => l.marque === "__new__" && !l.nouvelleRef.trim())) { alert("Nouvelle marque : saisis la référence de la boîte (ex. HU 718/5 x)."); return; }
     const montant = valid.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
-    const libelle = (l: RecLine) => l.marque === "__new__" ? `${l.nouvelleRef.trim()} (${l.nouvelleMarque})` : `${l.reference}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""}`;
+    const libelle = (l: RecLine) => l.nouvellePiece ? `${l.nouvellePiece.reference.trim()} (${l.nouvellePiece.marque})`
+      : l.marque === "__new__" ? `${l.nouvelleRef.trim()} (${l.nouvelleMarque})` : `${l.reference}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""}`;
     const details = valid.map(l => `${libelle(l)}×${l.quantite}`).join(", ");
     // Toujours via la file d'attente : marche hors-ligne et reprend proprement après une coupure
     ajouterReception({
@@ -355,6 +398,7 @@ export default function FournisseursPage() {
         product_id: l.product_id, equivalence_id: l.marque === "__new__" ? null : l.equivalence_id, quantite: l.quantite,
         prix_achat: l.prix_achat, prix_vente: l.prix_vente, code_barre: l.code_barre,
         nouvelleMarque: l.marque === "__new__" ? l.nouvelleMarque : null, nouvelleRef: l.nouvelleRef, libelle: libelle(l),
+        nouvellePiece: l.nouvellePiece ? { ...l.nouvellePiece, reference: l.nouvellePiece.reference.trim(), nom: `${libelleCat(l.nouvellePiece.categorie)} ${l.nouvellePiece.marque}` } : null,
       })),
     });
     setRecFor(null);
@@ -739,6 +783,17 @@ export default function FournisseursPage() {
                 <input type="date" className="input mt-1" value={recDate} onChange={e => setRecDate(e.target.value)} />
               </label>
             </div>
+            {/* « Je reçois » : la recherche des lignes ne montre que cette famille (et ses marques) — BIBLE §8.30 */}
+            <p className="text-[10px] uppercase text-slate-500 mb-1">Je reçois</p>
+            <div className="grid grid-cols-4 gap-1.5 mb-3">
+              {FAMILLES.map(x => (
+                <button key={x.k} type="button" onClick={() => setFamille(x.k)}
+                  className={`flex flex-col items-center justify-center gap-1 rounded-lg py-2 px-1 text-[11px] font-semibold leading-tight text-center transition-colors ${
+                    famille === x.k ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-900/40" : "bg-[var(--surface-2)] text-slate-300 hover:text-white"}`}>
+                  <CategoryIcon categorie={x.icone} size={18} /> {x.label}
+                </button>
+              ))}
+            </div>
             {/* Scan des boîtes : chaque boîte scannée ajoute sa ligne (ou +1) */}
             <button onClick={() => { setScanMsg(""); setScanTarget("boite"); }} disabled={products.length === 0}
               className="w-full mb-2 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium bg-red-600 hover:bg-red-500 text-white disabled:opacity-50">
@@ -747,6 +802,12 @@ export default function FournisseursPage() {
             {scanMsg && <p className="text-xs text-amber-400 mb-2">{scanMsg}</p>}
             <div className="space-y-2 mb-2">
               {products.length === 0 && <p className="text-xs text-amber-400">Chargement des produits… (quelques secondes sur réseau lent)</p>}
+              {products.length > 0 && pieceNouvellePossible && (
+                <p className="text-[11px] text-amber-300/90">
+                  {produitsFamille.length === 0 ? "Aucune pièce de ce type dans l'appli pour l'instant. " : `${produitsFamille.length} pièce(s) déjà enregistrée(s). `}
+                  Tape la réf. écrite sur la boîte : si elle n&apos;existe pas, touche « ➕ Nouvelle pièce » (créée à l&apos;enregistrement).
+                </p>
+              )}
               <div className="grid grid-cols-12 gap-2 text-[10px] uppercase text-slate-500">
                 <span className="col-span-11">Produit</span>
                 <span className="col-span-1"></span>
@@ -754,11 +815,58 @@ export default function FournisseursPage() {
               {recLines.map((l, i) => (
                 <div key={i} className="border-b border-slate-800/40 pb-2">
                   <div className="grid grid-cols-12 gap-2 items-center">
-                    <div className="col-span-11"><ProductPicker products={products} variants={pickerVariants} value={l.product_id} onSelect={(p, v) => { setRecProduct(i, p); if (v) setRecVariant(i, v.marque); }} /></div>
+                    <div className="col-span-11">
+                      {l.nouvellePiece ? (
+                        <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 px-2.5 py-1.5 flex items-center justify-between gap-2">
+                          <span className="text-xs text-amber-300 font-semibold truncate">🆕 Nouvelle pièce · <span className="font-mono">{l.nouvellePiece.reference || "—"}</span></span>
+                          <button type="button" onClick={() => patchLine(i, { nouvellePiece: null })} className="text-[11px] text-slate-400 hover:text-white shrink-0">Annuler</button>
+                        </div>
+                      ) : (
+                        <ProductPicker products={produitsFamille} variants={pickerVariants} value={l.product_id}
+                          placeholder={famille === "filtres" ? undefined : famille === "huile" ? "Réf. de l'huile…" : "Réf. Gates, Dayco, Dolz, SKF…"}
+                          onCreate={pieceNouvellePossible ? (ref) => nouvellePieceSurLigne(i, ref) : undefined}
+                          onSelect={(p, v) => { setRecProduct(i, p); if (v) setRecVariant(i, v.marque); }} />
+                      )}
+                    </div>
                     <button onClick={() => setRecLines(prev => prev.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center"><Trash2 size={14} /></button>
                   </div>
-                  {!l.product_id && l.code_barre && (
+                  {!l.product_id && !l.nouvellePiece && l.code_barre && (
                     <p className="text-[11px] text-amber-400 mt-1">📦 Boîte scannée ×{l.quantite} (code {l.code_barre}) : tape sa réf. ci-dessus — le code sera retenu pour les prochaines fois.</p>
+                  )}
+                  {!l.product_id && !l.nouvellePiece && pieceNouvellePossible && (
+                    <button type="button" onClick={() => nouvellePieceSurLigne(i, "")} className="mt-1 text-[11px] text-amber-400 hover:text-amber-300">➕ Nouvelle pièce (pas encore dans l&apos;appli)</button>
+                  )}
+                  {/* Nouvelle pièce : type + marque + réf. de la boîte ; la fiche est créée à l'enregistrement (même hors-ligne) */}
+                  {l.nouvellePiece && (
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <label className="text-[10px] uppercase text-slate-500">Type
+                        <select className="input mt-0.5 py-1 text-xs" value={l.nouvellePiece.categorie} onChange={e => patchPiece(i, { categorie: e.target.value as ProductCategory })}>
+                          {TYPES_PIECE.map(c => <option key={c} value={c}>{libelleCat(c)}</option>)}
+                        </select>
+                      </label>
+                      <label className="text-[10px] uppercase text-slate-500">Marque
+                        <select className={`input mt-0.5 py-1 text-xs ${l.nouvellePiece.marque ? "" : "ring-1 ring-amber-500"}`} value={l.nouvellePiece.marque} onChange={async e => {
+                          if (e.target.value !== "__ajout__") { patchPiece(i, { marque: e.target.value }); return; }
+                          const nom = window.prompt("Nom de la nouvelle marque (comme sur la boîte) :");
+                          if (!nom) return;
+                          const r = await ajouterMarque(nom);
+                          setMarques(r.marques);
+                          if (r.erreur) { alert(r.erreur); return; }
+                          if (r.marque) patchPiece(i, { marque: r.marque });
+                        }}>
+                          {!l.nouvellePiece.marque && <option value="">— choisis —</option>}
+                          {marquesPour(marques, true, l.nouvellePiece.marque).map(b => <option key={b} value={b}>{b}</option>)}
+                          <option value="__ajout__">➕ Nouvelle marque…</option>
+                        </select>
+                      </label>
+                      <label className="col-span-2 text-[10px] uppercase text-slate-500">Réf. sur la boîte
+                        <input className="input mt-0.5 py-1 text-xs font-mono uppercase" placeholder="ex. K015578XS" value={l.nouvellePiece.reference} onChange={e => patchPiece(i, { reference: e.target.value.toUpperCase() })} />
+                      </label>
+                      <div className="col-span-2 flex items-center gap-2">
+                        <input className="input py-1 text-xs font-mono" placeholder="Code-barres de la boîte" value={l.code_barre} onChange={e => patchLine(i, { code_barre: e.target.value })} />
+                        <button type="button" onClick={() => setScanTarget(i)} className="btn-secondary px-2.5 py-1.5 shrink-0" aria-label="Scanner le code-barres"><ScanLine size={14} /></button>
+                      </div>
+                    </div>
                   )}
                   {/* Qté + prix sur une 2e ligne : lisible sur téléphone (grille avec libellés : .input est w-full) */}
                   <div className="grid grid-cols-3 gap-2 mt-1">
@@ -778,15 +886,18 @@ export default function FournisseursPage() {
                     </p>
                   )}
                   {/* Choix de la marque : le stock ira sur cette marque (Flag, Mann…) ou sur Filtron ; ou nouvelle marque */}
-                  {l.product_id && (
-                    <select className="input mt-1 py-1 text-xs" value={l.marque} onChange={e => setRecVariant(i, e.target.value)}>
-                      <option value="Filtron">{products.find(p => p.id === l.product_id)?.reference} · Filtron (principal)</option>
-                      {(variantsMap[l.product_id] ?? []).map(v => (
-                        <option key={v.id} value={v.marque}>{v.reference} · {v.marque}</option>
-                      ))}
-                      <option value="__new__">+ Autre marque (Mann, Wix, Mahle, Purflux, Mecafilter…)</option>
-                    </select>
-                  )}
+                  {l.product_id && (() => {
+                    const p = products.find(x => x.id === l.product_id);
+                    return (
+                      <select className="input mt-1 py-1 text-xs" value={l.marque} onChange={e => setRecVariant(i, e.target.value)}>
+                        <option value="Filtron">{p?.reference} · {p?.marque || "Filtron"} (principal)</option>
+                        {(variantsMap[l.product_id] ?? []).map(v => (
+                          <option key={v.id} value={v.marque}>{v.reference} · {v.marque}</option>
+                        ))}
+                        <option value="__new__">+ Autre marque ({estDistribution(p?.categorie) ? "Gates, Dayco, Dolz, SKF…" : "Mann, Wix, Mahle, Purflux, Mecafilter…"})</option>
+                      </select>
+                    );
+                  })()}
                   {l.marque === "__new__" && (
                     <div className="grid grid-cols-2 gap-2 mt-1">
                       <label className="text-[10px] uppercase text-slate-500">Marque
@@ -800,7 +911,7 @@ export default function FournisseursPage() {
                           if (r.erreur) { alert(r.erreur); return; }
                           if (r.marque) patchLine(i, { nouvelleMarque: r.marque });
                         }}>
-                          {marques.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
+                          {marquesPour(marques, estDistribution(products.find(x => x.id === l.product_id)?.categorie), l.nouvelleMarque).filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
                           <option value="__ajout__">➕ Nouvelle marque…</option>
                         </select>
                       </label>
@@ -815,8 +926,8 @@ export default function FournisseursPage() {
                       <button type="button" onClick={() => setScanTarget(i)} className="btn-secondary px-2.5 py-1.5 shrink-0" aria-label="Scanner le code-barres"><ScanLine size={14} /></button>
                     </div>
                   )}
-                  {/* Équivalents officiels (catalogues du groupe Filtron) */}
-                  {l.product_id && (
+                  {/* Équivalents officiels (catalogues du groupe Filtron) — filtres seulement */}
+                  {l.product_id && estFiltre(products.find(x => x.id === l.product_id)?.categorie) && (
                     <div className="flex gap-3 mt-1 text-[11px]">
                       {(["Mann", "Wix"] as const).map(m => (
                         <a key={m} href={crossUrl(m, products.find(p => p.id === l.product_id)?.reference ?? "")} target="_blank" rel="noreferrer" className="text-blue-400 hover:underline flex items-center gap-1">

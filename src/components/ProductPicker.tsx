@@ -8,9 +8,13 @@ export type PickerVariant = { id: string; product_id: string; marque: string; re
 // qu'un menu déroulant de milliers de produits.
 // Avec `variants` : on trouve aussi un filtre par la référence d'une variante de marque
 // (ex. « WL7009 » Wix → OE640/2) ; onSelect reçoit alors la variante en 2e argument.
+// Avec `onCreate` : la réf. tapée peut devenir une NOUVELLE pièce (Réception de distribution, BIBLE §8.30).
 export default function ProductPicker({
-  products, value, onSelect, variants,
-}: { products: Product[]; value: string; onSelect: (p: Product, v?: PickerVariant) => void; variants?: PickerVariant[] }) {
+  products, value, onSelect, variants, placeholder, onCreate,
+}: {
+  products: Product[]; value: string; onSelect: (p: Product, v?: PickerVariant) => void; variants?: PickerVariant[];
+  placeholder?: string; onCreate?: (reference: string) => void;
+}) {
   const selected = products.find((p) => p.id === value) || null;
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
@@ -53,14 +57,14 @@ export default function ProductPicker({
     <div className="relative" ref={wrapRef}>
       <input
         className="input font-mono"
-        placeholder={variants ? "Réf. Filtron, Wix, Flag, Mann…" : "Réf. (ex : AK218/1)"}
+        placeholder={placeholder ?? (variants ? "Réf. Filtron, Wix, Flag, Mann…" : "Réf. (ex : AK218/1)")}
         value={open ? q : label}
         onFocus={() => { setOpen(true); setQ(""); setHi(0); }}
         onChange={(e) => { setQ(e.target.value); setOpen(true); setHi(0); }}
         onKeyDown={(e) => {
           if (e.key === "ArrowDown") { e.preventDefault(); setHi((h) => Math.min(h + 1, matches.length - 1)); }
           else if (e.key === "ArrowUp") { e.preventDefault(); setHi((h) => Math.max(h - 1, 0)); }
-          else if (e.key === "Enter") { e.preventDefault(); if (matches[hi]) pick(matches[hi]); }
+          else if (e.key === "Enter") { e.preventDefault(); if (matches[hi]) pick(matches[hi]); else if (onCreate && q.trim()) { onCreate(q.trim()); setQ(""); setOpen(false); } }
           else if (e.key === "Escape") setOpen(false);
         }}
       />
@@ -91,7 +95,15 @@ export default function ProductPicker({
         </div>
       )}
       {open && q.trim() && matches.length === 0 && (
-        <div className="absolute z-[60] mt-1 w-full card p-3 text-xs text-slate-400 shadow-xl">Aucune référence trouvée</div>
+        <div className="absolute z-[60] mt-1 w-full card p-1 text-xs text-slate-400 shadow-xl">
+          <p className="px-2 py-1.5">Aucune référence trouvée</p>
+          {onCreate && (
+            <button type="button" onClick={() => { onCreate(q.trim()); setQ(""); setOpen(false); }}
+              className="w-full text-left px-2 py-2 rounded-md bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 font-medium">
+              ➕ Nouvelle pièce « {q.trim().toUpperCase()} »
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

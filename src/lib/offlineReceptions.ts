@@ -3,11 +3,14 @@
 // mémorisée après chaque ligne -> une coupure réseau en plein envoi reprend là où elle s'est
 // arrêtée, sans compter deux fois le stock. Hors-ligne : la réception attend le retour du réseau.
 import { supabase } from "./supabase";
-import type { ReceptionLigne } from "@/types/database";
+import type { ProductCategory, ReceptionLigne } from "@/types/database";
 
+// Pièce pas encore dans l'appli (distribution : Filtron n'en fait pas) : créée à l'envoi (BIBLE §8.30)
+export type NouvellePiece = { categorie: ProductCategory; marque: string; reference: string; nom: string };
 export type RecLigneAttente = {
   product_id: string; equivalence_id: string | null; quantite: number; prix_achat: number; prix_vente: number;
   code_barre: string; nouvelleMarque: string | null; nouvelleRef: string; libelle: string;
+  nouvellePiece?: NouvellePiece | null; // product_id vide tant que la pièce n'est pas créée
 };
 export type ReceptionAttente = {
   id: string;               // id de la réception (créée une seule fois, même après coupure)
@@ -34,8 +37,35 @@ async function ok<T extends { error: unknown }>(p: PromiseLike<T>): Promise<T> {
   return res;
 }
 
-// Applique une réception : ligne `receptions`, puis stock + prix + code-barres de chaque ligne.
+// Nouvelles pièces (distribution…) : créées AVANT la ligne `receptions` → si la base les refuse (SQL pas collé),
+// rien n'est écrit (ni dette, ni stock) et la réception attend dans la file. Réutilisées si la même référence existe
+// déjà (autre appareil, essai coupé) ; product_id gardé tout de suite → une reprise ne les crée pas deux fois.
+async function creerPieces(r: ReceptionAttente) {
+  for (const l of r.lignes) {
+    if (l.product_id || !l.nouvellePiece) continue;
+    const np = l.nouvellePiece;
+    const trouver = async () => (await ok(supabase.from("products").select("id").ilike("reference", np.reference).limit(1))).data?.[0]?.id as string | undefined;
+    let id = await trouver();
+    if (!id) {
+      const { data, error } = await supabase.from("products").insert({
+        reference: np.reference, marque: np.marque, categorie: np.categorie, nom_fr: np.nom, nom_ar: "",
+        prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 1, notes: null,
+      }).select("id").single();
+      if (error && !/duplicate|unique/i.test(error.message)) {
+        throw /categorie_check/i.test(error.message)
+          ? new Error("Catégorie pas encore acceptée par la base : colle supabase/categories_distribution.sql dans Supabase (la réception attend, rien n'est perdu).")
+          : error;
+      }
+      id = (data as { id: string } | null)?.id ?? await trouver();
+    }
+    if (!id) throw new Error(`Pièce ${np.reference} non créée`);
+    l.product_id = id; maj(r);
+  }
+}
+
+// Applique une réception : nouvelles pièces, ligne `receptions`, puis stock + prix + code-barres de chaque ligne.
 async function appliquer(r: ReceptionAttente) {
+  await creerPieces(r);
   if (!r.enregistree) {
     const { error } = await supabase.from("receptions").insert({ id: r.id, fournisseur_id: r.fournisseur_id, date: r.date, montant: r.montant, details: r.details });
     if (error && !/duplicate|unique/i.test(error.message)) throw error; // déjà créée lors d'un essai coupé
