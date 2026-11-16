@@ -166,6 +166,7 @@ Avant : n'importe qui pouvait lire, modifier ou effacer tes clients, tes ventes 
   - 🔴 sinon → tape le code moteur ou le modèle dans le 2e champ, choisis la bonne voiture et appuie sur **« C'est cette voiture »**. La prochaine fois, ce VIN sera reconnu tout seul.
 - Si la variante tapée n'existe pas dans les données Filtron, l'appli montre le moteur de base avec un avertissement 🟠 : vérifie le modèle et l'année avant de vendre.
 - L'année lue dans le VIN est seulement une **indication** : beaucoup de marques européennes ne l'écrivent pas.
+- **Peugeot et Citroën** (VIN qui commence par VF3, VR3, VF7, VR7 ou VS7) : le VIN indique le plus souvent le **type de moteur** (caractères 6 à 8, par exemple « RHZ » pour le 2.0 HDi). FiltroPro propose alors directement les voitures avec ce moteur 🟠 (exemple : Citroën Evasion 2.0 HDi). Vérifie le modèle et l'année, puis appuie sur **« C'est cette voiture »**. Si ce n'est pas la bonne, tape le modèle ou le code moteur dans le 2e champ.
 
 ## 11. Le catalogue par marque
 

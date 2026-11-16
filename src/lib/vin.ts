@@ -93,7 +93,20 @@ const ANNEES: Record<string, number> = {
   L: 2020, M: 2021, N: 2022, P: 2023, R: 2024, S: 2025, T: 2026, V: 2027, W: 2028, X: 2029, Y: 2030,
 };
 export function anneeProbable(vin: string): number | null {
-  return vin.length >= 10 ? ANNEES[vin[9]] ?? null : null;
+  const a = vin.length >= 10 ? ANNEES[vin[9]] ?? null : null;
+  // Les lettres reviennent tous les 30 ans : « Y » = 2000 ou 2030 → jamais une année dans le futur
+  return a && a > new Date().getFullYear() + 1 ? a - 30 : a;
+}
+
+// Peugeot / Citroën (PSA, puis Stellantis) : les positions 6 à 8 du VIN indiquent le plus souvent le TYPE de moteur
+// (ex. « RHZ » = 2.0 HDi DW10ATED, « 9HZ » = 1.6 HDi DV6TED4), mais pas sur tous les modèles. Sources (16/11/2026) :
+// youcanic.com/peugeot-vin-decoder, vin.mecalife.com (Peugeot 1007, Rifter) ; « ne pas déduire la motorisation du
+// seul VIN » → c'est une PROPOSITION à vérifier et confirmer, jamais une certitude.
+const PSA = new Set(["VF3", "VR3", "VF7", "VR7", "VS7"]);
+export function typeMoteurPsa(vin: string): string | null {
+  if (vin.length !== 17 || !PSA.has(vin.slice(0, 3))) return null;
+  const t = vin.slice(5, 8);
+  return /^[0-9A-Z]{3}$/.test(t) && /[A-Z]/.test(t) ? t : null;
 }
 
 /** « Famille » du VIN : constructeur + partie descriptive (8 premiers caractères, sans le caractère de contrôle). */
