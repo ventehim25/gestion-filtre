@@ -365,9 +365,11 @@ export default function FournisseursPage() {
   }
 
   function histOf(id: string) {
-    const r = receptions.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "rec" as const, date: x.date, montant: x.montant, text: x.details ?? "Marchandise", rec: x, av: null }));
-    const a = avances.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "av" as const, date: x.date, montant: x.montant, text: x.note ?? "Avance", rec: null, av: x }));
-    return [...r, ...a].sort((p, q) => q.date.localeCompare(p.date));
+    const r = receptions.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "rec" as const, date: x.date, cree: x.created_at ?? "", montant: x.montant, text: x.details ?? "Marchandise", rec: x, av: null }));
+    const a = avances.filter(x => x.fournisseur_id === id && inMonth(x.date)).map(x => ({ type: "av" as const, date: x.date, cree: x.created_at ?? "", montant: x.montant, text: x.note ?? "Avance", rec: null, av: x }));
+    // Par date, puis le plus récent en haut dans une même journée (avant : toutes les réceptions du jour passaient
+    // avant les avances du même jour, qui se retrouvaient en bas de la liste)
+    return [...r, ...a].sort((p, q) => q.date.localeCompare(p.date) || q.cree.localeCompare(p.cree));
   }
 
   // ---- Réceptions en attente (hors-ligne / coupure) : envoi auto au retour du réseau ----
