@@ -14,6 +14,8 @@ import VoiceButton from "@/components/VoiceButton";
 import RechercheVin from "@/components/RechercheVin";
 import CatalogueMarques from "@/components/CatalogueMarques";
 import { constructeur, anneeProbable, nettoyerVin } from "@/lib/vin";
+import { CATEGORIES, CATEGORY_KEYS, estDistribution } from "@/lib/categories";
+import { DEPART, chargerMarques, marquesPour } from "@/lib/brands";
 
 type Vehicule = {
   id: string;
@@ -120,12 +122,8 @@ export default function RecherchePage() {
   }, []);
 
   const categoryLabel = (cat: string) => {
-    const map: Record<string, string> = {
-      filtre_huile: t("filterOil"), filtre_air: t("filterAir"),
-      filtre_carburant: t("filterFuel"), filtre_habitacle: t("filterCabin"),
-      filtre_refroidissement: t("filterCooling"), huile_moteur: t("motorOil"), autre: t("other"),
-    };
-    return map[cat] ?? cat;
+    const k = CATEGORY_KEYS[cat as ProductCategory];
+    return k ? t(k) : cat;
   };
 
   const catColor = (cat: string) => {
@@ -135,6 +133,10 @@ export default function RecherchePage() {
       filtre_carburant: "bg-rose-100 text-rose-700",
       filtre_habitacle: "bg-emerald-100 text-emerald-700",
       huile_moteur: "bg-orange-100 text-orange-700",
+      chaine_distribution: "bg-violet-100 text-violet-700",
+      courroie_distribution: "bg-indigo-100 text-indigo-700",
+      pompe_eau: "bg-cyan-100 text-cyan-700",
+      kit_distribution: "bg-fuchsia-100 text-fuchsia-700",
     };
     return map[cat] ?? "bg-slate-100 text-slate-600";
   };
@@ -178,17 +180,24 @@ export default function RecherchePage() {
   function toggleDetails(id: string) { setOpenDetails(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
 
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
-  const ADD_CATS = ["filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle", "filtre_refroidissement", "huile_moteur", "autre"];
-  const ADD_BRANDS = ["Filtron", "Flag", "Filtrex", "Mann", "Wix", "Bosch", "Champion", "Purflux", "Mecafilter", "Mahle", "Hengst", "UFI", "Fram", "Misfat", "Wunder", "OE", "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
+  const ADD_CATS = CATEGORIES;
+  // Marques : celles du métier de la pièce (filtres ou distribution, BIBLE §8.30) + celles ajoutées par l'utilisateur
+  const [toutesMarques, setToutesMarques] = useState<string[]>(DEPART);
+  useEffect(() => { chargerMarques().then(setToutesMarques); }, []);
   const emptyAdd = { reference: "", marque: "Filtron", filtronRef: "", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, code_barre: "" };
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState(emptyAdd);
   const [addSaving, setAddSaving] = useState(false);
   const [addScan, setAddScan] = useState(false);
+  const addDistrib = estDistribution(addForm.categorie);
+  const ADD_BRANDS = addDistrib
+    ? marquesPour(toutesMarques, true, addForm.marque)
+    : [...marquesPour(toutesMarques, false, addForm.marque), "OE", "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"].filter((b, i, a) => a.indexOf(b) === i);
   function openAdd() { setAddForm({ ...emptyAdd, reference: refQuery.trim().toUpperCase() }); setShowAdd(true); }
   async function saveNew() {
     const ref = addForm.reference.trim();
     if (!ref) { alert("Référence obligatoire."); return; }
+    if (!addForm.marque) { alert("Choisis la marque de la pièce (Gates, Dayco, Dolz…)."); return; }
     const { filtronRef, ...prod } = addForm;
     const fref = (filtronRef || "").trim();
     setAddSaving(true);
@@ -211,7 +220,7 @@ export default function RecherchePage() {
         setRefQuery(parent.reference); searchRef(parent.reference);
         return;
       }
-      alert(`Filtron « ${fref} » introuvable — la référence est créée comme fiche indépendante.`);
+      alert(`« ${fref} » introuvable — la référence est créée comme fiche indépendante.`);
     }
 
     // Empêche de créer une fiche en double (même référence, casse/espaces différents)
@@ -229,7 +238,12 @@ export default function RecherchePage() {
     const payload = { ...prod, reference: ref, nom_fr: "", nom_ar: "", notes: "", prix_promo: null };
     const { error } = await supabase.from("products").insert(payload);
     setAddSaving(false);
-    if (error) { alert("Erreur : " + error.message); return; }
+    if (error) {
+      alert(/categorie_check/i.test(error.message)
+        ? "La base n'accepte pas encore cette catégorie.\nColle d'abord le fichier supabase/categories_distribution.sql dans l'éditeur SQL de Supabase, puis réessaie."
+        : "Erreur : " + error.message);
+      return;
+    }
     setShowAdd(false);
     setRefQuery(ref); searchRef(ref);
   }
@@ -656,14 +670,25 @@ export default function RecherchePage() {
                 <input autoFocus className="input font-mono uppercase" value={addForm.reference} onChange={e => setAddForm({ ...addForm, reference: e.target.value.toUpperCase() })} /></div>
               <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">Marque</label>
                 <select className="input" value={addForm.marque} onChange={e => setAddForm({ ...addForm, marque: e.target.value })}>
+                  {!addForm.marque && <option value="">— choisis la marque —</option>}
                   {ADD_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
                 </select></div>
-              {addForm.marque !== "Filtron" && (
-                <div className="col-span-2"><label className="text-xs text-amber-400 mb-1 block">Référence Filtron équivalente <span className="text-slate-500 font-normal">(pour rattacher sous le Filtron)</span></label>
-                  <input className="input font-mono uppercase" placeholder="ex : OE667/6 — laisse vide si aucune" value={addForm.filtronRef} onChange={e => setAddForm({ ...addForm, filtronRef: e.target.value.toUpperCase() })} /></div>
+              {addForm.marque && addForm.marque !== "Filtron" && (
+                addDistrib ? (
+                  <div className="col-span-2"><label className="text-xs text-amber-400 mb-1 block">Même pièce déjà enregistrée sous une autre marque ? <span className="text-slate-500 font-normal">(sa référence, pour rattacher comme variante)</span></label>
+                    <input className="input font-mono uppercase" placeholder="ex : la réf. Gates du même kit — laisse vide si aucune" value={addForm.filtronRef} onChange={e => setAddForm({ ...addForm, filtronRef: e.target.value.toUpperCase() })} /></div>
+                ) : (
+                  <div className="col-span-2"><label className="text-xs text-amber-400 mb-1 block">Référence Filtron équivalente <span className="text-slate-500 font-normal">(pour rattacher sous le Filtron)</span></label>
+                    <input className="input font-mono uppercase" placeholder="ex : OE667/6 — laisse vide si aucune" value={addForm.filtronRef} onChange={e => setAddForm({ ...addForm, filtronRef: e.target.value.toUpperCase() })} /></div>
+                )
               )}
               <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
-                <select className="input" value={addForm.categorie} onChange={e => setAddForm({ ...addForm, categorie: e.target.value as ProductCategory })}>
+                <select className="input" value={addForm.categorie} onChange={e => {
+                  const c = e.target.value as ProductCategory;
+                  // Filtron ne fait pas de distribution : on fait choisir la vraie marque (et l'inverse)
+                  const marque = estDistribution(c) && addForm.marque === "Filtron" ? "" : !estDistribution(c) && !addForm.marque ? "Filtron" : addForm.marque;
+                  setAddForm({ ...addForm, categorie: c, marque });
+                }}>
                   {ADD_CATS.map(c => <option key={c} value={c}>{categoryLabel(c)}</option>)}
                 </select></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("buyPrice")} (MAD)</label>

@@ -233,6 +233,10 @@ export type ProductCategory =
   | "filtre_habitacle"
   | "filtre_refroidissement"
   | "huile_moteur"
+  | "chaine_distribution"
+  | "courroie_distribution"
+  | "pompe_eau"
+  | "kit_distribution"
   | "autre";
 
 export type Product = {

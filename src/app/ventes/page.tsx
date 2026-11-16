@@ -210,7 +210,7 @@ export default function VentesPage() {
   async function setLineProductVariant(i: number, p: Product, marque: string) {
     setLineProduct(i, p);
     const v = (await loadVariants(p)).find(x => x.marque === marque);
-    if (v) setLines(prev => prev.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: prixClient(v.prix, v), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
+    if (v) setLines(prev => prev.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: prixClient(v.prix, v), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.equivalence_id ? v.marque : (p.marque || "Filtron")})` } : x));
   }
 
   // Applique une marque à une ligne : prix de vente auto + coût figé + libellé "réf (marque)"
@@ -218,7 +218,9 @@ export default function VentesPage() {
     const l = lines[i];
     const v = (variants[l.product_id] || []).find(x => x.marque === marque);
     if (!v) return;
-    setLines(lines.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: prixClient(v.prix, v), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.marque})` } : x));
+    // Marque principale = celle de la fiche (Filtron pour un filtre, Gates/Dayco… pour la distribution)
+    const principale = productById(l.product_id)?.marque || "Filtron";
+    setLines(lines.map((x, j) => j === i ? { ...x, variant: marque, prix_unitaire: prixClient(v.prix, v), cout_unitaire: v.prix_achat, equivalence_id: v.equivalence_id, nom: `${v.reference} (${v.equivalence_id ? v.marque : principale})` } : x));
   }
 
   // Vente croisée : autres filtres (catégories différentes) compatibles avec le même véhicule
@@ -717,7 +719,7 @@ export default function VentesPage() {
                   {variants[l.product_id] && variants[l.product_id].length > 1 && (
                     <select className="input mt-1 py-1 text-xs" value={l.variant ?? "Filtron"} onChange={e => applyVariant(i, e.target.value)}>
                       {variants[l.product_id].map(v => (
-                        <option key={v.marque + v.reference} value={v.marque}>{v.marque} · {v.reference} · {v.prix} MAD (stock {v.stock})</option>
+                        <option key={v.marque + v.reference} value={v.marque}>{v.equivalence_id ? v.marque : (productById(l.product_id)?.marque || "Filtron")} · {v.reference} · {v.prix} MAD (stock {v.stock})</option>
                       ))}
                     </select>
                   )}

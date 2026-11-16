@@ -2,6 +2,7 @@
 // EN DIRECT depuis les produits gérés dans /produits. Change un prix / un stock → ça suit.
 import { supabase } from "./supabase";
 import { ProductCategory } from "@/types/database";
+import { CATEGORIES } from "./categories";
 import { chargerPourcentages, prixPour, type PrixManuels, type TypeCatalogue } from "./prixCatalogues";
 
 // Clé du lien privé. Le catalogue de prix ne s'ouvre qu'avec ?k=<clé>.
@@ -14,13 +15,14 @@ export const CAT_FR: Record<string, string> = {
   filtre_habitacle: "Filtres d'habitacle",
   filtre_refroidissement: "Filtres de refroidissement",
   huile_moteur: "Huile moteur",
+  chaine_distribution: "Chaînes de distribution",
+  courroie_distribution: "Courroies de distribution",
+  pompe_eau: "Pompes à eau",
+  kit_distribution: "Kits de distribution",
   autre: "Autres pièces",
 };
 
-export const CAT_ORDER: ProductCategory[] = [
-  "filtre_huile", "filtre_air", "filtre_carburant", "filtre_habitacle",
-  "filtre_refroidissement", "huile_moteur", "autre",
-];
+export const CAT_ORDER: ProductCategory[] = CATEGORIES;
 
 const norm = (s: string) => s.toUpperCase().replace(/\s+/g, "");
 const catOrder = (c: string) => { const i = CAT_ORDER.indexOf(c as ProductCategory); return i < 0 ? 99 : i; };

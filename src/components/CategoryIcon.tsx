@@ -1,5 +1,5 @@
 "use client";
-import { Wind, Fuel, Car, Snowflake, Ellipsis, Droplet, type LucideProps } from "lucide-react";
+import { Wind, Fuel, Car, Snowflake, Ellipsis, Droplet, Link, Infinity as Boucle, Droplets, Package, type LucideProps } from "lucide-react";
 
 // Icône burette d'huile (style ligne, comme Filtron) — pas disponible dans lucide
 function OilCan(props: LucideProps) {
@@ -24,6 +24,10 @@ const MAP: Record<string, React.ComponentType<LucideProps>> = {
   filtre_habitacle: Car,
   filtre_refroidissement: Snowflake,
   huile_moteur: Droplet,
+  chaine_distribution: Link,
+  courroie_distribution: Boucle,
+  pompe_eau: Droplets,
+  kit_distribution: Package,
   autre: Ellipsis,
 };
 

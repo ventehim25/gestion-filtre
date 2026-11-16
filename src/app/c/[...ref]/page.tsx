@@ -13,7 +13,8 @@ const TEL_WA = "212602350290";
 const CAT_FR: Record<string, string> = {
   filtre_huile: "Filtre à huile", filtre_air: "Filtre à air", filtre_carburant: "Filtre à carburant",
   filtre_habitacle: "Filtre d'habitacle", filtre_refroidissement: "Filtre de refroidissement",
-  huile_moteur: "Huile moteur", autre: "Pièce auto",
+  huile_moteur: "Huile moteur", chaine_distribution: "Chaîne de distribution", courroie_distribution: "Courroie de distribution",
+  pompe_eau: "Pompe à eau", kit_distribution: "Kit de distribution", autre: "Pièce auto",
 };
 
 type Row = Product & { equivalences: Equivalence[]; applications: Application[] };

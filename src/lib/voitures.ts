@@ -10,10 +10,11 @@ export type Voiture = {
 };
 
 export const COLS = "marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, product_id, products(id, reference, marque, categorie, stock, stock_min, prix_vente, image_url)";
-export const ORDRE = ["filtre_huile", "filtre_air", "filtre_habitacle", "filtre_carburant", "filtre_refroidissement", "huile_moteur", "autre"];
+export const ORDRE = ["filtre_huile", "filtre_air", "filtre_habitacle", "filtre_carburant", "filtre_refroidissement", "huile_moteur", "kit_distribution", "courroie_distribution", "chaine_distribution", "pompe_eau", "autre"];
 export const LIBELLE: Record<string, string> = {
   filtre_huile: "Filtre à huile", filtre_air: "Filtre à air", filtre_habitacle: "Filtre d'habitacle",
-  filtre_carburant: "Filtre à carburant", filtre_refroidissement: "Refroidissement", huile_moteur: "Huile moteur", autre: "Autre",
+  filtre_carburant: "Filtre à carburant", filtre_refroidissement: "Refroidissement", huile_moteur: "Huile moteur",
+  chaine_distribution: "Chaîne de distribution", courroie_distribution: "Courroie de distribution", pompe_eau: "Pompe à eau", kit_distribution: "Kit de distribution", autre: "Autre",
 };
 
 /** Regroupe les lignes par voiture (marque + modèle + motorisation + code moteur), filtres triés huile → air → habitacle → carburant. */

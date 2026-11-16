@@ -11,23 +11,11 @@ import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { queueStock, pendingStockCount, syncStock } from "@/lib/offlineStock";
+import { CATEGORIES, CATEGORY_KEYS as categoryKeys } from "@/lib/categories";
+import { DEPART } from "@/lib/brands";
 
-const CATEGORIES: ProductCategory[] = [
-  "filtre_huile", "filtre_air", "filtre_carburant",
-  "filtre_habitacle", "filtre_refroidissement", "huile_moteur", "autre",
-];
-
-const categoryKeys: Record<ProductCategory, "filterOil" | "filterAir" | "filterFuel" | "filterCabin" | "filterCooling" | "motorOil" | "other"> = {
-  filtre_huile: "filterOil",
-  filtre_air: "filterAir",
-  filtre_carburant: "filterFuel",
-  filtre_habitacle: "filterCabin",
-  filtre_refroidissement: "filterCooling",
-  huile_moteur: "motorOil",
-  autre: "other",
-};
-
-const BRANDS = ["Filtron", "Mann", "Bosch", "Champion", "Purflux", "Mecafilter", "Mahle", "Hengst", "UFI", "Flag", "Filtrex", "Fram", "Misfat", "Wunder", "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
+// Catégories et marques : listes communes (filtres + huile + distribution, BIBLE §8.30)
+const BRANDS = [...DEPART, "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
 const PAGE_SIZE = 60;
 
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe

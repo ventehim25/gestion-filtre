@@ -7,7 +7,8 @@ import { useLang } from "@/context/LangContext";
 import type { TranslationKey } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
-import { FILTER_BRANDS, chargerMarques, ajouterMarque } from "@/lib/brands";
+import { DEPART, DISTRIBUTION_BRANDS, chargerMarques, ajouterMarque, marquesPour } from "@/lib/brands";
+import { CATEGORIES, CATEGORY_KEYS as categoryKeys, estDistribution, estFiltre } from "@/lib/categories";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
 import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle, Camera } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
@@ -23,20 +24,13 @@ import { CATALOGUES, POURCENTAGES_DEFAUT, chargerPourcentages, prixPour, type Po
 const MANUELS_VIDES = { prix_particulier: 0, prix_location: 0, prix_magasin: 0 };
 const COL_CAT = { particulier: "prix_particulier", location: "prix_location", magasin: "prix_magasin" } as const;
 
-const CATEGORIES: ProductCategory[] = [
-  "filtre_huile", "filtre_air", "filtre_carburant",
-  "filtre_habitacle", "filtre_refroidissement", "huile_moteur", "autre",
-];
-
-const categoryKeys: Record<ProductCategory, TranslationKey> = {
-  filtre_huile: "filterOil",
-  filtre_air: "filterAir",
-  filtre_carburant: "filterFuel",
-  filtre_habitacle: "filterCabin",
-  filtre_refroidissement: "filterCooling",
-  huile_moteur: "motorOil",
-  autre: "other",
-};
+// Catégories : liste commune (src/lib/categories.ts), filtres + huile + distribution (BIBLE §8.30)
+// Marque proposée par défaut pour une nouvelle variante : Flag pour un filtre, la 1re marque de distribution
+// différente de la marque principale pour une pièce de distribution.
+const varDefaut = (categorie: string, marque?: string) =>
+  estDistribution(categorie) ? (DISTRIBUTION_BRANDS.find(m => m !== marque) ?? "Dayco") : "Flag";
+const ERREUR_CATEGORIE = "La base n'accepte pas encore cette catégorie.\nColle d'abord le fichier supabase/categories_distribution.sql dans l'éditeur SQL de Supabase, puis réessaie.";
+const msgErreur = (e: { message: string } | null) => e && (/categorie_check/i.test(e.message) ? ERREUR_CATEGORIE : `Erreur : ${e.message}`);
 
 const empty = { nom_fr: "", nom_ar: "", reference: "", marque: "Filtron", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0, code_barre: "", image_url: "" };
 
@@ -113,9 +107,11 @@ export default function ProduitsPage() {
 
   async function save() {
     let productId = editing?.id;
+    if (!form.marque.trim()) { alert("Choisis la marque de la pièce (Gates, Dayco, Dolz…)."); return; }
     const payload = { ...form, prix_promo: form.prix_promo > 0 ? form.prix_promo : null, image_url: form.image_url || null };
     if (editing) {
-      await supabase.from("products").update(payload).eq("id", editing.id);
+      const { error } = await supabase.from("products").update(payload).eq("id", editing.id);
+      if (error) { alert(msgErreur(error)); return; }
     } else {
       // Empêche de créer une fiche en double (même référence, casse/espaces différents) —
       // redirige plutôt vers la fiche existante pour y ajouter la marque comme variante.
@@ -127,7 +123,8 @@ export default function ProduitsPage() {
         if (triedMarque && triedMarque !== "Filtron") setNewEquiv(n => ({ ...n, marque: triedMarque }));
         return;
       }
-      const { data: inserted } = await supabase.from("products").insert(payload).select().single();
+      const { data: inserted, error } = await supabase.from("products").insert(payload).select().single();
+      if (error) { alert(msgErreur(error)); return; }
       productId = (inserted as Product | null)?.id;
     }
     // Prix par catalogue corrigés à la main : envoyés à part (sans effet tant que le SQL n'est pas collé)
@@ -159,7 +156,7 @@ export default function ProduitsPage() {
       });
       if (nouvelles.length) await supabase.from("equivalences").insert(nouvelles);
     }
-    setShowForm(false); setEditing(null); setForm(empty); setManuels(MANUELS_VIDES); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
+    setShowForm(false); setEditing(null); setForm(empty); setManuels(MANUELS_VIDES); setEquivs([]); setNewEquiv({ marque: varDefaut(empty.categorie), reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
     load();
   }
 
@@ -196,13 +193,13 @@ export default function ProduitsPage() {
     setManuels({ prix_particulier: p.prix_particulier ?? 0, prix_location: p.prix_location ?? 0, prix_magasin: p.prix_magasin ?? 0 });
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
     setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined, prix_achat: e.prix_achat ?? undefined, stock: e.stock ?? 0, code_barre: e.code_barre ?? "" })) ?? []);
-    setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
+    setNewEquiv({ marque: varDefaut(p.categorie, p.marque), reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" });
     setShowAutoEquivs(false);
     setShowForm(true);
   }
 
   function openNew() {
-    setShowForm(true); setEditing(null); setForm(empty); setManuels(MANUELS_VIDES); setEquivs([]); setNewEquiv({ marque: "Flag", reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" }); setShowAutoEquivs(false);
+    setShowForm(true); setEditing(null); setForm(empty); setManuels(MANUELS_VIDES); setEquivs([]); setNewEquiv({ marque: varDefaut(empty.categorie), reference: "", prix: 0, prix_achat: 0, stock: 0, code_barre: "" }); setShowAutoEquivs(false);
   }
 
   // Diffuse les produits en promo (prix_promo > 0) par WhatsApp
@@ -221,7 +218,7 @@ export default function ProduitsPage() {
       .select("marque, modele, moteur", { count: "exact" }).eq("product_id", p.id).limit(4);
     const variantes = (equivMap[p.id] ?? []).filter(e => e.stock > 0).map(e => e.marque);
     const lignes = [
-      `🔧 *${p.nom_fr || "Filtre"} ${p.marque || "Filtron"} ${p.reference}*`,
+      `🔧 *${p.nom_fr || (estFiltre(p.categorie) ? "Filtre" : t(categoryKeys[p.categorie] ?? "other"))} ${p.marque || "Filtron"} ${p.reference}*`,
     ];
     if (p.dimensions) lignes.push(`📏 ${p.dimensions}`);
     const appRows = (apps ?? []) as { marque: string; modele: string; moteur: string | null }[];
@@ -253,13 +250,19 @@ export default function ProduitsPage() {
 
   // Marques de FILTRES (Filtron = produit principal, les autres = variantes équivalentes) : celles de départ
   // + celles ajoutées par l'utilisateur (« ➕ Nouvelle marque… », gardées dans la base, src/lib/brands.ts).
-  const [BRANDS, setBrands] = useState<string[]>(FILTER_BRANDS);
+  const [BRANDS, setBrands] = useState<string[]>(DEPART);
   // Marques reconnues (hors Filtron, + "OE") : toujours visibles dans les variantes, jamais
   // mélangées avec les codes constructeur (Citroën, Ford…) importés automatiquement.
   const KNOWN_BRANDS = new Set([...BRANDS.filter(b => b !== "Filtron"), "OE"].map(b => b.toLowerCase()));
-  // Toutes les marques possibles pour un PRODUIT (filtres + huiles moteur, produits indépendants
-  // sans système de variantes) — utilisé pour la fiche produit et le filtre de la liste.
-  const PRODUCT_BRANDS = [...BRANDS, "Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
+  // Toutes les marques possibles pour un PRODUIT (filtres + distribution + huiles moteur, produits indépendants
+  // sans système de variantes) — utilisé pour le filtre de la liste.
+  const OIL_BRANDS = ["Castrol", "Pemko", "Fanfaro", "Mannol", "Motul", "Total", "Kansler"];
+  const PRODUCT_BRANDS = [...BRANDS, ...OIL_BRANDS];
+  // Fiche produit : les marques du métier de la pièce (filtres ou distribution), la marque choisie toujours présente
+  const formDistribution = estDistribution(form.categorie);
+  const FORM_BRANDS = formDistribution ? marquesPour(BRANDS, true, form.marque) : [...marquesPour(BRANDS, false, form.marque), ...OIL_BRANDS.filter(b => b !== form.marque)];
+  const VARIANT_BRANDS = marquesPour(BRANDS, formDistribution, newEquiv.marque).filter(b => b !== "Filtron" && b !== form.marque);
+  const marquePrincipale = form.marque || "Filtron";
   const [brandFilter, setBrandFilter] = useState("");
   const [refSearch, setRefSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
@@ -278,7 +281,8 @@ export default function ProduitsPage() {
     const matchRef = !refSearch || norm(p.reference).startsWith(refN) || eqs.some(e => norm(e.reference).startsWith(refN));
     const matchBrand = !brandFilter || (p.marque ?? "Filtron").toLowerCase() === brandFilter.toLowerCase();
     const matchCat = !catFilter || p.categorie === catFilter;
-    const matchKind = !kindFilter || classifyKind(p.reference, vehMap[p.id]?.makes) === kindFilter;
+    // Préfixes camion = règle des références FILTRON seulement (une réf Gates/Dolz n'en dit rien)
+    const matchKind = !kindFilter || classifyKind(estDistribution(p.categorie) ? "" : p.reference, vehMap[p.id]?.makes) === kindFilter;
     return matchSearch && matchRef && matchBrand && matchCat && matchKind;
   }).sort((a, b) => {
     // Disponibles en HAUT, ruptures en BAS (un produit est « dispo » si son stock
@@ -347,12 +351,21 @@ export default function ProduitsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div><label className="text-xs text-slate-500 mb-1 block">{t("reference")}</label><input className="input font-mono uppercase" value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value.toUpperCase() })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">Marque</label>
-                <select className="input" value={form.marque} onChange={e => setForm({ ...form, marque: e.target.value })}>
-                  {PRODUCT_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                <select className="input" value={form.marque} onChange={e => { const m = e.target.value; setForm({ ...form, marque: m }); if (newEquiv.marque === m) setNewEquiv(n => ({ ...n, marque: varDefaut(form.categorie, m) })); }}>
+                  {!form.marque && <option value="">— choisis la marque —</option>}
+                  {FORM_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
                 </select>
               </div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("category")}</label>
-                <select className="input" value={form.categorie} onChange={e => setForm({ ...form, categorie: e.target.value as ProductCategory })}>
+                <select className="input" value={form.categorie} onChange={e => {
+                  const c = e.target.value as ProductCategory;
+                  const versDistrib = estDistribution(c) && !estDistribution(form.categorie);
+                  const versFiltre = !estDistribution(c) && estDistribution(form.categorie);
+                  // Filtron ne fait pas de distribution : on fait choisir la vraie marque (et l'inverse)
+                  const marque = versDistrib && form.marque === "Filtron" ? "" : versFiltre && !form.marque ? "Filtron" : form.marque;
+                  setForm({ ...form, categorie: c, marque });
+                  if (versDistrib || versFiltre) setNewEquiv(n => ({ ...n, marque: varDefaut(c, marque) }));
+                }}>
                   {CATEGORIES.map(c => <option key={c} value={c}>{t(categoryKeys[c])}</option>)}
                 </select>
               </div>
@@ -377,7 +390,7 @@ export default function ProduitsPage() {
               </div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("stock")}</label><input type="number" className="input" value={form.stock} onChange={e => setForm({ ...form, stock: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">Stock min</label><input type="number" className="input" value={form.stock_min} onChange={e => setForm({ ...form, stock_min: +e.target.value })} /></div>
-              <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">Code-barres (Filtron)</label>
+              <div className="col-span-2"><label className="text-xs text-slate-500 mb-1 block">Code-barres ({marquePrincipale})</label>
                 <div className="flex gap-2">
                   <input className="input font-mono flex-1" placeholder="scanne ou tape le code" value={form.code_barre} onChange={e => setForm({ ...form, code_barre: e.target.value })} />
                   <button type="button" onClick={() => setScanTarget("product")} className="btn-secondary shrink-0 flex items-center gap-1.5"><Barcode size={16} /> Scanner</button>
@@ -385,7 +398,7 @@ export default function ProduitsPage() {
               </div>
               {/* Photo du filtre (pour le catalogue) */}
               <div className="col-span-2">
-                <label className="text-xs text-slate-500 mb-1 block">📷 Photo du filtre (catalogue)</label>
+                <label className="text-xs text-slate-500 mb-1 block">📷 Photo {formDistribution ? "de la pièce" : "du filtre"} (catalogue)</label>
                 <div className="flex items-center gap-3">
                   <FilterImage reference={form.reference || "?"} categorie={form.categorie} imageUrl={form.image_url || undefined} wid={160} zoom={false}
                     className="h-16 w-16 rounded-lg object-contain bg-white p-1 border border-slate-300 shrink-0" />
@@ -402,7 +415,7 @@ export default function ProduitsPage() {
             {/* Variantes de marque — Filtron + équivalents sur une seule grille */}
             <div className="mt-5 pt-4 border-t border-slate-200">
               <label className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2"><Repeat size={15} /> Variantes de marque</label>
-              <p className="text-xs text-slate-400 mb-2">La ligne Filtron reprend les infos du produit ci-dessus. Ajoute les marques équivalentes avec leur référence, prix et quantité.</p>
+              <p className="text-xs text-slate-400 mb-2">La ligne {marquePrincipale} reprend les infos du produit ci-dessus. Ajoute les marques équivalentes avec leur référence, prix et quantité.</p>
 
               <div className="rounded-lg border border-slate-200 overflow-x-auto">
                 {/* En-tête */}
@@ -417,7 +430,7 @@ export default function ProduitsPage() {
 
                 {/* Ligne Filtron (le produit lui-même, lecture seule) */}
                 <div className="grid grid-cols-[76px_minmax(120px,1fr)_56px_56px_50px_58px] gap-1.5 items-center px-2.5 py-2 bg-amber-50 border-t border-slate-200 min-w-[420px]">
-                  <span className="text-xs font-bold text-amber-700">Filtron</span>
+                  <span className="text-xs font-bold text-amber-700 truncate" title={marquePrincipale}>{marquePrincipale}</span>
                   <span className="text-sm font-mono truncate text-slate-700">{form.reference || <span className="text-slate-300">— réf. —</span>}</span>
                   <span className="text-xs text-center text-slate-600">{form.prix_achat || "—"}</span>
                   <span className="text-xs text-center text-slate-600">{form.prix_vente || "—"}</span>
@@ -474,7 +487,7 @@ export default function ProduitsPage() {
                     if (r.erreur) { alert(r.erreur); return; }
                     if (r.marque) setNewEquiv({ ...newEquiv, marque: r.marque });
                   }}>
-                    {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
+                    {VARIANT_BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
                     <option value="OE">OE</option>
                     <option value="__ajout__">➕ Nouvelle marque…</option>
                   </select>
