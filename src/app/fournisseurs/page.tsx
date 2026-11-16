@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { FILTER_BRANDS, chargerMarques, ajouterMarque } from "@/lib/brands";
-import { coutCreditParFournisseur, setBonRembourse } from "@/lib/dinoun";
+import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, donnerPortefeuille, type BonPortefeuille } from "@/lib/dinoun";
 import { ajouterReception, getReceptionsAttente, syncReceptions } from "@/lib/offlineReceptions";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
@@ -33,13 +33,33 @@ export default function FournisseursPage() {
   const [products, setProducts] = useState<Product[]>([]);
   // Variantes de marque par produit (Flag, Mann…) pour la réception
   const [variantsMap, setVariantsMap] = useState<Record<string, VariantRow[]>>({});
-  // Bons vendus avec de la marchandise crédit, pas encore remboursés (par fournisseur)
+  // Bons vendus avec de la marchandise crédit, pas encore mis de côté (par fournisseur)
   const [bonsARemb, setBonsARemb] = useState<Record<string, BonARembourser[]>>({});
   const [bonsOuverts, setBonsOuverts] = useState<string | null>(null);
+  // Portefeuille dinoun (src/lib/dinoun.ts) : argent des bons mis de côté, pas encore donné → la dette ne bouge pas
+  const [portefeuille, setPortefeuille] = useState<BonPortefeuille[]>([]);
+  const [portefeuilleOuvert, setPortefeuilleOuvert] = useState<string | null>(null);
+  const creditIdsDe = () => new Set(fournisseurs.filter(x => (x.type ?? "credit") === "credit").map(x => x.id));
   async function rembourserBon(f: Fournisseur, b: BonARembourser) {
-    if (!confirm(`As-tu vraiment remis ${b.cout.toFixed(0)} MAD à ${f.nom} pour le bon ${b.client} du ${b.date} ?`)) return;
-    const creditIds = new Set(fournisseurs.filter(x => (x.type ?? "credit") === "credit").map(x => x.id));
-    const r = await setBonRembourse({ id: b.id, date: b.date, clientNom: b.client }, true, creditIds);
+    if (!confirm(`Mettre ${b.cout.toFixed(0)} MAD de côté dans le portefeuille ${f.nom} (bon ${b.client} du ${b.date}) ?\nLa dette ne baisse pas maintenant : elle baissera quand tu donneras le portefeuille à ${f.nom}.`)) return;
+    const r = await setBonRembourse({ id: b.id, date: b.date, clientNom: b.client }, true, creditIdsDe());
+    if (!r.ok) { alert(r.error); return; }
+    load();
+  }
+  async function sortirDuPortefeuille(b: BonPortefeuille) {
+    if (!confirm(`Sortir le bon ${b.client} du ${b.bon_date} (${b.montant.toFixed(0)} MAD) du portefeuille ?`)) return;
+    const r = await setBonRembourse({ id: b.sale_id, date: b.bon_date, clientNom: b.client }, false, creditIdsDe());
+    if (!r.ok) { alert(r.error); return; }
+    load();
+  }
+  async function donner(f: Fournisseur) {
+    const bons = portefeuille.filter(b => b.fournisseur_id === f.id);
+    const prevu = bons.reduce((s, b) => s + b.montant, 0);
+    const saisi = window.prompt(`Combien d'argent donnes-tu à ${f.nom} ? (compté dans le portefeuille)\nPrévu d'après les ${bons.length} bons : ${prevu.toFixed(0)} MAD`, prevu.toFixed(0));
+    if (saisi == null) return;
+    const montant = Number(saisi.replace(",", ".").replace(/\s/g, ""));
+    if (!(montant > 0)) { alert("Tape la somme comptée (ex. 1250)."); return; }
+    const r = await donnerPortefeuille(f.id, montant, new Date().toISOString().split("T")[0]);
     if (!r.ok) { alert(r.error); return; }
     load();
   }
@@ -89,14 +109,16 @@ export default function FournisseursPage() {
     setLoading(true);
     loadPicker();
     try {
-    const [{ data: f }, { data: r }, { data: a }] = await Promise.all([
+    const [{ data: f }, { data: r }, { data: a }, pf] = await Promise.all([
       supabase.from("fournisseurs").select("*").order("nom"),
       supabase.from("receptions").select("*").order("date", { ascending: false }),
       supabase.from("avances").select("*").order("date", { ascending: false }),
+      lirePortefeuille(),
     ]);
     setFournisseurs((f as Fournisseur[]) ?? []);
     setReceptions((r as Reception[]) ?? []);
     setAvances((a as Avance[]) ?? []);
+    setPortefeuille(pf);
 
     // Bons pas encore remboursés au fournisseur crédit (camion), avec leur coût crédit
     const creditIds = new Set(((f as Fournisseur[]) ?? []).filter(x => (x.type ?? "credit") === "credit").map(x => x.id));
@@ -508,11 +530,11 @@ export default function FournisseursPage() {
                   )}
                 </div>
 
-                {/* Bons vendus avec sa marchandise, pas encore remboursés (camion) */}
+                {/* Bons vendus avec sa marchandise, pas encore mis de côté (camion) */}
                 {!cap && (bonsARemb[f.id]?.length ?? 0) > 0 && (
                   <div className="mt-3 rounded-lg border border-red-500/30 bg-red-500/5">
                     <button onClick={() => setBonsOuverts(bonsOuverts === f.id ? null : f.id)} className="w-full px-3 py-2 flex items-center justify-between text-xs text-red-300">
-                      <span className="flex items-center gap-1.5"><Truck size={13} /> Bons à rembourser : {bonsARemb[f.id].length}</span>
+                      <span className="flex items-center gap-1.5"><Truck size={13} /> Bons à mettre de côté : {bonsARemb[f.id].length}</span>
                       <span className="font-semibold">{money(bonsARemb[f.id].reduce((s, b) => s + b.cout, 0))} {bonsOuverts === f.id ? "▴" : "▾"}</span>
                     </button>
                     {bonsOuverts === f.id && (
@@ -521,7 +543,7 @@ export default function FournisseursPage() {
                           <div key={b.id} className="px-3 py-2 flex items-center justify-between gap-2 text-xs">
                             <span className="text-slate-300 min-w-0 truncate">{b.date.slice(5).split("-").reverse().join("/")} · {b.client || "—"}</span>
                             <button onClick={() => rembourserBon(f, b)} className="shrink-0 rounded-full bg-red-600 hover:bg-red-500 text-white px-2.5 py-1 font-medium">
-                              Rembourser {money(b.cout)}
+                              👛 Mettre de côté {money(b.cout)}
                             </button>
                           </div>
                         ))}
@@ -529,6 +551,34 @@ export default function FournisseursPage() {
                     )}
                   </div>
                 )}
+
+                {/* Portefeuille : argent mis de côté pour ce fournisseur, pas encore donné (la dette ne bouge pas) */}
+                {!cap && portefeuille.some(b => b.fournisseur_id === f.id) && (() => {
+                  const bons = portefeuille.filter(b => b.fournisseur_id === f.id);
+                  return (
+                    <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
+                      <div className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <button onClick={() => setPortefeuilleOuvert(portefeuilleOuvert === f.id ? null : f.id)} className="flex items-center gap-1.5 text-amber-300">
+                          👛 Portefeuille : <b>{money(bons.reduce((s, b) => s + b.montant, 0))}</b> ({bons.length} bon{bons.length > 1 ? "s" : ""}) {portefeuilleOuvert === f.id ? "▴" : "▾"}
+                        </button>
+                        <button onClick={() => donner(f)} className="rounded-full bg-amber-500 hover:bg-amber-400 text-slate-900 px-2.5 py-1 font-semibold">
+                          Donner à {f.nom}
+                        </button>
+                      </div>
+                      <p className="px-3 pb-2 text-[11px] text-slate-400">Pas encore compté dans la dette : elle baisse quand tu donnes le portefeuille (une seule avance avec la somme comptée).</p>
+                      {portefeuilleOuvert === f.id && (
+                        <div className="border-t border-amber-500/20 divide-y divide-slate-800">
+                          {bons.map(b => (
+                            <div key={`${b.sale_id}-${b.fournisseur_id}`} className="px-3 py-2 flex items-center justify-between gap-2 text-xs">
+                              <span className="text-slate-300 min-w-0 truncate">{b.bon_date.slice(5).split("-").reverse().join("/")} · {b.client || "—"} · {money(b.montant)}</span>
+                              <button onClick={() => sortirDuPortefeuille(b)} className="shrink-0 text-slate-400 hover:text-red-300 underline">Sortir</button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button onClick={() => openReception(f)} className="flex items-center gap-1.5 text-xs bg-orange-500/15 text-orange-300 px-3 py-1.5 rounded-lg hover:bg-orange-500/25"><PackagePlus size={14} /> Marchandise prise</button>

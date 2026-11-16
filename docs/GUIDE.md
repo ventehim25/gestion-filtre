@@ -53,7 +53,8 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 - **Marchandise prise** (accueil → **Réception**, ou Fournisseurs) → choisis **chez qui** (dinoun = dette, filtropro = ton argent), puis **scanne les boîtes** (+1 par boîte) ou tape la réf (Filtron, Wix, Mann, Mahle, Purflux, Mecafilter… reconnues). Par ligne : qté, **prix d'achat + prix de vente** (marge affichée), marque (« + Autre marque » crée Mahle/Purflux/Mecafilter/SIMI/Meat & Doria…), code-barres mémorisé. **Une marque qui n'est pas dans la liste ?** Dans la liste des marques, choisis **« ➕ Nouvelle marque… »**, écris son nom comme sur la boîte : elle est enregistrée pour toujours et proposée partout (Réception, Produits, Vente), sur tous tes appareils. Enregistrer → stock + prix sur la fiche + dette (ou capital) + catalogue à jour. **Marche hors-ligne** : envoyée au retour du réseau (bandeau jaune).
 - **Erreur de réception / de paiement** → Fournisseurs → Historique → **✕** sur la ligne : la réception est annulée (stock retiré + dette corrigée) ; un paiement libre est annulé.
 - **Vente** (accueil → **Vente**) → la **source de chaque ligne se met toute seule** : celle de la **dernière réception** de ce filtre (dinoun ou filtropro ; à défaut dinoun). Un même bon peut mélanger les deux. Sous chaque ligne, 2 boutons **dinoun | filtropro** : 1 tap pour corriger.
-- **Rembourser dinoun bon par bon** → sur le bon (Ventes) : bouton **🚚 Rembourser {coût}** (confirmation) → devient **Remboursé** et ta dette baisse du coût de ce bon. Ou dans Fournisseurs → carte dinoun → **Bons à rembourser**. Le paiement du garage reste séparé : il ne touche jamais dinoun.
+- **Le portefeuille dinoun** (depuis le 16/11) : quand un bon est payé, sur le bon (Ventes) bouton **🚚 👛 Mettre de côté {coût}** → devient **👛 De côté** : l'argent est dans ton portefeuille, **la dette ne baisse pas encore**. Ou dans Fournisseurs → carte dinoun → **Bons à mettre de côté**.
+- **Donner l'argent à dinoun** (après un mois ou plus) : Fournisseurs → carte dinoun → **👛 Portefeuille : X MAD** → **Donner à dinoun** → tape la somme comptée → **une seule avance** est enregistrée (c'est là que la dette baisse) et le portefeuille se vide ; les bons passent à **✓ Donné**. Un bon mis de côté par erreur : **Sortir** dans la liste du portefeuille. Le paiement du garage reste séparé : il ne touche jamais dinoun.
 - **Encaisser un garage** → accueil → **Encaisser** (liste des impayés) → 💰 sur le bon.
 - **Solde de départ** (Fournisseurs, crayon) : ce que tu dois déjà à dinoun au démarrage. `50000` = tu lui dois ; négatif (`-500`) = il te doit.
 - **Capital (filtropro)** = ton argent qui tourne et grandit. **Crédit (dinoun)** = dette à rembourser.
@@ -115,7 +116,7 @@ Fais une **marque « début app »** dans ton cahier. Avant la marque = un seul 
 - **Client qui ne paie pas** → carte « À relancer » → WhatsApp 1-tap.
 - **On te demande une réf que tu n'as pas** → Recherche → **« ❌ J'ai pas »** (à 3 demandes, l'app te dit de la stocker).
 - **Tu vends un filtre à huile** → tape l'**huile** proposée (pack vidange).
-- **Tu paies dinoun un bon** → **camion 🚚** vert.
+- **Un bon est payé** → **camion 🚚 « 👛 Mettre de côté »** (l'argent va dans le portefeuille dinoun). **Tu donnes le portefeuille à dinoun** → Fournisseurs → **Donner à dinoun**.
 - **Vendredi** → **📣 Arrivages** en statut WhatsApp + **📊 Mon bilan** (Stats).
 - **Un dimanche** → prends tes filtres en photo (Produits) petit à petit.
 

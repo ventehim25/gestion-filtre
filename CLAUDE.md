@@ -66,7 +66,7 @@ Colonnes ajoutées (migrations dans `supabase/`) :
 - clients : `quartier`, `latitude`/`longitude` (localisation exacte), `origine` ('terrain' | 'prospection')
 - products / equivalences : `prix_particulier`, `prix_location`, `prix_magasin` (prix corrigés par catalogue, vide = prix_vente ± pourcentage de `reglages`)
 - receptions : `lignes` jsonb (détail produit/variante/qté → annulation propre)
-- avances : `sale_id` (remboursement dinoun d'un bon via le camion) · sales : `fournisseur_paye`
+- avances : `sale_id` (ancien remboursement dinoun bon par bon, avant le 16/11) · sales : `fournisseur_paye` (= argent du bon mis de côté ou donné) · **portefeuille dinoun** dans `reglages` (`portefeuille_dinoun`, `portefeuille_dinoun_donnes`), voir `src/lib/dinoun.ts` (BIBLE §8.29)
 - prospects : robots OSM/Google + note d'intérêt `score` /10 + `statut_prospection`
 
 ## Fonctionnalités principales (par page)

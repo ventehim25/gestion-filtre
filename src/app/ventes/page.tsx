@@ -9,7 +9,7 @@ import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/type
 import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import { chargerMarques } from "@/lib/brands";
-import { coutCreditParFournisseur, setBonRembourse } from "@/lib/dinoun";
+import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, retirerDuPortefeuille } from "@/lib/dinoun";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { addPending, envoyerVente, getPending, syncPending } from "@/lib/offlineSales";
 import { buildReceipt, sendWhatsApp } from "@/lib/whatsapp";
@@ -28,6 +28,8 @@ type LineItem = { product_id: string; quantite: number; prix_unitaire: number; n
 export default function VentesPage() {
   const { t } = useLang();
   const [sales, setSales] = useState<(Sale & { client: Client })[]>([]);
+  // Bons dont l'argent est mis de côté pour dinoun (portefeuille, pas encore donné)
+  const [enPortefeuille, setEnPortefeuille] = useState<Set<string>>(new Set());
   const [clients, setClients] = useState<Client[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
@@ -97,6 +99,7 @@ export default function VentesPage() {
       supabase.from("fournisseurs").select("*").order("nom"),
       loadAll<Product>("products", "*", { filter: q => q.order("reference") }),
     ]);
+    lirePortefeuille().then(p => setEnPortefeuille(new Set(p.map(b => b.sale_id)))).catch(() => {});
     chargerMarques() // marques de départ + celles ajoutées par l'utilisateur
       .then(marques => loadAll<PickerVariant>("equivalences", "id, product_id, marque, reference", { filter: q => q.in("marque", marques).order("id") }))
       .then(setBrandVariants).catch(() => {});
@@ -424,19 +427,33 @@ export default function VentesPage() {
     load();
   }
 
-  // Coche « fournisseur (dinoun) payé » pour ce bon (roulement bon par bon).
-  // En cochant : crée un paiement (avance) au fournisseur crédit du bon → baisse ta dette.
-  // En décochant : annule ce paiement. Les avances liées portent le sale_id du bon.
+  // Camion dinoun d'un bon = le PORTEFEUILLE (16/11/2026, src/lib/dinoun.ts) :
+  // « 👛 Mettre de côté » → le coût dinoun du bon va dans le portefeuille, la dette NE BAISSE PAS ;
+  // elle baisse quand l'argent compté est donné (Fournisseurs → « Donner à dinoun » = une avance).
   async function toggleFournisseurPaye(s: Sale & { client: Client }, cout: number) {
-    const nv = !s.fournisseur_paye;
     const nom = fournisseurs.find(f => f.type === "credit")?.nom ?? "dinoun";
-    if (!confirm(nv
-      ? `As-tu vraiment remis ${cout.toFixed(0)} MAD à ${nom} pour ce bon (${s.client?.nom ?? ""}, ${s.date}) ?`
-      : `Annuler le remboursement de ce bon ? La dette ${nom} remontera de ${cout.toFixed(0)} MAD.`)) return;
-    const r = await setBonRembourse({ id: s.id, date: s.date, clientNom: s.client?.nom }, nv, creditIds);
+    if (!s.fournisseur_paye) {
+      if (!confirm(`Mettre ${cout.toFixed(0)} MAD de côté dans le portefeuille ${nom} pour ce bon (${s.client?.nom ?? ""}, ${s.date}) ?\nLa dette ne baisse pas maintenant : elle baissera quand tu donneras le portefeuille à ${nom}.`)) return;
+      const r = await setBonRembourse({ id: s.id, date: s.date, clientNom: s.client?.nom }, true, creditIds);
+      if (!r.ok) { alert(r.error); return; }
+      setSales(prev => prev.map(x => x.id === s.id ? { ...x, fournisseur_paye: true } : x));
+      setEnPortefeuille(prev => new Set(prev).add(s.id));
+      flash(`👛 ${r.montant.toFixed(0)} MAD mis de côté (portefeuille ${nom})`);
+      return;
+    }
+    if (enPortefeuille.has(s.id)) {
+      if (!confirm(`Sortir ce bon du portefeuille ${nom} (${cout.toFixed(0)} MAD) ?`)) return;
+    } else {
+      // Déjà donné : un ancien bon (avant le 16/11) a son avance à lui ; sinon il fait partie d'un versement du portefeuille
+      const { count } = await supabase.from("avances").select("id", { count: "exact", head: true }).eq("sale_id", s.id);
+      if (!count) { alert(`Ce bon a déjà été donné à ${nom} avec le portefeuille : rien à annuler ici.\nPour corriger, modifie l'avance dans Fournisseurs → ${nom} → Historique.`); return; }
+      if (!confirm(`Annuler le remboursement de ce bon ? La dette ${nom} remontera de ${cout.toFixed(0)} MAD.`)) return;
+    }
+    const r = await setBonRembourse({ id: s.id, date: s.date, clientNom: s.client?.nom }, false, creditIds);
     if (!r.ok) { alert(r.error); return; }
-    setSales(prev => prev.map(x => x.id === s.id ? { ...x, fournisseur_paye: nv } : x));
-    flash(nv ? `${nom} remboursé ✓ · −${r.montant.toFixed(0)} sur ta dette` : `Remboursement ${nom} annulé`);
+    setSales(prev => prev.map(x => x.id === s.id ? { ...x, fournisseur_paye: false } : x));
+    setEnPortefeuille(prev => { const n = new Set(prev); n.delete(s.id); return n; });
+    flash(`Bon sorti du portefeuille ${nom}`);
   }
   const creditIds = new Set(fournisseurs.filter(f => f.type === "credit").map(f => f.id));
 
@@ -444,10 +461,13 @@ export default function VentesPage() {
   // et supprime le bon (les paiements dinoun liés partent en cascade via avances.sale_id).
   async function deleteSale(s: Sale & { client: Client }) {
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Suppression impossible hors-ligne."); return; }
-    // Bon déjà remboursé à dinoun : son remboursement part avec lui (la dette remonte) alors que l'argent a été donné
+    // Bon dans le portefeuille : il en sort. Ancien bon remboursé (avant le 16/11) : son avance part avec lui (la dette remonte)
     const remb = s.fournisseur_paye ? [...coutCreditParFournisseur(s.items ?? [], creditIds).values()].reduce((a, b) => a + b, 0) : 0;
+    const dansPortefeuille = enPortefeuille.has(s.id);
     if (!confirm(`Supprimer la vente de ${s.client?.nom ?? "ce client"} — ${s.total.toFixed(0)} MAD ?\nLe stock des articles sera rendu.`
-      + (remb > 0 ? `\n\n⚠ Ce bon est déjà REMBOURSÉ à dinoun (${remb.toFixed(0)} MAD) : ce remboursement sera aussi annulé et la dette remontera.\nSi tu as vraiment payé dinoun, enregistre ensuite ces ${remb.toFixed(0)} MAD en « Avance / paiement » (Fournisseurs).` : ""))) return;
+      + (remb > 0 && dansPortefeuille ? `\n\nCe bon est dans le portefeuille dinoun (${remb.toFixed(0)} MAD) : il en sera retiré.` : "")
+      + (remb > 0 && !dansPortefeuille ? `\n\n⚠ Ce bon a déjà été donné à dinoun (${remb.toFixed(0)} MAD). S'il avait son propre remboursement (avant le 16/11), celui-ci sera annulé et la dette remontera : enregistre alors ces ${remb.toFixed(0)} MAD en « Avance / paiement » (Fournisseurs).` : ""))) return;
+    if (dansPortefeuille) await retirerDuPortefeuille(s.id);
     try {
       const prepared = (s.notes ?? "").startsWith("Commande WhatsApp"); // vente préparée = stock jamais retiré
       if (!prepared) {
@@ -858,9 +878,9 @@ export default function VentesPage() {
                   {/* Remboursement dinoun du bon : indépendant du paiement du client */}
                   {coutDinoun > 0 && (
                     <button onClick={() => toggleFournisseurPaye(s, coutDinoun)}
-                      className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${s.fournisseur_paye ? "bg-emerald-500/15 text-emerald-400" : "bg-red-500/15 text-red-300 hover:bg-red-500/25"}`}
-                      title={s.fournisseur_paye ? "Remboursé à dinoun — clique pour annuler" : "Rembourser dinoun pour ce bon"}>
-                      <Truck size={13} /> {s.fournisseur_paye ? "Remboursé" : `Rembourser ${coutDinoun.toFixed(0)}`}
+                      className={`shrink-0 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${!s.fournisseur_paye ? "bg-red-500/15 text-red-300 hover:bg-red-500/25" : enPortefeuille.has(s.id) ? "bg-amber-500/15 text-amber-300" : "bg-emerald-500/15 text-emerald-400"}`}
+                      title={!s.fournisseur_paye ? "Mettre l'argent de ce bon de côté pour dinoun (la dette ne baisse pas encore)" : enPortefeuille.has(s.id) ? "Dans le portefeuille dinoun — clique pour le sortir" : "Déjà donné à dinoun"}>
+                      <Truck size={13} /> {!s.fournisseur_paye ? `👛 Mettre de côté ${coutDinoun.toFixed(0)}` : enPortefeuille.has(s.id) ? "👛 De côté" : "✓ Donné"}
                     </button>
                   )}
                   <button onClick={() => openPayEdit(s)} className="text-amber-500 hover:text-amber-400" title="Modifier le paiement"><Wallet size={16} /></button>
