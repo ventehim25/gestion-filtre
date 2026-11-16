@@ -36,7 +36,7 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 | `supabase/storage_produits.sql` | Stockage des photos produits | ✅ collé |
 | `supabase/securite.sql` | **Base protégée + connexion obligatoire** (voir §9) | ✅ collé le 12/11/2026 (compte ventehim@gmail.com) |
 | `supabase/vin_connus.sql` | Mémoire des VIN confirmés (« VIN ou code moteur ») | ✅ collé le 12/11/2026 |
-| `supabase/categories_distribution.sql` | Catégories **chaîne, courroie, pompe à eau, kit de distribution** (voir §16) | ⏳ **à coller** (16/11/2026) |
+| `supabase/categories_distribution.sql` | Catégories **chaîne, courroie, pompe à eau, kit de distribution** (voir §16) | ✅ collé le 16/11/2026 |
 
 > Règle : après un `CREATE`/`ALTER`, le SQL finit par `notify pgrst, 'reload schema';` et tu **recharges l'app**.
 
@@ -243,7 +243,7 @@ Tu tapes **un seul prix** : le prix garage (comme avant). Les autres se calculen
 
 ## 16. Distribution : chaîne, courroie, pompe à eau, kit (depuis le 16/11/2026)
 
-**Une seule fois** : colle `supabase/categories_distribution.sql` dans l'éditeur SQL de Supabase (lien §2) → « Run ». Sans lui, l'appli te dit « La base n'accepte pas encore cette catégorie » et rien n'est enregistré (ni stock, ni dette).
+**SQL** `supabase/categories_distribution.sql` : ✅ collé le 16/11/2026, rien d'autre à faire. (S'il fallait un jour le recoller : éditeur SQL de Supabase, lien §2 → « Run ».)
 
 **Recevoir des pièces de distribution** (Filtron n'en fait pas : la première fois, chaque pièce est à créer) :
 1. Accueil → **Réception** → choisis **Chez** (dinoun / filtropro).
