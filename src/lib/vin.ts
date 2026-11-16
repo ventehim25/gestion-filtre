@@ -109,6 +109,38 @@ export function typeMoteurPsa(vin: string): string | null {
   return /^[0-9A-Z]{3}$/.test(t) && /[A-Z]/.test(t) ? t : null;
 }
 
+// Autres marques (16/11/2026) : le VIN contient un code de modèle que Filtron écrit aussi, entre parenthèses :
+// - VW, Audi, Seat (WVW, WV1, WV2, WAU, TRU, VSS) : caractères 7 et 8, ex. « 5G » → « Golf VII (5G1, BQ1, BE2) » ;
+// - Mercedes : caractères 4 à 9 = le modèle exact, ex. « 203008 » → moteur Filtron « C 220 CDI (203.008) » ;
+// - Fiat (ZFA) : caractères 4 à 6, ex. « 169 » → « Panda (169) ».
+// On ne propose QUE ce qui correspond à un code présent dans les données Filtron (rien n'est inventé), toujours en 🟠.
+// Renault, Dacia (Filtron n'écrit pas leurs codes) et les autres marques : apprentissage par les VIN déjà confirmés.
+const VAG = new Set(["WVW", "WV1", "WV2", "WAU", "TRU", "VSS"]);
+const MERCEDES = new Set(["WDB", "WDD", "WDC", "W1K", "W1N"]);
+export type IndiceVin =
+  | { genre: "moteur"; code: string; ou: string } // Peugeot / Citroën : type de moteur
+  | { genre: "modele"; code: string; ou: string } // VW, Audi, Seat, Fiat : code de modèle Filtron
+  | { genre: "baumuster"; code: string; ou: string }; // Mercedes : « 203.008 »
+export function indiceVin(vin: string): IndiceVin | null {
+  if (vin.length !== 17) return null;
+  const w = vin.slice(0, 3);
+  const psa = typeMoteurPsa(vin);
+  if (psa) return { genre: "moteur", code: psa, ou: "caractères 6 à 8" };
+  const vag = vin.slice(6, 8);
+  if (VAG.has(w) && /^[0-9A-Z]{2}$/.test(vag) && vag !== "ZZ") return { genre: "modele", code: vag, ou: "caractères 7 et 8" };
+  if (MERCEDES.has(w) && /^\d{6}$/.test(vin.slice(3, 9))) return { genre: "baumuster", code: `${vin.slice(3, 6)}.${vin.slice(6, 9)}`, ou: "caractères 4 à 9" };
+  if (w === "ZFA" && /^\d{3}$/.test(vin.slice(3, 6))) return { genre: "modele", code: vin.slice(3, 6), ou: "caractères 4 à 6" };
+  return null;
+}
+
+/** Motif LIKE « même modèle » pour apprendre des VIN déjà confirmés (constructeur + caractères du modèle). */
+export function motifModeleVin(vin: string): string {
+  const w = vin.slice(0, 3);
+  if (VAG.has(w)) return `${w}___${vin.slice(6, 8)}%`;
+  if (MERCEDES.has(w)) return `${vin.slice(0, 6)}%`;
+  return `${vin.slice(0, 5)}%`; // Renault, Dacia, Peugeot, Citroën, Fiat, Hyundai… : constructeur + 2 caractères du modèle
+}
+
 /** « Famille » du VIN : constructeur + partie descriptive (8 premiers caractères, sans le caractère de contrôle). */
 export function familleVin(vin: string): string {
   return vin.slice(0, 8);

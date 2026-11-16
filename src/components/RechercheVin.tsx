@@ -3,17 +3,19 @@
 // - Code moteur (lu sur le moteur, ex. « K9K 612 ») → voitures + leurs filtres, directement (données Filtron).
 // - VIN déjà confirmé (table vin_connus) → 🟢 les filtres s'affichent sans rien choisir.
 // - VIN de la même famille qu'un VIN confirmé (8 premiers caractères) → 🟠 proposition à confirmer.
+// - VIN lu par ses caractères (16/11/2026, BIBLE §8.26) → 🟠 voitures probables à confirmer : type de moteur
+//   Peugeot/Citroën, code de modèle VW/Audi/Seat/Fiat, modèle exact Mercedes, ou modèle d'un VIN déjà confirmé.
 // - VIN inconnu → 🔴 on connaît la marque, le vendeur tape le code moteur ou le modèle, puis « C'est cette voiture »
-//   retient le VIN pour la prochaine fois. Le VIN seul ne donne JAMAIS le moteur : on ne devine pas.
+//   retient le VIN pour la prochaine fois. On ne propose que ce qui existe dans les données : rien n'est deviné au hasard.
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { VinConnu } from "@/types/database";
-import { nettoyerVin, vinValide, constructeur, anneeProbable, familleVin, ressembleCodeMoteur, motifsCodeMoteur, typeMoteurPsa, MARQUES_COURANTES, AUTRES_MARQUES, type MarqueVin } from "@/lib/vin";
+import { nettoyerVin, vinValide, constructeur, anneeProbable, familleVin, ressembleCodeMoteur, motifsCodeMoteur, indiceVin, motifModeleVin, MARQUES_COURANTES, AUTRES_MARQUES, type MarqueVin } from "@/lib/vin";
 import { COLS, grouper, type Ligne, type Voiture } from "@/lib/voitures";
 import VoitureCarte from "@/components/VoitureCarte";
 import { Search, ScanLine } from "lucide-react";
 
-type Niveau = "vert" | "orange" | "psa" | "rouge" | null;
+type Niveau = "vert" | "orange" | "vin" | "rouge" | null;
 const MAX_VOITURES = 30;
 
 type Resultat = { voitures: Voiture[]; note: string | null };
@@ -58,13 +60,16 @@ async function chercherVoitures(texte: string, motifMarque?: string): Promise<Re
 // « RHW/RHZ (DW10ATED/4) »… ou seulement le code long (« DW10 ATED », ex. Citroën Evasion) : on prend d'abord les
 // lignes avec le type, on y lit les codes longs liés (DW10ATED), puis on ajoute les lignes qui n'ont que ce code long.
 const motCode = (type: string) => new RegExp(`(^|[^0-9A-Z])${type}([^0-9A-Z]|$)`);
+const MARQUES_PSA = "marque.ilike.PEUGEOT%,marque.ilike.CITRO%,marque.ilike.DS%";
+const deMarque = (motif?: string) => { const re = motif ? new RegExp(`^${motif.replace(/%/g, ".*")}$`, "i") : null; return (a: Ligne) => !re || re.test(a.marque); };
 async function parTypePsa(type: string, motifMarque?: string): Promise<Voiture[]> {
-  let q1 = supabase.from("applications").select(COLS).ilike("code_moteur", `%${type}%`);
-  if (motifMarque) q1 = q1.ilike("marque", motifMarque);
-  const { data: d1 } = await q1.limit(800);
-  const avecType = ((d1 ?? []) as unknown as Ligne[]).filter((a) => motCode(type).test((a.code_moteur ?? "").toUpperCase()));
+  // Le lien type ↔ code long se cherche chez Peugeot, Citroën et DS (même moteurs) : « RHW » n'est écrit que chez Peugeot
+  // (« RHW/RHZ (DW10ATED) »), alors qu'une Citroën RHW est notée « DW10 ATED ». On n'affiche ensuite que la marque du VIN.
+  const { data: d1 } = await supabase.from("applications").select(COLS).or(MARQUES_PSA).ilike("code_moteur", `%${type}%`).limit(1000);
+  const tousType = ((d1 ?? []) as unknown as Ligne[]).filter((a) => motCode(type).test((a.code_moteur ?? "").toUpperCase()));
+  const avecType = tousType.filter(deMarque(motifMarque));
   const longs = new Set<string>();
-  for (const a of avecType) for (const tok of (a.code_moteur ?? "").toUpperCase().split(/[^0-9A-Z]+/)) if (tok.length >= 5 && /\d/.test(tok) && /[A-Z]/.test(tok)) longs.add(tok);
+  for (const a of tousType) for (const tok of (a.code_moteur ?? "").toUpperCase().split(/[^0-9A-Z]+/)) if (tok.length >= 5 && /\d/.test(tok) && /[A-Z]/.test(tok)) longs.add(tok);
   let parLong: Ligne[] = [];
   if (longs.size) {
     // « DW10ATED » → motif « %DW%10%ATED% » (trouve aussi « DW10 ATED »), puis on garde le code long exact (pas DW10ATED4)
@@ -78,6 +83,49 @@ async function parTypePsa(type: string, motifMarque?: string): Promise<Voiture[]
     });
   }
   return grouper([...avecType, ...parLong]);
+}
+
+// Toutes les lignes d'un motif (paginé : un modèle courant peut avoir plus de 1000 lignes, une par filtre et par version)
+type Requete = { range: (debut: number, fin: number) => PromiseLike<{ data: unknown[] | null }> };
+async function lignes(construire: () => Requete, max = 4000): Promise<Ligne[]> {
+  const out: Ligne[] = [];
+  for (let a = 0; a < max; a += 1000) {
+    const { data } = await construire().range(a, a + 999);
+    out.push(...((data ?? []) as Ligne[]));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
+// VW, Audi, Seat, Fiat : le code de modèle du VIN (« 5G », « 169 ») parmi les codes Filtron entre parenthèses
+async function parCodeModele(code: string, motifMarque?: string): Promise<Voiture[]> {
+  const rows = await lignes(() => {
+    let q = supabase.from("applications").select(COLS).ilike("modele", `%${code}%`);
+    if (motifMarque) q = q.ilike("marque", motifMarque);
+    return q as unknown as Requete;
+  });
+  return grouper(rows.filter((a) => {
+    const nom = (a.modele ?? "").split("|")[0];
+    const codes = [...nom.matchAll(/\(([^)]*)\)/g)].flatMap((m) => m[1].toUpperCase().split(/[^0-9A-Z]+/)).filter(Boolean);
+    return codes.some((c) => c.startsWith(code));
+  }));
+}
+
+// Mercedes : le modèle exact (« 203.008 ») écrit dans le moteur Filtron (« C 220 CDI (203.008) »)
+async function parBaumuster(code: string, motifMarque?: string): Promise<Voiture[]> {
+  let q = supabase.from("applications").select(COLS).ilike("moteur", `%${code}%`);
+  if (motifMarque) q = q.ilike("marque", motifMarque);
+  const { data } = await q.limit(1000);
+  return grouper((data ?? []) as unknown as Ligne[]);
+}
+
+// Apprentissage : les modèles des VIN déjà confirmés qui ont les mêmes caractères de modèle (toutes marques)
+async function parModeleAppris(vin: string): Promise<Voiture[]> {
+  const { data } = await supabase.from("vin_connus").select("marque, modele").like("vin", motifModeleVin(vin)).limit(50);
+  const modeles = [...new Map(((data ?? []) as { marque: string; modele: string }[]).map((r) => [`${r.marque}|${r.modele}`, r])).values()].slice(0, 3);
+  const rows: Ligne[] = [];
+  for (const m of modeles) rows.push(...await lignes(() => supabase.from("applications").select(COLS).eq("marque", m.marque).eq("modele", m.modele) as unknown as Requete));
+  return grouper(rows);
 }
 // Les voitures dont la période contient l'année probable du VIN d'abord (l'année n'est qu'une indication)
 const anDe = (s: string | null) => Number((s ?? "").match(/(\d{4})/)?.[1] ?? 0);
@@ -108,6 +156,9 @@ export default function RechercheVin() {
   const [note, setNote] = useState<string | null>(null);
   // Marque choisie à la main (comme partslink24) : facultative, elle passe avant la marque lue dans le VIN
   const [marqueManuelle, setMarqueManuelle] = useState<MarqueVin | null>(null);
+  // Voitures probables lues dans le VIN (le 2e champ cherche d'abord parmi elles) et pourquoi
+  const [candidats, setCandidats] = useState<Voiture[]>([]);
+  const [raison, setRaison] = useState("");
 
   const net = nettoyerVin(q);
   const estVin = vinValide(net);
@@ -120,6 +171,7 @@ export default function RechercheVin() {
   useEffect(() => {
     setMessage(null); setNote(null);
     const t = q.trim();
+    setCandidats([]); setRaison("");
     if (!estVin && t.length < 3) { setVoitures([]); setNiveau(null); setConfirme(null); return; }
     if (vinEnCours) { setVoitures([]); setNiveau(null); setConfirme(null); return; }
     let actif = true;
@@ -147,13 +199,25 @@ export default function RechercheVin() {
             setNiveau("orange"); setVoitures(vs);
             return;
           }
-          // Peugeot / Citroën : le type de moteur écrit dans le VIN → voitures probables, à confirmer
-          const type = typeMoteurPsa(net);
-          if (type) {
-            const vs = await parTypePsa(type, (marqueManuelle ?? constructeur(net))?.motif);
-            if (!actif) return;
-            if (vs.length) { setNiveau("psa"); setVoitures(trierParAnnee(vs, anneeProbable(net))); return; }
+          // Les caractères du VIN (type de moteur, code de modèle) → voitures probables, à confirmer
+          const motif = (marqueManuelle ?? constructeur(net))?.motif;
+          const ind = indiceVin(net);
+          let vs: Voiture[] = [];
+          let pourquoi = "";
+          if (ind?.genre === "moteur") { vs = await parTypePsa(ind.code, motif); pourquoi = `chez Peugeot et Citroën, le VIN indique le plus souvent le type de moteur (${ind.ou} : « ${ind.code} »)`; }
+          else if (ind?.genre === "modele") {
+            vs = await parCodeModele(ind.code, motif);
+            pourquoi = `le VIN indique le modèle (${ind.ou} : « ${ind.code} »), le même code que dans les données Filtron${ind.ou.startsWith("caractères 7") ? " — attention, chez VW un même code peut couvrir deux générations (« 1K » = Golf 5 et Golf 6) : vérifie bien l'année" : ""}`;
           }
+          else if (ind?.genre === "baumuster") { vs = await parBaumuster(ind.code, motif); pourquoi = `chez Mercedes, le VIN indique le modèle exact (${ind.ou} : « ${ind.code} »)`; }
+          if (!actif) return;
+          if (!vs.length) { // apprentissage : même modèle qu'un VIN déjà confirmé (toutes marques, dont Renault et Dacia)
+            vs = await parModeleAppris(net);
+            if (!actif) return;
+            if (vs.length) pourquoi = `même modèle qu'un VIN déjà confirmé (début « ${motifModeleVin(net).replace(/%$/, "").replace(/_/g, "·")} »)`;
+          }
+          if (vs.length) { const tries = trierParAnnee(vs, anneeProbable(net)); setRaison(pourquoi); setCandidats(tries); setNiveau("vin"); setVoitures(tries); return; }
+          setRaison(ind ? `${ind.ou} du VIN : « ${ind.code} », introuvable dans les données Filtron` : ""); setCandidats([]);
           setNiveau("rouge"); setVoitures([]);
         } else {
           setNiveau(null); setConfirme(null);
@@ -171,15 +235,19 @@ export default function RechercheVin() {
   useEffect(() => {
     if (!estVin || niveau === "vert") return;
     const t = precision.trim();
-    if (t.length < 2) return;
+    if (t.length < 2) { if (niveau === "vin" && candidats.length) setVoitures(candidats); return; } // champ vidé : la liste lue dans le VIN revient
     let actif = true;
     const id = setTimeout(async () => {
+      // D'abord parmi les voitures lues dans le VIN (« 105 », « TDI », « Evasion »…), sinon dans toutes les données
+      const toks = t.toLowerCase().split(/\s+/).filter((s) => s.length >= 2);
+      const parmi = candidats.filter((v) => { const hay = `${v.marque} ${v.modele} ${v.moteur ?? ""} ${v.code_moteur ?? ""} ${v.puissance ?? ""}`.toLowerCase(); return toks.every((tk) => hay.includes(tk)); });
+      if (parmi.length) { setVoitures(parmi); setNote(null); return; }
       setChargement(true);
       const r = await chercherVoitures(t, marque?.motif);
       if (actif) { setVoitures(r.voitures); setNote(r.note); setNiveau("rouge"); setChargement(false); }
     }, 350);
     return () => { actif = false; clearTimeout(id); };
-  }, [precision, estVin, niveau, marque?.motif]);
+  }, [precision, estVin, niveau, marque?.motif, candidats]);
 
   async function retenir(v: Voiture) {
     const ligne = { vin: net, marque: v.marque, modele: v.modele, moteur: v.moteur, code_moteur: v.code_moteur, annee_debut: v.annee_debut, annee_fin: v.annee_fin, puissance: v.puissance };
@@ -201,8 +269,8 @@ export default function RechercheVin() {
   const pastille: Record<Exclude<Niveau, null>, { classe: string; texte: string }> = {
     vert: { classe: "bg-green-500/15 text-green-400", texte: "🟢 Confirmé : ce VIN a déjà été vendu pour cette voiture." },
     orange: { classe: "bg-amber-500/15 text-amber-300", texte: "🟠 Probable : même début de VIN qu'une voiture déjà confirmée. Vérifie le moteur, puis confirme." },
-    psa: { classe: "bg-amber-500/15 text-amber-300", texte: `🟠 Probable : chez Peugeot et Citroën, le VIN indique le plus souvent le type de moteur (positions 6 à 8 : « ${typeMoteurPsa(net) ?? "?"} »). Vérifie le modèle et l'année, puis appuie sur « C'est cette voiture ». Pas la bonne ? Tape le modèle ou le code moteur ci-dessous.` },
-    rouge: { classe: "bg-red-500/15 text-red-300", texte: `🔴 Moteur pas encore connu pour ce VIN : tape le modèle (ex. Evasion, Logan) ou le code moteur (sur le moteur) ci-dessous.${typeMoteurPsa(net) ? ` (Type moteur lu dans le VIN : « ${typeMoteurPsa(net)} », introuvable dans les données Filtron.)` : ""}` },
+    vin: { classe: "bg-amber-500/15 text-amber-300", texte: `🟠 Probable : ${raison}. Vérifie le modèle, le moteur et l'année, puis appuie sur « C'est cette voiture ». Pour réduire la liste ou si ce n'est pas la bonne, tape le modèle, la puissance ou le code moteur ci-dessous.` },
+    rouge: { classe: "bg-red-500/15 text-red-300", texte: `🔴 Voiture pas encore connue pour ce VIN : tape le modèle (ex. Logan, Golf 7) ou le code moteur (sur le moteur) ci-dessous. Une fois confirmée, les VIN du même modèle seront proposés tout seuls.${raison ? ` (${raison}.)` : ""}` },
   };
 
   return (
