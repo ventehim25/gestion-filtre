@@ -8,7 +8,7 @@ import { loadAll } from "@/lib/pagedFetch";
 import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/types/database";
 import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
-import { FILTER_BRANDS } from "@/lib/brands";
+import { chargerMarques } from "@/lib/brands";
 import { coutCreditParFournisseur, setBonRembourse } from "@/lib/dinoun";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { addPending, envoyerVente, getPending, syncPending } from "@/lib/offlineSales";
@@ -97,7 +97,8 @@ export default function VentesPage() {
       supabase.from("fournisseurs").select("*").order("nom"),
       loadAll<Product>("products", "*", { filter: q => q.order("reference") }),
     ]);
-    loadAll<PickerVariant>("equivalences", "id, product_id, marque, reference", { filter: q => q.in("marque", FILTER_BRANDS).order("id") })
+    chargerMarques() // marques de départ + celles ajoutées par l'utilisateur
+      .then(marques => loadAll<PickerVariant>("equivalences", "id, product_id, marque, reference", { filter: q => q.in("marque", marques).order("id") }))
       .then(setBrandVariants).catch(() => {});
     setSales(s);
     setClients(c.data ?? []);

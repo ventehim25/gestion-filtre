@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
-import { FILTER_BRANDS } from "@/lib/brands";
+import { FILTER_BRANDS, chargerMarques, ajouterMarque } from "@/lib/brands";
 import { coutCreditParFournisseur, setBonRembourse } from "@/lib/dinoun";
 import { ajouterReception, getReceptionsAttente, syncReceptions } from "@/lib/offlineReceptions";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
@@ -25,6 +25,8 @@ const todayStr = () => new Date().toISOString().split("T")[0];
 function waLink(tel: string) { return `https://wa.me/212${tel.replace(/\D/g, "").replace(/^0/, "")}`; }
 
 export default function FournisseursPage() {
+  // Marques de filtres : celles de départ + celles ajoutées par l'utilisateur (« ➕ Nouvelle marque… »)
+  const [marques, setMarques] = useState<string[]>(FILTER_BRANDS);
   const [fournisseurs, setFournisseurs] = useState<Fournisseur[]>([]);
   const [receptions, setReceptions] = useState<Reception[]>([]);
   const [avances, setAvances] = useState<Avance[]>([]);
@@ -70,9 +72,11 @@ export default function FournisseursPage() {
   // chargé en arrière-plan pour ne pas bloquer l'affichage des soldes sur réseau lent.
   async function loadPicker() {
     try {
+      const toutesMarques = await chargerMarques();
+      setMarques(toutesMarques);
       const [all, eqs] = await Promise.all([
         loadAll<Product>("products", "*", { filter: (q) => q.order("reference") }),
-        loadAll<VariantRow & { product_id: string }>("equivalences", "id, product_id, marque, reference, prix_achat, prix, code_barre", { filter: (q) => q.in("marque", FILTER_BRANDS).order("id") }),
+        loadAll<VariantRow & { product_id: string }>("equivalences", "id, product_id, marque, reference, prix_achat, prix, code_barre", { filter: (q) => q.in("marque", toutesMarques).order("id") }),
       ]);
       const vmap: Record<string, VariantRow[]> = {};
       for (const e of eqs) (vmap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix_achat: e.prix_achat, prix: e.prix, code_barre: e.code_barre });
@@ -677,8 +681,18 @@ export default function FournisseursPage() {
                   {l.marque === "__new__" && (
                     <div className="grid grid-cols-2 gap-2 mt-1">
                       <label className="text-[10px] uppercase text-slate-500">Marque
-                        <select className="input mt-0.5 py-1 text-xs" value={l.nouvelleMarque ?? ""} onChange={e => patchLine(i, { nouvelleMarque: e.target.value })}>
-                          {FILTER_BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
+                        <select className="input mt-0.5 py-1 text-xs" value={l.nouvelleMarque ?? ""} onChange={async e => {
+                          if (e.target.value !== "__ajout__") { patchLine(i, { nouvelleMarque: e.target.value }); return; }
+                          // Nouvelle marque écrite par l'utilisateur : enregistrée pour toujours avec les autres
+                          const nom = window.prompt("Nom de la nouvelle marque (comme sur la boîte) :");
+                          if (!nom) return;
+                          const r = await ajouterMarque(nom);
+                          setMarques(r.marques);
+                          if (r.erreur) { alert(r.erreur); return; }
+                          if (r.marque) patchLine(i, { nouvelleMarque: r.marque });
+                        }}>
+                          {marques.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
+                          <option value="__ajout__">➕ Nouvelle marque…</option>
                         </select>
                       </label>
                       <label className="text-[10px] uppercase text-slate-500">Réf. sur la boîte

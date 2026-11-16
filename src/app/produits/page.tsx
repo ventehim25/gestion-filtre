@@ -7,7 +7,7 @@ import { useLang } from "@/context/LangContext";
 import type { TranslationKey } from "@/lib/i18n";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
-import { FILTER_BRANDS } from "@/lib/brands";
+import { FILTER_BRANDS, chargerMarques, ajouterMarque } from "@/lib/brands";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
 import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle, Camera } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
@@ -82,9 +82,11 @@ export default function ProduitsPage() {
       return m;
     };
     const EQ_COLS = "id, product_id, marque, reference, prix, prix_achat, stock";
+    const marquesChargees = await chargerMarques();
+    setBrands(marquesChargees);
     const [all, brandedEq, vehRows] = await Promise.all([
       loadAll<Product>("products", "*", { filter: q => q.order("nom_fr") }),
-      loadAll<EqRow>("equivalences", EQ_COLS, { filter: q => q.in("marque", BRANDS) }),
+      loadAll<EqRow>("equivalences", EQ_COLS, { filter: q => q.in("marque", marquesChargees) }),
       loadAll<VehRow>("product_vehicles", "*"),
     ]);
     setProducts(all);
@@ -232,8 +234,9 @@ export default function ProduitsPage() {
     setScanTarget(null);
   }
 
-  // Marques de FILTRES (Filtron = produit principal, les autres = variantes équivalentes).
-  const BRANDS = FILTER_BRANDS;
+  // Marques de FILTRES (Filtron = produit principal, les autres = variantes équivalentes) : celles de départ
+  // + celles ajoutées par l'utilisateur (« ➕ Nouvelle marque… », gardées dans la base, src/lib/brands.ts).
+  const [BRANDS, setBrands] = useState<string[]>(FILTER_BRANDS);
   // Marques reconnues (hors Filtron, + "OE") : toujours visibles dans les variantes, jamais
   // mélangées avec les codes constructeur (Citroën, Ford…) importés automatiquement.
   const KNOWN_BRANDS = new Set([...BRANDS.filter(b => b !== "Filtron"), "OE"].map(b => b.toLowerCase()));
@@ -444,9 +447,19 @@ export default function ProduitsPage() {
 
                 {/* Ligne d'ajout — toujours visible sous la liste */}
                 <div className="grid grid-cols-[76px_minmax(120px,1fr)_56px_56px_50px_58px] gap-1.5 items-center px-2.5 py-2 border-t border-slate-200 bg-slate-50/70 min-w-[420px]">
-                  <select className="input py-1 text-xs px-1" value={newEquiv.marque} onChange={e => setNewEquiv({ ...newEquiv, marque: e.target.value })}>
+                  <select className="input py-1 text-xs px-1" value={newEquiv.marque} onChange={async e => {
+                    if (e.target.value !== "__ajout__") { setNewEquiv({ ...newEquiv, marque: e.target.value }); return; }
+                    // Nouvelle marque écrite par l'utilisateur : enregistrée pour toujours avec les autres
+                    const nom = window.prompt("Nom de la nouvelle marque (comme sur la boîte) :");
+                    if (!nom) return;
+                    const r = await ajouterMarque(nom);
+                    setBrands(r.marques);
+                    if (r.erreur) { alert(r.erreur); return; }
+                    if (r.marque) setNewEquiv({ ...newEquiv, marque: r.marque });
+                  }}>
                     {BRANDS.filter(b => b !== "Filtron").map(b => <option key={b} value={b}>{b}</option>)}
                     <option value="OE">OE</option>
+                    <option value="__ajout__">➕ Nouvelle marque…</option>
                   </select>
                   <input className="input font-mono py-1 text-xs" placeholder="réf (ex Z555)" value={newEquiv.reference}
                     onChange={e => setNewEquiv({ ...newEquiv, reference: e.target.value })}
