@@ -267,5 +267,5 @@ Tu tapes **un seul prix** : le prix garage (comme avant). Les autres se calculen
 - **Même pièce chez une autre marque** : Produits → la fiche → « Variantes de marque », ou en Réception « + Autre marque » sous la ligne. Chaque marque garde son prix et son stock.
 - **Pièce d'origine** : « Renault Origine » ou « PSA Origine » (pas « Renault » tout court : ce nom sert aux codes constructeur, l'appli le refuse).
 - **Produits / Stock** : le menu « Catégorie » est rangé par famille ; « — Freinage (tout) — » montre toute la famille d'un coup.
-- **Catalogues** (/tarif, /catalogue) : une pièce avec stock et prix apparaît toute seule dans sa rubrique. Photo : prends la boîte en photo dans la fiche (photo automatique seulement pour les filtres).
+- **Catalogues** (/tarif, /catalogue) : rangés en **onglets par famille**. Une pièce avec stock (et prix pour /tarif) apparaît toute seule dans sa rubrique ; le client touche « ▼ détails » pour voir le type, la marque, le prix, les références équivalentes et la fiche complète. Une rubrique **sans stock** affiche « 🔄 Réapprovisionnement en cours » avec un bouton **Demander** (WhatsApp vers toi). Photo : prends la boîte en photo dans la fiche (photo automatique seulement pour les filtres).
 - **Vente** : rien ne change ; la marque affichée est la vraie.
