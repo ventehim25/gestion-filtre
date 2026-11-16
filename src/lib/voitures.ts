@@ -1,16 +1,23 @@
 // Voitures et leurs filtres à partir des applications Filtron (114 000 lignes, docs/VIN_ANALYSE.md).
 // Partagé par « VIN ou code moteur » (RechercheVin) et le « Catalogue par marque » (CatalogueMarques).
 import type { Application, Product } from "@/types/database";
+import { libelleCategorie } from "@/lib/categories";
 
 export type ProdLite = Pick<Product, "id" | "reference" | "marque" | "categorie" | "stock" | "stock_min" | "prix_vente" | "image_url">;
 export type Ligne = Application & { products: ProdLite | null };
 export type Voiture = {
   cle: string; marque: string; modele: string; moteur: string | null; code_moteur: string | null;
   annee_debut: string | null; annee_fin: string | null; puissance: string | null; filtres: ProdLite[];
+  /** Remarque de montage par pièce (catalogues de distribution, ex. Gates : « à partir de 09/2010 », « avec climatisation ») */
+  remarques?: Record<string, string>;
 };
 
-export const COLS = "marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, product_id, products(id, reference, marque, categorie, stock, stock_min, prix_vente, image_url)";
-export const ORDRE = ["filtre_huile", "filtre_air", "filtre_habitacle", "filtre_carburant", "filtre_refroidissement", "huile_moteur", "kit_distribution", "courroie_distribution", "chaine_distribution", "pompe_eau", "autre"];
+export const COLS = "marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, remarque, product_id, products(id, reference, marque, categorie, stock, stock_min, prix_vente, image_url)";
+export const ORDRE = ["filtre_huile", "filtre_air", "filtre_habitacle", "filtre_carburant", "filtre_refroidissement", "huile_moteur",
+  "kit_distribution_pompe", "kit_distribution", "courroie_distribution", "galet_distribution", "chaine_distribution", "pompe_eau",
+  "kit_courroie_accessoire", "courroie_accessoire", "poulie", "autre"];
+/** Libellé d'une catégorie (les filtres en abrégé, les autres pièces avec le nom de la liste unique categories.ts) */
+export const libelle = (c: string) => LIBELLE[c] ?? libelleCategorie(c);
 export const LIBELLE: Record<string, string> = {
   filtre_huile: "Filtre à huile", filtre_air: "Filtre à air", filtre_habitacle: "Filtre d'habitacle",
   filtre_carburant: "Filtre à carburant", filtre_refroidissement: "Refroidissement", huile_moteur: "Huile moteur",
@@ -24,11 +31,17 @@ export function grouper(rows: Ligne[]): Voiture[] {
     const cle = [r.marque, r.modele, r.moteur ?? "", r.code_moteur ?? ""].join("|");
     let v = map.get(cle);
     if (!v) {
-      v = { cle, marque: r.marque, modele: r.modele, moteur: r.moteur, code_moteur: r.code_moteur, annee_debut: r.annee_debut, annee_fin: r.annee_fin, puissance: r.puissance, filtres: [] };
+      v = { cle, marque: r.marque, modele: r.modele, moteur: r.moteur, code_moteur: r.code_moteur, annee_debut: r.annee_debut, annee_fin: r.annee_fin, puissance: r.puissance, filtres: [], remarques: {} };
       map.set(cle, v);
     }
     const p = r.products;
     if (p && !v.filtres.some((f) => f.id === p.id)) v.filtres.push(p);
+    const rem = r.remarque?.trim();
+    if (p && rem && v.remarques) {
+      const deja = v.remarques[p.id];
+      if (!deja) v.remarques[p.id] = rem;
+      else if (!deja.split(" — ou — ").includes(rem)) v.remarques[p.id] = `${deja} — ou — ${rem}`;
+    }
   }
   const out = [...map.values()];
   out.forEach((v) => v.filtres.sort((a, b) => ORDRE.indexOf(a.categorie) - ORDRE.indexOf(b.categorie)));
@@ -115,7 +128,7 @@ export function messageKit(v: Pick<Voiture, "marque" | "modele" | "moteur" | "co
     `🚗 *Kit filtres* — ${decouperModele(v.modele).nom} (${v.marque})`,
     [v.moteur, v.code_moteur && `code ${v.code_moteur}`].filter(Boolean).join(" · "),
     "————————————",
-    ...kit.map((f) => `• ${LIBELLE[f.categorie] ?? f.categorie} : *${f.reference}*${f.prix_vente > 0 ? ` — ${f.prix_vente} MAD` : ""}`),
+    ...kit.map((f) => `• ${libelle(f.categorie)} : *${f.reference}*${f.prix_vente > 0 ? ` — ${f.prix_vente} MAD` : ""}`),
     huile ? `• Huile moteur ${huile.texte}` : "",
     ...lignesHuile.map((l) => `   ${l.qte} × *${l.reference}*${l.prix_vente > 0 ? ` — ${l.prix_vente * l.qte} MAD` : ""}`),
     "————————————",

@@ -1,16 +1,18 @@
 "use client";
 // Une voiture et ses filtres (huile, air, habitacle, carburant) avec prix et stock,
 // + l'huile moteur conseillée (guide Liqui Moly, BIBLE §8.19)
-// + le « kit » (un filtre par type, + l'huile) à vendre ou envoyer sur WhatsApp en 1 tap (BIBLE §8.17).
+// + le « kit » (un filtre par type, + l'huile) à vendre ou envoyer sur WhatsApp en 1 tap (BIBLE §8.17)
+// + la distribution moteur (catalogue officiel Gates, BIBLE §8.34) avec la remarque de montage de chaque pièce.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
-import { type Voiture, LIBELLE, annees, kitDeVoiture, messageKit } from "@/lib/voitures";
+import { type Voiture, type ProdLite, libelle, annees, kitDeVoiture, messageKit } from "@/lib/voitures";
+import { estDistribution } from "@/lib/categories";
 import { type BidonHuile, bidonsConvenables, bidonsPourVidange, chargerHuiles, estCleVoiture, huilesDeLaVoiture, litresTexte, variantePrevue, versionsFap } from "@/lib/huiles";
 import type { HuileMoteur } from "@/types/database";
 import { sendWhatsApp } from "@/lib/whatsapp";
-import { Package, Send, Droplet } from "lucide-react";
+import { Package, Send, Droplet, Cog } from "lucide-react";
 
 export default function VoitureCarte({ v, action }: { v: Voiture; action?: React.ReactNode }) {
   const router = useRouter();
@@ -27,6 +29,25 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
   }, [v.code_moteur, v.moteur, v.marque, v.modele, v.annee_debut, v.puissance]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kit = kitDeVoiture(v);
+  const filtres = v.filtres.filter((f) => !estDistribution(f.categorie));
+  const distribution = v.filtres.filter((f) => estDistribution(f.categorie));
+  const piece = (f: ProdLite) => {
+    const rem = v.remarques?.[f.id];
+    return (
+      <div key={f.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/40">
+        <FilterImage reference={f.reference} categorie={f.categorie} imageUrl={f.image_url} wid={120} className="h-12 w-12 rounded object-contain bg-white shrink-0 p-0.5" />
+        <div className="min-w-0 flex-1">
+          <div className="text-xs text-slate-400">{libelle(f.categorie)}{f.marque && estDistribution(f.categorie) ? ` · ${f.marque}` : ""}</div>
+          <div className="font-mono font-semibold truncate">{f.reference}</div>
+          {rem && <div className="text-[11px] text-amber-300/90 leading-snug">⚠ {rem}</div>}
+        </div>
+        <div className="text-end shrink-0 space-y-1">
+          {f.prix_vente > 0 && <div className="text-sm font-semibold">{f.prix_vente} MAD</div>}
+          <StockBadge stock={f.stock} stockMin={f.stock_min} />
+        </div>
+      </div>
+    );
+  };
   const huile = huiles.find((h) => h.variante === variante) ?? null; // choisie (ou seule possible)
   const pourVidange = huile ? bidonsPourVidange(huile, bidons) : [];
   const total = kit.reduce((s, f) => s + (f.prix_vente > 0 ? f.prix_vente : 0), 0) + pourVidange.reduce((s, x) => s + (x.bidon.prix_vente > 0 ? x.bidon.prix_vente * x.qte : 0), 0);
@@ -54,27 +75,27 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
         {action}
       </div>
       <div className="grid sm:grid-cols-2 gap-2 mt-3">
-        {v.filtres.map((f) => (
-          <div key={f.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/40">
-            <FilterImage reference={f.reference} categorie={f.categorie} imageUrl={f.image_url} wid={120} className="h-12 w-12 rounded object-contain bg-white shrink-0 p-0.5" />
-            <div className="min-w-0 flex-1">
-              <div className="text-xs text-slate-400">{LIBELLE[f.categorie] ?? f.categorie}</div>
-              <div className="font-mono font-semibold truncate">{f.reference}</div>
-            </div>
-            <div className="text-end shrink-0 space-y-1">
-              {f.prix_vente > 0 && <div className="text-sm font-semibold">{f.prix_vente} MAD</div>}
-              <StockBadge stock={f.stock} stockMin={f.stock_min} />
-            </div>
-          </div>
-        ))}
-        {v.filtres.length === 0 && <p className="text-xs text-slate-400">Aucun filtre enregistré pour cette voiture.</p>}
+        {filtres.map(piece)}
+        {filtres.length === 0 && <p className="text-xs text-slate-400">Aucun filtre enregistré pour cette voiture.</p>}
       </div>
       {/* Pas de filtre à carburant dans nos références : normal sur beaucoup d'essence (il est dans le réservoir),
           à vérifier chez Filtron sur un diesel. On ne devine jamais une référence. */}
-      {v.filtres.length > 0 && !v.filtres.some((f) => f.categorie === "filtre_carburant") && (
+      {filtres.length > 0 && !filtres.some((f) => f.categorie === "filtre_carburant") && (
         <p className="mt-2 text-xs text-slate-400">
           Filtre à carburant : aucun dans tes références pour ce moteur. Sur beaucoup de moteurs essence, il est dans le réservoir avec la pompe ; sur un diesel, vérifie dans le catalogue Filtron.
         </p>
+      )}
+
+      {/* Distribution moteur (catalogue officiel Gates) : kit, kit + pompe, courroie, galets, kit chaîne.
+          Une voiture peut avoir plusieurs choix : la remarque (⚠) dit lequel prendre (date, climatisation, moteur exact). */}
+      {distribution.length > 0 && (
+        <div className="mt-3">
+          <div className="flex items-center gap-2 text-sm text-slate-200 font-medium">
+            <Cog size={14} className="text-amber-300" /> Distribution moteur
+            <span className="text-xs text-slate-500 font-normal">(catalogue officiel {[...new Set(distribution.map((f) => f.marque).filter(Boolean))].join(", ") || "fabricant"})</span>
+          </div>
+          <div className="grid sm:grid-cols-2 gap-2 mt-1.5">{distribution.map(piece)}</div>
+        </div>
       )}
 
       {/* Huile moteur conseillée (guide Liqui Moly) */}
@@ -120,7 +141,7 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
       )}
 
       {/* Moteur pas encore relevé : lien vers le guide (on ne devine jamais l'huile) */}
-      {huilesChargees && huiles.length === 0 && v.filtres.length > 0 && (
+      {huilesChargees && huiles.length === 0 && filtres.length > 0 && (
         <p className="mt-2 text-xs text-slate-400 flex items-center gap-1.5">
           <Droplet size={12} className="text-slate-500" /> Huile moteur : pas encore relevée pour ce moteur dans FiltroPro.
           <a href="https://www.liqui-moly.com/fr/fr/service/guide-des-huiles.html" target="_blank" rel="noreferrer" className="text-blue-400 hover:underline">Voir le guide Liqui Moly ↗</a>

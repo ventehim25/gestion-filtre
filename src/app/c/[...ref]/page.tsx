@@ -23,7 +23,7 @@ async function getProduct(segs: string[]): Promise<Row | null> {
   // Colonnes listées une par une : jamais de prix d'achat dans une page publique
   // (avant : select("*") envoyait aussi prix_achat dans les données de la page).
   const { data } = await supabase.from("products")
-    .select("id, reference, marque, categorie, stock, image_url, dimensions, equivalences(marque, reference, stock), applications(marque, modele, moteur, annee_debut, annee_fin)")
+    .select("id, reference, marque, categorie, stock, image_url, dimensions, equivalences(marque, reference, stock), applications(marque, modele, moteur, annee_debut, annee_fin, remarque)")
     .ilike("reference", loose).limit(10);
   const rows = (data ?? []) as unknown as Row[];
   return rows.find(p => p.reference.toUpperCase().replace(/\s+/g, "") === cleanNorm) ?? null;
@@ -112,7 +112,7 @@ export default async function CataloguePage({ params }: { params: Promise<{ ref:
                       <tr key={i}>
                         <td className="py-1.5 pe-3 text-slate-200">{a.marque}</td>
                         <td className="py-1.5 pe-3 text-slate-300">{a.modele}</td>
-                        <td className="py-1.5 pe-3 text-slate-400">{a.moteur ?? "—"}</td>
+                        <td className="py-1.5 pe-3 text-slate-400">{a.moteur ?? "—"}{a.remarque && <div className="text-[11px] text-amber-300/80">{a.remarque}</div>}</td>
                         <td className="py-1.5 text-slate-500 text-xs">{a.annee_debut ?? ""}{a.annee_fin ? ` – ${a.annee_fin}` : a.annee_debut ? " →" : "—"}</td>
                       </tr>
                     ))}

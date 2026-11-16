@@ -226,6 +226,9 @@ export type Application = {
   annee_debut: string | null;
   annee_fin: string | null;
   puissance: string | null;
+  // Remarque de montage (catalogues de distribution, ex. Gates : « à partir de 09/2010 », « avec climatisation »),
+  // supabase/applications_remarque.sql — BIBLE §8.34
+  remarque?: string | null;
 };
 
 export type ProductCategory =
