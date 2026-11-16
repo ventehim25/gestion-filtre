@@ -37,7 +37,7 @@ Tous collés dans l'éditeur Supabase : https://supabase.com/dashboard/project/w
 | `supabase/securite.sql` | **Base protégée + connexion obligatoire** (voir §9) | ✅ collé le 12/11/2026 (compte ventehim@gmail.com) |
 | `supabase/vin_connus.sql` | Mémoire des VIN confirmés (« VIN ou code moteur ») | ✅ collé le 12/11/2026 |
 | `supabase/categories_distribution.sql` | Catégories **chaîne, courroie, pompe à eau, kit de distribution** (voir §16) | ✅ collé le 16/11/2026 (remplacé par la ligne suivante) |
-| `supabase/categories_produits.sql` | **Les 9 familles de pièces** (freinage, embrayage, batteries…) ; ensuite plus aucun SQL pour une nouvelle catégorie (voir §16) | ⏳ **à coller** (16/11/2026) |
+| `supabase/categories_produits.sql` | **Les 9 familles de pièces** (freinage, embrayage, batteries…) ; ensuite plus aucun SQL pour une nouvelle catégorie (voir §16) | ✅ collé le 16/11/2026 |
 
 > Règle : après un `CREATE`/`ALTER`, le SQL finit par `notify pgrst, 'reload schema';` et tu **recharges l'app**.
 
@@ -244,7 +244,7 @@ Tu tapes **un seul prix** : le prix garage (comme avant). Les autres se calculen
 
 ## 16. Toutes les pièces, rangées en 9 familles (depuis le 16/11/2026)
 
-**Une seule fois** : colle `supabase/categories_produits.sql` dans l'éditeur SQL de Supabase (lien §2) → « Run ». Après, plus jamais de SQL pour ajouter une catégorie : tu me la demandes, je l'ajoute.
+**SQL** `supabase/categories_produits.sql` : ✅ collé le 16/11/2026. Plus jamais de SQL pour ajouter une catégorie : tu me la demandes, je l'ajoute.
 
 **Les familles** (comme les grands sites de pièces) :
 - **Filtres et huile** : filtres (huile, air, carburant, habitacle, refroidissement), autres filtrations, huile moteur, accessoires de vidange, outils de vidange.
