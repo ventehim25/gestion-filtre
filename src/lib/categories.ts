@@ -118,6 +118,16 @@ export const creables = (f: Famille): ProductCategory[] =>
 export const libelleCategorie = (c?: string | null) =>
   (c && CATEGORY_KEYS[c as ProductCategory] ? translations.fr[CATEGORY_KEYS[c as ProductCategory]] : "Pièce auto");
 
+/** Kit / courroie de distribution : case « nombre de dents / largeur » (ex. 141/25 = 141 dents, 25 mm). Gardée dans
+ *  products.dimensions (pour les filtres, cette colonne contient les dimensions Filtron) — BIBLE §8.33. */
+export const AVEC_DENTS: ProductCategory[] = ["kit_distribution", "kit_distribution_pompe", "courroie_distribution"];
+export const avecDents = (c?: string | null) => !!c && (AVEC_DENTS as string[]).includes(c);
+/** « 141 / 25 », « 141x25 », « 141-25 » → « 141/25 » (vide → ""). */
+export const normDents = (s?: string | null) => (s ?? "").trim().replace(/\s*[/x×-]\s*/i, "/").replace(/\s+/g, "").replace(",", ".");
+/** Format attendu : dents/largeur, ex. 141/25 ou 123/27 (largeur avec une décimale permise : 137/25.4). */
+export const dentsValides = (s: string) => /^\d{2,3}\/\d{1,2}(\.\d)?$/.test(s);
+export const MSG_DENTS = "Nombre de dents / largeur : écris les dents puis la largeur, par exemple 141/25 ou 123/27.";
+
 /** Valeur d'un filtre « toute la famille » dans les menus (« famille:distribution »). */
 export const FILTRE_FAMILLE = "famille:";
 export const correspondCategorie = (filtre: string, c: string) =>

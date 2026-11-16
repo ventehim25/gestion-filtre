@@ -14,7 +14,7 @@ import VoiceButton from "@/components/VoiceButton";
 import RechercheVin from "@/components/RechercheVin";
 import CatalogueMarques from "@/components/CatalogueMarques";
 import { constructeur, anneeProbable, nettoyerVin } from "@/lib/vin";
-import { CATEGORY_KEYS, estFiltre, familleDe, type Famille } from "@/lib/categories";
+import { CATEGORY_KEYS, estFiltre, familleDe, avecDents, normDents, dentsValides, MSG_DENTS, AVEC_DENTS, type Famille } from "@/lib/categories";
 import { DEPART, chargerMarques, marquesPour } from "@/lib/brands";
 import CategoryOptions from "@/components/CategoryOptions";
 
@@ -185,7 +185,7 @@ export default function RecherchePage() {
   // Marques : celles du métier de la pièce (filtres ou distribution, BIBLE §8.30) + celles ajoutées par l'utilisateur
   const [toutesMarques, setToutesMarques] = useState<string[]>(DEPART);
   useEffect(() => { chargerMarques().then(setToutesMarques); }, []);
-  const emptyAdd = { reference: "", marque: "Filtron", filtronRef: "", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, code_barre: "" };
+  const emptyAdd = { reference: "", marque: "Filtron", filtronRef: "", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, code_barre: "", dents: "" };
   const [showAdd, setShowAdd] = useState(false);
   const [addForm, setAddForm] = useState(emptyAdd);
   const [addSaving, setAddSaving] = useState(false);
@@ -197,7 +197,10 @@ export default function RecherchePage() {
     const ref = addForm.reference.trim();
     if (!ref) { alert("Référence obligatoire."); return; }
     if (!addForm.marque) { alert("Choisis la marque de la pièce (Gates, Dayco, Dolz…)."); return; }
-    const { filtronRef, ...prod } = addForm;
+    const { filtronRef, dents: dentsSaisis, ...prod } = addForm;
+    // Kit / courroie de distribution : nombre de dents / largeur (ex. 141/25) → products.dimensions (BIBLE §8.33)
+    const dents = avecDents(prod.categorie) ? normDents(dentsSaisis) : "";
+    if (dents && !dentsValides(dents)) { alert(MSG_DENTS); return; }
     const fref = (filtronRef || "").trim();
     setAddSaving(true);
 
@@ -234,7 +237,7 @@ export default function RecherchePage() {
     }
 
     // Sinon : créer un produit (Filtron, ou marque sans réf Filtron connue)
-    const payload = { ...prod, reference: ref, nom_fr: "", nom_ar: "", notes: "", prix_promo: null };
+    const payload = { ...prod, reference: ref, nom_fr: "", nom_ar: "", notes: "", prix_promo: null, dimensions: dents || null };
     const { error } = await supabase.from("products").insert(payload);
     setAddSaving(false);
     if (error) {
@@ -258,11 +261,14 @@ export default function RecherchePage() {
     const clean = q.replace(/\s+/g, "");
     const loose = "%" + clean.replace(/[%_]/g, "").split("").join("%") + "%";
     const sel = "*, equivalences(*), applications(*), compatibilites(vehicules(*))";
-    const [{ data: direct }, { data: eqMatches }] = await Promise.all([
+    const dentsQ = normDents(q);
+    const [{ data: direct }, { data: eqMatches }, { data: parDents }] = await Promise.all([
       supabase.from("products").select(sel).ilike("reference", loose).limit(60),
       supabase.from("equivalences").select("product_id").ilike("reference", loose).limit(60),
+      dentsValides(dentsQ) ? supabase.from("products").select(sel).in("categorie", AVEC_DENTS).eq("dimensions", dentsQ).limit(60) : Promise.resolve({ data: [] }),
     ]);
     let all = [...((direct as unknown as RefResult[]) ?? [])];
+    for (const p of ((parDents as unknown as RefResult[]) ?? [])) if (!all.some(x => x.id === p.id)) all.push(p);
     const ids = [...new Set((eqMatches ?? []).map((e: { product_id: string }) => e.product_id))]
       .filter(id => !all.some(p => p.id === id));
     if (ids.length) {
@@ -417,6 +423,7 @@ export default function RecherchePage() {
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>
                       <div className="text-xl font-bold font-mono text-slate-800 mt-1">{p.reference}</div>
                     </div>
+                    {avecDents(p.categorie) && p.dimensions && <div className="self-center text-xs font-semibold text-amber-500">🦷 {p.dimensions}</div>}
                     <div className="text-right">
                       <div className="text-lg font-bold text-blue-600">{p.prix_vente} MAD</div>
                       <div className="mt-1.5 flex justify-end"><StockBadge stock={p.stock} stockMin={p.stock_min} /></div>
@@ -431,7 +438,7 @@ export default function RecherchePage() {
                     </button>
                   )}
 
-                  {openDetails.has(p.id) && p.dimensions && <div className="text-xs text-slate-500 mt-2">📐 {p.dimensions}</div>}
+                  {openDetails.has(p.id) && p.dimensions && <div className="text-xs text-slate-500 mt-2">{avecDents(p.categorie) ? `🦷 Nombre de dents / largeur : ${p.dimensions}` : `📐 ${p.dimensions}`}</div>}
 
                   {openDetails.has(p.id) && (apps.length > 0 ? (
                     <div className="mt-3 pt-3 border-t border-slate-100">

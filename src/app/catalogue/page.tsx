@@ -43,7 +43,8 @@ export default function CataloguePublicPage() {
     return items.filter(i => !s
       || i.reference.toUpperCase().replace(/\s+/g, "").includes(s)
       || i.marque.toUpperCase().includes(s)
-      || (i.aliases?.some(a => a.includes(s)) ?? false));
+      || (i.aliases?.some(a => a.includes(s)) ?? false)
+      || (!!i.dents && i.dents.toUpperCase().includes(s))); // « 141/25 » : kits / courroies de distribution
   }, [items, q]);
   const recherche = q.trim().length > 0;
 
@@ -147,7 +148,7 @@ export default function CataloguePublicPage() {
                     <FilterImage reference={i.reference} categorie={i.categorie} imageUrl={i.imageUrl ?? undefined} wid={110} className="thumb" placeholder="logo" />
                     <button className="info-btn" onClick={() => setOuvert(o => o === k ? null : k)} aria-expanded={ouvert === k}>
                       <div className="ref">{i.reference}</div>
-                      <div className="mk">{i.marque}</div>
+                      <div className="mk">{i.marque}{i.dents ? ` · 🦷 ${i.dents}` : ""}</div>
                       <div className="plus">{ouvert === k ? "▲ moins" : "▼ détails"}</div>
                     </button>
                     <div className="sp">

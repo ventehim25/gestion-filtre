@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Product, Application, Equivalence } from "@/types/database";
 import FilterImage from "@/components/FilterImage";
-import { libelleCategorie } from "@/lib/categories";
+import { libelleCategorie, avecDents } from "@/lib/categories";
 
 export const revalidate = 86400; // ISR : page régénérée au plus toutes les 24 h
 
@@ -72,7 +72,7 @@ export default async function CataloguePage({ params }: { params: Promise<{ ref:
               <p className="text-xs uppercase tracking-widest text-red-400 font-semibold mb-1">{cat}</p>
               <h1 className="text-2xl font-bold font-mono">{p.reference}</h1>
               <p className="text-sm text-amber-400 font-semibold mt-0.5">{p.marque || "Filtron"}</p>
-              {p.dimensions && <p className="text-sm text-slate-400 mt-2">📏 {p.dimensions}</p>}
+              {p.dimensions && <p className="text-sm text-slate-400 mt-2">{avecDents(p.categorie) ? `🦷 Nombre de dents / largeur : ${p.dimensions}` : `📏 ${p.dimensions}`}</p>}
               <p className={`inline-block mt-3 text-sm font-medium px-3 py-1 rounded-full ${dispo ? "bg-green-500/15 text-green-400" : "bg-slate-500/15 text-slate-400"}`}>
                 {dispo ? "✅ Disponible" : "📦 Sur commande"}
               </p>

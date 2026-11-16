@@ -2,7 +2,7 @@
 // EN DIRECT depuis les produits gérés dans /produits. Change un prix / un stock → ça suit.
 import { supabase } from "./supabase";
 import { ProductCategory } from "@/types/database";
-import { CATEGORIES } from "./categories";
+import { CATEGORIES, avecDents } from "./categories";
 import { chargerPourcentages, prixPour, type PrixManuels, type TypeCatalogue } from "./prixCatalogues";
 
 // Clé du lien privé. Le catalogue de prix ne s'ouvre qu'avec ?k=<clé>.
@@ -85,11 +85,14 @@ export type CatItem = {
   prix: number; promo: boolean; prixAvant?: number;
   imageUrl?: string | null; aliases?: string[]; productId?: string;
   ficheRef?: string; // réf. de la fiche produit (page publique /c/…), BIBLE §8.32
+  dents?: string;    // kit / courroie de distribution : nombre de dents / largeur (ex. 141/25), BIBLE §8.33
 };
-export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null; aliases?: string[]; productId?: string; ficheRef?: string };
+export type PubItem = { reference: string; marque: string; categorie: string; imageUrl?: string | null; aliases?: string[]; productId?: string; ficheRef?: string; dents?: string };
 
-type ProdRow = PrixManuels & { id: string; reference: string; marque: string | null; categorie: string; stock: number; image_url: string | null; prix_vente?: number; prix_promo?: number | null };
-type ParentRow = { categorie: string | null; image_url: string | null; reference: string | null } | null;
+type ProdRow = PrixManuels & { id: string; reference: string; marque: string | null; categorie: string; stock: number; image_url: string | null; dimensions?: string | null; prix_vente?: number; prix_promo?: number | null };
+type ParentRow = { categorie: string | null; image_url: string | null; reference: string | null; dimensions?: string | null } | null;
+// Nombre de dents seulement pour les kits / courroies de distribution (pour les filtres, « dimensions » = cotes Filtron)
+const dentsDe = (categorie: string | null | undefined, dim: string | null | undefined) => (avecDents(categorie) && dim ? dim : undefined);
 type EqRow = PrixManuels & { product_id: string; marque: string; reference: string; stock: number; prix?: number | null; products?: ParentRow };
 const COLS_MANUELS = ", prix_particulier, prix_location, prix_magasin";
 
@@ -103,8 +106,8 @@ const COLS_MANUELS = ", prix_particulier, prix_location, prix_magasin";
 // Produits en stock (quelques centaines max → 1 page en général).
 async function stockProducts(withPrice: boolean, manuels = false): Promise<ProdRow[]> {
   const cols = withPrice
-    ? "id, reference, marque, categorie, stock, image_url, prix_vente, prix_promo" + (manuels ? COLS_MANUELS : "")
-    : "id, reference, marque, categorie, stock, image_url";
+    ? "id, reference, marque, categorie, stock, image_url, dimensions, prix_vente, prix_promo" + (manuels ? COLS_MANUELS : "")
+    : "id, reference, marque, categorie, stock, image_url, dimensions";
   const rows: ProdRow[] = [];
   for (let i = 0; i < 10; i++) {
     const { data, error } = await supabase.from("products").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
@@ -118,8 +121,8 @@ async function stockProducts(withPrice: boolean, manuels = false): Promise<ProdR
 // Variantes de marque en stock, avec les infos du produit parent (catégorie, photo, réf).
 async function stockEquivs(withPrice: boolean, manuels = false): Promise<EqRow[]> {
   const cols = withPrice
-    ? "product_id, marque, reference, stock, prix" + (manuels ? COLS_MANUELS : "") + ", products(categorie, image_url, reference)"
-    : "product_id, marque, reference, stock, products(categorie, image_url, reference)";
+    ? "product_id, marque, reference, stock, prix" + (manuels ? COLS_MANUELS : "") + ", products(categorie, image_url, reference, dimensions)"
+    : "product_id, marque, reference, stock, products(categorie, image_url, reference, dimensions)";
   const rows: EqRow[] = [];
   for (let i = 0; i < 10; i++) {
     const { data, error } = await supabase.from("equivalences").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
@@ -159,10 +162,10 @@ function mergeAliases<T extends { productId?: string; aliases?: string[] }>(item
 export async function loadPublicCatalogueItems(): Promise<PubItem[]> {
   const [prods, eqs] = await Promise.all([stockProducts(false), stockEquivs(false)]);
   const items: PubItem[] = [];
-  for (const p of prods) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id, ficheRef: p.reference });
+  for (const p of prods) items.push({ reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id, ficheRef: p.reference, dents: dentsDe(p.categorie, p.dimensions) });
   for (const e of eqs) {
     const parentRef = e.products?.reference ? [norm(e.products.reference)] : [];
-    items.push({ reference: e.reference, marque: e.marque, categorie: e.products?.categorie ?? "autre", imageUrl: e.products?.image_url ?? null, aliases: [norm(e.reference), ...parentRef], productId: e.product_id, ficheRef: e.products?.reference ?? undefined });
+    items.push({ reference: e.reference, marque: e.marque, categorie: e.products?.categorie ?? "autre", imageUrl: e.products?.image_url ?? null, aliases: [norm(e.reference), ...parentRef], productId: e.product_id, ficheRef: e.products?.reference ?? undefined, dents: dentsDe(e.products?.categorie, e.products?.dimensions) });
   }
   items.sort((a, b) => catOrder(a.categorie) - catOrder(b.categorie) || a.reference.localeCompare(b.reference, undefined, { numeric: true }));
   writeCache(PUB_CACHE, items);
@@ -192,7 +195,7 @@ export async function loadCatalogueItems(type: TypeCatalogue = "garage"): Promis
       items.push({
         reference: p.reference, marque: p.marque || "Filtron", categorie: p.categorie,
         prix: promo ? prixPour(type, p.prix_promo as number, null, pct) : prixNormal, promo,
-        prixAvant: promo ? prixNormal : undefined, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id, ficheRef: p.reference,
+        prixAvant: promo ? prixNormal : undefined, imageUrl: p.image_url, aliases: [norm(p.reference)], productId: p.id, ficheRef: p.reference, dents: dentsDe(p.categorie, p.dimensions),
       });
     }
   }
@@ -202,7 +205,7 @@ export async function loadCatalogueItems(type: TypeCatalogue = "garage"): Promis
       items.push({
         reference: e.reference, marque: e.marque, categorie: e.products?.categorie ?? "autre",
         prix: prixPour(type, e.prix, e, pct), promo: false, imageUrl: e.products?.image_url ?? null,
-        aliases: [norm(e.reference), ...parentRef], productId: e.product_id, ficheRef: e.products?.reference ?? undefined,
+        aliases: [norm(e.reference), ...parentRef], productId: e.product_id, ficheRef: e.products?.reference ?? undefined, dents: dentsDe(e.products?.categorie, e.products?.dimensions),
       });
     }
   }

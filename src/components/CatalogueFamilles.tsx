@@ -9,7 +9,7 @@ import { translations } from "@/lib/i18n";
 import { CAT_FR } from "@/lib/catalogue";
 import CategoryIcon from "./CategoryIcon";
 
-type Base = { reference: string; marque: string; categorie: string; aliases?: string[]; ficheRef?: string };
+type Base = { reference: string; marque: string; categorie: string; aliases?: string[]; ficheRef?: string; dents?: string };
 
 const libelleFamille = (k: Famille) => translations.fr[FAMILLES.find((f) => f.k === k)!.cle];
 const waDemande = (wa: string, cat: string) =>
@@ -99,6 +99,7 @@ export function DetailsArticle({ item, extra }: { item: Base; extra?: ReactNode 
     <div className="det">
       <div><span className="ok">✓ En stock</span> · livraison rapide aux garages</div>
       <div>Type : <b>{libelleCategorie(item.categorie)}</b> · Marque : <b>{item.marque}</b></div>
+      {item.dents && <div>🦷 Nombre de dents / largeur : <b>{item.dents}</b></div>}
       {extra}
       {autres.length > 0 && <div>Aussi connu sous : <span className="mono">{autres.join(" · ")}</span></div>}
       {item.ficheRef && (

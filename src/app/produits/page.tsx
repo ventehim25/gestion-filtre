@@ -7,7 +7,7 @@ import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { DEPART, chargerMarques, ajouterMarque, marquesPour, marqueVarianteDefaut as varDefaut } from "@/lib/brands";
-import { CATEGORY_KEYS as categoryKeys, estFiltre, familleDe, correspondCategorie } from "@/lib/categories";
+import { CATEGORY_KEYS as categoryKeys, estFiltre, familleDe, correspondCategorie, avecDents, normDents, dentsValides, MSG_DENTS } from "@/lib/categories";
 import CategoryOptions from "@/components/CategoryOptions";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
 import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle, Camera } from "lucide-react";
@@ -28,7 +28,7 @@ const COL_CAT = { particulier: "prix_particulier", location: "prix_location", ma
 const ERREUR_CATEGORIE = "La base n'accepte pas encore cette catégorie.\nColle d'abord le fichier supabase/categories_produits.sql dans l'éditeur SQL de Supabase, puis réessaie.";
 const msgErreur = (e: { message: string } | null) => e && (/categorie_(check|fkey)/i.test(e.message) ? ERREUR_CATEGORIE : `Erreur : ${e.message}`);
 
-const empty = { nom_fr: "", nom_ar: "", reference: "", marque: "Filtron", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0, code_barre: "", image_url: "" };
+const empty = { nom_fr: "", nom_ar: "", reference: "", marque: "Filtron", categorie: "filtre_huile" as ProductCategory, prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 2, notes: "", prix_promo: 0, code_barre: "", image_url: "", dimensions: "" };
 
 // Tri naturel par référence : préfixe (lettres) puis numéro puis variante /n puis suffixe
 function refCompare(a: string, b: string) {
@@ -104,7 +104,10 @@ export default function ProduitsPage() {
   async function save() {
     let productId = editing?.id;
     if (!form.marque.trim()) { alert("Choisis la marque de la pièce (Gates, Dayco, Dolz…)."); return; }
-    const payload = { ...form, prix_promo: form.prix_promo > 0 ? form.prix_promo : null, image_url: form.image_url || null };
+    // Kit / courroie de distribution : nombre de dents / largeur (ex. 141/25) gardé dans « dimensions » (BIBLE §8.33)
+    const dents = avecDents(form.categorie) ? normDents(form.dimensions) : form.dimensions.trim();
+    if (avecDents(form.categorie) && dents && !dentsValides(dents)) { alert(MSG_DENTS); return; }
+    const payload = { ...form, dimensions: dents || null, prix_promo: form.prix_promo > 0 ? form.prix_promo : null, image_url: form.image_url || null };
     if (editing) {
       const { error } = await supabase.from("products").update(payload).eq("id", editing.id);
       if (error) { alert(msgErreur(error)); return; }
@@ -185,7 +188,7 @@ export default function ProduitsPage() {
 
   async function startEdit(p: Product) {
     setEditing(p);
-    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, marque: p.marque ?? "Filtron", categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0, code_barre: p.code_barre ?? "", image_url: p.image_url ?? "" });
+    setForm({ nom_fr: p.nom_fr, nom_ar: p.nom_ar, reference: p.reference, marque: p.marque ?? "Filtron", categorie: p.categorie, prix_achat: p.prix_achat, prix_vente: p.prix_vente, stock: p.stock, stock_min: p.stock_min, notes: p.notes ?? "", prix_promo: p.prix_promo ?? 0, code_barre: p.code_barre ?? "", image_url: p.image_url ?? "", dimensions: p.dimensions ?? "" });
     setManuels({ prix_particulier: p.prix_particulier ?? 0, prix_location: p.prix_location ?? 0, prix_magasin: p.prix_magasin ?? 0 });
     const { data } = await supabase.from("equivalences").select("*").eq("product_id", p.id);
     setEquivs((data as Equivalence[] | null)?.map(e => ({ id: e.id, marque: e.marque, reference: e.reference, prix: e.prix ?? undefined, prix_achat: e.prix_achat ?? undefined, stock: e.stock ?? 0, code_barre: e.code_barre ?? "" })) ?? []);
@@ -216,7 +219,7 @@ export default function ProduitsPage() {
     const lignes = [
       `🔧 *${p.nom_fr || (estFiltre(p.categorie) ? "Filtre" : t(categoryKeys[p.categorie] ?? "other"))} ${p.marque || "Filtron"} ${p.reference}*`,
     ];
-    if (p.dimensions) lignes.push(`📏 ${p.dimensions}`);
+    if (p.dimensions) lignes.push(avecDents(p.categorie) ? `🦷 Dents / largeur : ${p.dimensions}` : `📏 ${p.dimensions}`);
     const appRows = (apps ?? []) as { marque: string; modele: string; moteur: string | null }[];
     if (appRows.length > 0) {
       lignes.push("", "🚗 Compatible :");
@@ -270,10 +273,11 @@ export default function ProduitsPage() {
     const q = search.toLowerCase();
     const qn = norm(search);
     const eqs = equivMap[p.id] ?? [];
-    const matchSearch = !q || p.nom_fr.toLowerCase().includes(q) || norm(p.reference).includes(qn) || p.nom_ar.includes(search)
+    const dentsP = avecDents(p.categorie) && p.dimensions ? norm(p.dimensions) : ""; // « 141/25 » trouvé aussi
+    const matchSearch = !q || p.nom_fr.toLowerCase().includes(q) || norm(p.reference).includes(qn) || p.nom_ar.includes(search) || (!!dentsP && dentsP.includes(qn))
       || eqs.some(e => norm(e.reference).includes(qn) || e.marque.toLowerCase().includes(q));
     const refN = norm(refSearch);
-    const matchRef = !refSearch || norm(p.reference).startsWith(refN) || eqs.some(e => norm(e.reference).startsWith(refN));
+    const matchRef = !refSearch || norm(p.reference).startsWith(refN) || eqs.some(e => norm(e.reference).startsWith(refN)) || (!!dentsP && dentsP.startsWith(refN));
     const matchBrand = !brandFilter || (p.marque ?? "Filtron").toLowerCase() === brandFilter.toLowerCase();
     const matchCat = correspondCategorie(catFilter, p.categorie); // une catégorie ou « toute la famille »
     // Préfixes camion = règle des références FILTRON seulement (une réf Gates/Dolz n'en dit rien)
@@ -362,6 +366,12 @@ export default function ProduitsPage() {
                   <CategoryOptions t={t} />
                 </select>
               </div>
+              {avecDents(form.categorie) && (
+                <div><label className="text-xs text-amber-400 mb-1 block">🦷 Nombre de dents / largeur</label>
+                  <input className={`input font-mono ${form.dimensions && !dentsValides(normDents(form.dimensions)) ? "ring-2 ring-red-500/70" : ""}`} placeholder="ex. 141/25" inputMode="decimal"
+                    value={form.dimensions} onChange={e => setForm({ ...form, dimensions: e.target.value })} onBlur={e => setForm(f => ({ ...f, dimensions: normDents(e.target.value) }))} />
+                </div>
+              )}
               <div><label className="text-xs text-slate-500 mb-1 block">{t("buyPrice")} (MAD)</label><input type="number" className="input" value={form.prix_achat} onChange={e => setForm({ ...form, prix_achat: +e.target.value })} /></div>
               <div><label className="text-xs text-slate-500 mb-1 block">{t("sellPrice")} (MAD)</label><input type="number" className="input" value={form.prix_vente} onChange={e => setForm({ ...form, prix_vente: +e.target.value })} /></div>
               <div><label className="text-xs text-rose-400 mb-1 block">Prix promo (MAD) — 0 = pas de promo</label><input type="number" className="input" value={form.prix_promo} onChange={e => setForm({ ...form, prix_promo: +e.target.value })} /></div>
@@ -533,6 +543,7 @@ export default function ProduitsPage() {
                     <div className="min-w-0">
                       <span className="font-mono text-xs text-slate-300">{p.reference}</span>
                       <span className="ms-2 text-[10px] font-semibold text-amber-400">{p.marque || "Filtron"}</span>
+                      {avecDents(p.categorie) && p.dimensions && <div className="text-[10px] text-slate-400">🦷 {p.dimensions}</div>}
                     </div>
                   </div>
                 </td>

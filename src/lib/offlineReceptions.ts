@@ -6,7 +6,7 @@ import { supabase } from "./supabase";
 import type { ProductCategory, ReceptionLigne } from "@/types/database";
 
 // Pièce pas encore dans l'appli (distribution, freinage… : Filtron n'en fait pas) : créée à l'envoi (BIBLE §8.30-8.31)
-export type NouvellePiece = { categorie: ProductCategory; marque: string; reference: string; nom: string };
+export type NouvellePiece = { categorie: ProductCategory; marque: string; reference: string; nom: string; dents?: string }; // dents : kit/courroie, ex. 141/25
 export type RecLigneAttente = {
   product_id: string; equivalence_id: string | null; quantite: number; prix_achat: number; prix_vente: number;
   code_barre: string; nouvelleMarque: string | null; nouvelleRef: string; libelle: string;
@@ -46,9 +46,11 @@ async function creerPieces(r: ReceptionAttente) {
     const np = l.nouvellePiece;
     const trouver = async () => (await ok(supabase.from("products").select("id").ilike("reference", np.reference).limit(1))).data?.[0]?.id as string | undefined;
     let id = await trouver();
+    // Pièce déjà là sans nombre de dents : on le complète (jamais écrasé s'il existe)
+    if (id && np.dents) await supabase.from("products").update({ dimensions: np.dents }).eq("id", id).is("dimensions", null);
     if (!id) {
       const { data, error } = await supabase.from("products").insert({
-        reference: np.reference, marque: np.marque, categorie: np.categorie, nom_fr: np.nom, nom_ar: "",
+        reference: np.reference, marque: np.marque, categorie: np.categorie, nom_fr: np.nom, nom_ar: "", dimensions: np.dents || null,
         prix_achat: 0, prix_vente: 0, stock: 0, stock_min: 1, notes: null,
       }).select("id").single();
       if (error && !/duplicate|unique/i.test(error.message)) {

@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Product } from "@/types/database";
+import { avecDents } from "@/lib/categories";
 
 export type PickerVariant = { id: string; product_id: string; marque: string; reference: string };
 
@@ -34,7 +35,9 @@ export default function ProductPicker({
   const matches = useMemo(() => {
     const norm = (r: string) => r.toUpperCase().replace(/\s+/g, "");
     const s = norm(q.trim());
-    const prods = (s ? products.filter((p) => norm(p.reference).includes(s)) : products)
+    // Kit / courroie de distribution : retrouvé aussi par son nombre de dents (« 141/25 », BIBLE §8.33)
+    const dents = (p: Product) => (avecDents(p.categorie) && p.dimensions ? norm(p.dimensions) : "");
+    const prods = (s ? products.filter((p) => norm(p.reference).includes(s) || (!!dents(p) && dents(p).includes(s))) : products)
       .slice(0, 30).map((p) => ({ p, v: undefined as PickerVariant | undefined }));
     const vars = s && variants
       ? variants.filter((v) => norm(v.reference).includes(s) && byId.has(v.product_id))
@@ -88,6 +91,7 @@ export default function ProductPicker({
                 <>
                   <span className="font-mono text-xs text-slate-100 shrink-0">{m.p.reference}</span>
                   {m.p.marque && m.p.marque !== "Filtron" && <span className="text-xs text-indigo-300 truncate">{m.p.marque}</span>}
+                  {avecDents(m.p.categorie) && m.p.dimensions && <span className="text-[11px] text-amber-300 shrink-0">🦷 {m.p.dimensions}</span>}
                 </>
               )}
             </button>

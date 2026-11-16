@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { DEPART, chargerMarques, ajouterMarque, marquesPour, marquesBase, marqueVarianteDefaut } from "@/lib/brands";
-import { CATEGORY_KEYS, FAMILLES, familleDe, creables, estFiltre, type Famille } from "@/lib/categories";
+import { CATEGORY_KEYS, FAMILLES, familleDe, creables, estFiltre, avecDents, normDents, dentsValides, MSG_DENTS, type Famille } from "@/lib/categories";
 import { translations } from "@/lib/i18n";
 import CategoryIcon from "@/components/CategoryIcon";
 import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, donnerPortefeuille, totauxPortefeuille, insererAvance, textePaiement, marquerChequeEncaisse, type BonPortefeuille, type Paiement } from "@/lib/dinoun";
@@ -377,6 +377,8 @@ export default function FournisseursPage() {
     const valid = lignesOk.filter(l => (l.product_id || l.nouvellePiece) && l.quantite > 0);
     if (valid.length === 0) { alert("Ajoute au moins un produit"); return; }
     if (valid.some(l => l.nouvellePiece && (!l.nouvellePiece.reference.trim() || !l.nouvellePiece.marque))) { alert("Nouvelle pièce : écris sa référence et choisis sa marque (Gates, Dayco, Dolz…)."); return; }
+    const dentsDe = (np: NouvellePiece) => (avecDents(np.categorie) ? normDents(np.dents) : "");
+    if (valid.some(l => l.nouvellePiece && dentsDe(l.nouvellePiece) && !dentsValides(dentsDe(l.nouvellePiece)))) { alert(MSG_DENTS); return; }
     if (valid.some(l => l.marque === "__new__" && !l.nouvelleRef.trim())) { alert("Nouvelle marque : saisis la référence de la boîte (ex. HU 718/5 x)."); return; }
     const montant = valid.reduce((s, l) => s + l.quantite * l.prix_achat, 0);
     const libelle = (l: RecLine) => l.nouvellePiece ? `${l.nouvellePiece.reference.trim()} (${l.nouvellePiece.marque})`
@@ -389,7 +391,7 @@ export default function FournisseursPage() {
         product_id: l.product_id, equivalence_id: l.marque === "__new__" ? null : l.equivalence_id, quantite: l.quantite,
         prix_achat: l.prix_achat, prix_vente: l.prix_vente, code_barre: l.code_barre,
         nouvelleMarque: l.marque === "__new__" ? l.nouvelleMarque : null, nouvelleRef: l.nouvelleRef, libelle: libelle(l),
-        nouvellePiece: l.nouvellePiece ? { ...l.nouvellePiece, reference: l.nouvellePiece.reference.trim(), nom: `${libelleCat(l.nouvellePiece.categorie)} ${l.nouvellePiece.marque}` } : null,
+        nouvellePiece: l.nouvellePiece ? { ...l.nouvellePiece, reference: l.nouvellePiece.reference.trim(), nom: `${libelleCat(l.nouvellePiece.categorie)} ${l.nouvellePiece.marque}`, dents: dentsDe(l.nouvellePiece) || undefined } : null,
       })),
     });
     setRecFor(null);
@@ -850,9 +852,15 @@ export default function FournisseursPage() {
                           <option value="__ajout__">➕ Nouvelle marque…</option>
                         </select>
                       </label>
-                      <label className="col-span-2 text-[10px] uppercase text-slate-500">Réf. sur la boîte
+                      <label className={`${avecDents(l.nouvellePiece.categorie) ? "" : "col-span-2 "}text-[10px] uppercase text-slate-500`}>Réf. sur la boîte
                         <input className="input mt-0.5 py-1 text-xs font-mono uppercase" placeholder="ex. K015578XS" value={l.nouvellePiece.reference} onChange={e => patchPiece(i, { reference: e.target.value.toUpperCase() })} />
                       </label>
+                      {avecDents(l.nouvellePiece.categorie) && (
+                        <label className="text-[10px] uppercase text-amber-400">🦷 Dents / largeur
+                          <input className={`input mt-0.5 py-1 text-xs font-mono ${l.nouvellePiece.dents && !dentsValides(normDents(l.nouvellePiece.dents)) ? "ring-2 ring-red-500/70" : ""}`} placeholder="ex. 141/25" inputMode="decimal"
+                            value={l.nouvellePiece.dents ?? ""} onChange={e => patchPiece(i, { dents: e.target.value })} onBlur={e => patchPiece(i, { dents: normDents(e.target.value) })} />
+                        </label>
+                      )}
                       <div className="col-span-2 flex items-center gap-2">
                         <input className="input py-1 text-xs font-mono" placeholder="Code-barres de la boîte" value={l.code_barre} onChange={e => patchLine(i, { code_barre: e.target.value })} />
                         <button type="button" onClick={() => setScanTarget(i)} className="btn-secondary px-2.5 py-1.5 shrink-0" aria-label="Scanner le code-barres"><ScanLine size={14} /></button>
