@@ -1,11 +1,15 @@
 # 📌 Récap de session — FiltroPro
 
 > Point de reprise pour une nouvelle session. Complément de [GUIDE](GUIDE.md) et [BIBLE](BIBLE.md).
-> **Dernière session : 13→14/11/2026** (catalogue par marque, données Filtron complétées, sauvegardes, marque Mecafilter, prévenir avant tournée, kit, 4 catalogues, huile par voiture, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
+> **Dernière session : 16/11/2026** (distribution, portefeuille dinoun, VIN PSA) · 15/11 (huile toutes marques, protection, Vidani) · **13→14/11/2026** (catalogue par marque, données Filtron complétées, sauvegardes, marque Mecafilter, prévenir avant tournée, kit, 4 catalogues, huile par voiture, §0000) · 12/11 (VIN §000, sécurité §00) · avant : 05→07/11 (§0) ; §1-4 = session du 29/10.
 
 ---
 
-## ▶ REPRENDRE ICI (mis à jour le 15/11/2026)
+## ▶ REPRENDRE ICI (mis à jour le 16/11/2026)
+
+**Distribution (16/11, soir) : code EN LIGNE, SQL À COLLER** (BIBLE §8.30, GUIDE §16). 4 catégories (`chaine_distribution`, `courroie_distribution`, `pompe_eau`, `kit_distribution`, liste unique `src/lib/categories.ts`) + 23 marques de distribution (`DISTRIBUTION_BRANDS`, « Renault Origine » / « PSA Origine » car « Renault »/« Peugeot » = noms des codes OE). Marchandise prise : « Je reçois » Filtres · Huile · Distribution · Pompe à eau + « ➕ Nouvelle pièce » (fiche créée à l'envoi, avant la ligne `receptions`, `creerPieces` dans `offlineReceptions.ts`). **En attente** : l'utilisateur colle `supabase/categories_distribution.sql` → vérifier ensuite par un essai avec la clé serveur (insérer un produit `kit_distribution` d'essai puis le supprimer ; avant le SQL : erreur `products_categorie_check`). Puis son premier vrai kit en Réception. Pistes : voitures compatibles pour la distribution (pas dans Filtron), « Nouvelle pièce » pour l'huile si demandé.
+
+**16/11 (journée)** : VIN Peugeot/Citroën + autres marques (§8.26), nouvelles marques de filtres + « ➕ Nouvelle marque… » (§8.27), fiche produit qui recréait toutes les références corrigée (§8.28), portefeuille dinoun + avances espèces/chèque (§8.29, SQL `avances_paiement.sql` collé et vérifié ; dette dinoun 63 038 au 16/11).
 
 **Vidani relié à FiltroPro (15/11, soir) : FAIT en version de test** (BIBLE §8.25). `scripts/export_vidani.mjs` → `vidani-bot/donnees/filtropro-voitures.json` (17 838 versions, refaite chaque jour à 13 h par `sauvegarde_quotidienne.cmd`). Dans Vidani : `src/filtropro.mjs` ; la fiche du garage passe en premier ; prix = fiche du garage × litres FiltroPro, statut « À valider » ; Vidani relancé sur le PC. Page des étapes Vidani : https://claude.ai/artifact/AyS83NDQdrT9sTy6a4oJUR.
 Puis, sur les essais de l'utilisateur : durée de vidange, prestations (durée/prix, « et pour… »), demandes de travaux (devis distribution) — corrigés, puis **IA Claude** pour comprendre tous les messages (`vidani-bot/src/ia.mjs`, BIBLE §8.25) ; tests Vidani **16/16**. **En attente** : l'utilisateur crée sa clé sur console.anthropic.com et la colle dans `vidani-bot/.env` (`ANTHROPIC_API_KEY=`) ; quand il dit « clé IA ajoutée » → faire UN vrai essai (petit script, < 1 centime) et vérifier `donnees/ia-usage.jsonl` (si erreur 400 sur `fallbacks`, l'enlever).
