@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { FILTER_BRANDS, chargerMarques, ajouterMarque } from "@/lib/brands";
-import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, donnerPortefeuille, totauxPortefeuille, type BonPortefeuille } from "@/lib/dinoun";
+import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, donnerPortefeuille, totauxPortefeuille, insererAvance, textePaiement, marquerChequeEncaisse, type BonPortefeuille, type Paiement } from "@/lib/dinoun";
 import { ajouterReception, getReceptionsAttente, syncReceptions } from "@/lib/offlineReceptions";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
@@ -54,16 +54,12 @@ export default function FournisseursPage() {
     if (!r.ok) { alert(r.error); return; }
     load();
   }
-  async function donner(f: Fournisseur) {
-    const bons = portefeuille.filter(b => b.fournisseur_id === f.id);
-    const { vendu, cout: prevu, nb } = totauxPortefeuille(bons);
-    const saisi = window.prompt(`Combien d'argent donnes-tu à ${f.nom} ?\n${nb} bons : vendu ${vendu.toFixed(0)} MAD · coût de la marchandise ${f.nom} ${prevu.toFixed(0)} MAD`, prevu.toFixed(0));
-    if (saisi == null) return;
-    const montant = Number(saisi.replace(",", ".").replace(/\s/g, ""));
-    if (!(montant > 0)) { alert("Tape la somme comptée (ex. 1250)."); return; }
-    const r = await donnerPortefeuille(f.id, montant, new Date().toISOString().split("T")[0]);
-    if (!r.ok) { alert(r.error); return; }
-    load();
+  // « Donner à dinoun » : le même formulaire que « Avance / paiement » (espèces ou chèque, nom, n° de chèque),
+  // pré-rempli avec le coût dinoun des bons du portefeuille ; à l'enregistrement le portefeuille se vide.
+  function donner(f: Fournisseur) {
+    const { cout } = totauxPortefeuille(portefeuille.filter(b => b.fournisseur_id === f.id));
+    openAvance(f, true);
+    setAvMontant(Math.round(cout));
   }
   const [salesAgg, setSalesAgg] = useState<{ date: string; cout: number; benef: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,6 +85,13 @@ export default function FournisseursPage() {
   const [avDate, setAvDate] = useState(todayStr());
   const [avMontant, setAvMontant] = useState(0);
   const [avNote, setAvNote] = useState("");
+  // Mode de paiement de l'avance (espèces / chèque), nom de la personne, n° du chèque ; avance depuis le portefeuille ?
+  const [avMode, setAvMode] = useState<"especes" | "cheque">("especes");
+  const [avPersonne, setAvPersonne] = useState("");
+  const [avCheque, setAvCheque] = useState("");
+  const [avDateCheque, setAvDateCheque] = useState(todayStr());
+  const [avEncaisse, setAvEncaisse] = useState(false);
+  const [avPortefeuille, setAvPortefeuille] = useState(false);
 
   // Sélecteur de la réception (produits + variantes de MARQUE, pas les ~23 000 codes OE) :
   // chargé en arrière-plan pour ne pas bloquer l'affichage des soldes sur réseau lent.
@@ -359,10 +362,26 @@ export default function FournisseursPage() {
   }
 
   // ---- Avance ----
-  function openAvance(f: Fournisseur) { setAvFor(f); setAvDate(todayStr()); setAvMontant(0); setAvNote(""); }
+  function openAvance(f: Fournisseur, depuisPortefeuille = false) {
+    setAvFor(f); setAvDate(todayStr()); setAvMontant(0); setAvNote("");
+    setAvMode("especes"); setAvPersonne(""); setAvCheque(""); setAvDateCheque(todayStr()); setAvEncaisse(false); setAvPortefeuille(depuisPortefeuille);
+  }
+  async function basculerEncaisse(a: Avance) {
+    const erreur = await marquerChequeEncaisse(a.id, !a.cheque_encaisse);
+    if (erreur) { alert(erreur); return; }
+    setAvances(prev => prev.map(x => x.id === a.id ? { ...x, cheque_encaisse: !a.cheque_encaisse } : x));
+  }
   async function saveAvance() {
     if (!avFor || avMontant <= 0) { alert("Montant requis"); return; }
-    await supabase.from("avances").insert({ fournisseur_id: avFor.id, date: avDate, montant: avMontant, note: avNote || null });
+    if (avMode === "cheque" && !avCheque.trim()) { alert("Tape le numéro du chèque."); return; }
+    const paiement: Paiement = { mode: avMode, personne: avPersonne, numero_cheque: avCheque, date_cheque: avDateCheque, cheque_encaisse: avEncaisse };
+    if (avPortefeuille) {
+      const r = await donnerPortefeuille(avFor.id, avMontant, avDate, paiement, avNote);
+      if (!r.ok) { alert(r.error); return; }
+    } else {
+      const erreur = await insererAvance({ fournisseur_id: avFor.id, date: avDate, montant: avMontant, note: avNote || null }, paiement);
+      if (erreur) { alert(erreur); return; }
+    }
     setAvFor(null); load();
   }
 
@@ -614,12 +633,25 @@ export default function FournisseursPage() {
                         </button>
                       )}
                     </div>
+                    {onglet === "av" && (() => {
+                      const attente = avs.filter(h => h.av?.mode === "cheque" && !h.av.cheque_encaisse);
+                      return attente.length > 0 ? <p className="text-[11px] text-amber-300 mb-2">⏳ Chèques pas encore encaissés : {attente.length} · {money(tot(attente))}</p> : null;
+                    })()}
                   <div className="space-y-1 max-h-60 overflow-y-auto">
                     {liste.length === 0 ? (
                       <p className="text-xs text-slate-500 py-2">{onglet === "rec" ? "Aucune marchandise prise." : "Aucune avance."}</p>
                     ) : liste.map((h, i) => (
                       <div key={i} className="flex items-center justify-between gap-2 text-xs py-1">
-                        <span className="text-slate-400 min-w-0">{h.date} · <span className="text-slate-300">{h.text}</span></span>
+                        <span className="text-slate-400 min-w-0">
+                          {h.date} · <span className="text-slate-300">{h.text}</span>
+                          {h.av && textePaiement(h.av) && <span className="block text-slate-400">{textePaiement(h.av)}</span>}
+                          {h.av?.mode === "cheque" && (
+                            <button onClick={() => basculerEncaisse(h.av!)} title="Changer : encaissé / pas encore"
+                              className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${h.av.cheque_encaisse ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+                              {h.av.cheque_encaisse ? "✓ Encaissé" : "⏳ Pas encore encaissé"}
+                            </button>
+                          )}
+                        </span>
                         <span className="flex items-center gap-2 shrink-0">
                           <span className={h.type === "rec" ? "text-orange-300 font-medium" : "text-emerald-300 font-medium"}>
                             {h.type === "rec" ? "+" : "−"}{money(h.montant)}
@@ -816,15 +848,41 @@ export default function FournisseursPage() {
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-sm">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-semibold text-slate-100 flex items-center gap-2"><HandCoins size={18} className="text-emerald-400" /> Avance — {avFor.nom}</h3>
+              <h3 className="font-semibold text-slate-100 flex items-center gap-2"><HandCoins size={18} className="text-emerald-400" /> {avPortefeuille ? `Donner à ${avFor.nom}` : `Avance — ${avFor.nom}`}</h3>
               <button onClick={() => setAvFor(null)} className="text-slate-400 hover:text-white"><X size={18} /></button>
             </div>
             {soldeOf(avFor.id) < 0
               ? <p className="text-xs text-slate-400 mb-3">Il te doit : <b className="text-emerald-400">{Math.abs(soldeOf(avFor.id)).toFixed(0)} MAD</b></p>
               : <p className="text-xs text-slate-400 mb-3">Reste à payer : <b className="text-red-400">{soldeOf(avFor.id).toFixed(0)} MAD</b></p>}
+            {avPortefeuille && (() => {
+              const t = totauxPortefeuille(portefeuille.filter(b => b.fournisseur_id === avFor.id));
+              return <p className="text-xs text-amber-300 bg-amber-500/10 rounded-lg px-3 py-2 mb-3">👛 Portefeuille : {t.nb} bons · vendu {t.vendu.toFixed(0)} MAD · pour {avFor.nom} {t.cout.toFixed(0)} MAD. Tape la somme que tu donnes vraiment (avec les ventes du cahier s'il y en a) : le portefeuille se videra.</p>;
+            })()}
             <div className="space-y-3">
               <div><label className="text-xs text-slate-400 mb-1 block">Date</label><input type="date" className="input" value={avDate} onChange={e => setAvDate(e.target.value)} /></div>
               <div><label className="text-xs text-slate-400 mb-1 block">Montant versé (MAD)</label><input type="number" min={0} className="input" value={avMontant} onChange={e => setAvMontant(+e.target.value)} /></div>
+              <div>
+                <span className="text-xs text-slate-400 mb-1 block">Payé en</span>
+                <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Mode de paiement">
+                  <button type="button" role="radio" aria-checked={avMode === "especes"} onClick={() => setAvMode("especes")}
+                    className={`rounded-lg px-3 py-2 text-sm border ${avMode === "especes" ? "bg-emerald-500/20 border-emerald-500 text-emerald-300" : "border-slate-600 text-slate-300"}`}>💵 Espèces</button>
+                  <button type="button" role="radio" aria-checked={avMode === "cheque"} onClick={() => setAvMode("cheque")}
+                    className={`rounded-lg px-3 py-2 text-sm border ${avMode === "cheque" ? "bg-emerald-500/20 border-emerald-500 text-emerald-300" : "border-slate-600 text-slate-300"}`}>🧾 Chèque</button>
+                </div>
+              </div>
+              <div><label className="text-xs text-slate-400 mb-1 block" htmlFor="av-personne">Nom de la personne</label><input id="av-personne" className="input" placeholder="ex. Si Mohamed (qui reçoit ou signe)" value={avPersonne} onChange={e => setAvPersonne(e.target.value)} /></div>
+              {avMode === "cheque" && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><label className="text-xs text-slate-400 mb-1 block" htmlFor="av-cheque">Numéro du chèque</label><input id="av-cheque" className="input font-mono" inputMode="numeric" placeholder="ex. 4512378" value={avCheque} onChange={e => setAvCheque(e.target.value)} /></div>
+                    <div><label className="text-xs text-slate-400 mb-1 block" htmlFor="av-date-cheque">Date du chèque</label><input id="av-date-cheque" type="date" className="input" value={avDateCheque} onChange={e => setAvDateCheque(e.target.value)} /></div>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+                    <input type="checkbox" checked={avEncaisse} onChange={e => setAvEncaisse(e.target.checked)} className="w-4 h-4" />
+                    Déjà encaissé
+                  </label>
+                </>
+              )}
               <div><label className="text-xs text-slate-400 mb-1 block">Note</label><input className="input" value={avNote} onChange={e => setAvNote(e.target.value)} /></div>
             </div>
             <div className="flex gap-2 justify-end mt-5">

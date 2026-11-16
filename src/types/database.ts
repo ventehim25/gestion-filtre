@@ -145,6 +145,12 @@ export type Avance = {
   montant: number;
   note: string | null;
   sale_id?: string | null; // avance auto « dinoun payé » liée à un bon (sale_fournisseur_paye.sql)
+  // supabase/avances_paiement.sql (16/11/2026) : espèces ou chèque, nom de la personne, numéro du chèque
+  mode?: "especes" | "cheque" | null;
+  personne?: string | null;
+  numero_cheque?: string | null;
+  date_cheque?: string | null; // date du chèque (encaissement)
+  cheque_encaisse?: boolean | null; // chèque déjà encaissé par le fournisseur ?
 };
 
 export type GarageStatut = "prospect" | "a_livrer" | "preparee" | "livre" | "reporte";

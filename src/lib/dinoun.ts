@@ -91,8 +91,41 @@ export async function setBonRembourse(
   return { ok: true, montant: nouveaux.reduce((s, b) => s + b.montant, 0) };
 }
 
+// ---------- Une avance (paiement au fournisseur) : espèces ou chèque, nom, numéro de chèque ----------
+export type Paiement = { mode: "especes" | "cheque"; personne: string; numero_cheque: string; date_cheque: string; cheque_encaisse: boolean };
+const jjmmaaaa = (d: string) => d.split("-").reverse().join("/");
+export const textePaiement = (p: { mode?: string | null; personne?: string | null; numero_cheque?: string | null; date_cheque?: string | null }) =>
+  [p.mode === "cheque" ? `🧾 Chèque${p.numero_cheque ? ` n° ${p.numero_cheque}` : ""}${p.date_cheque ? ` du ${jjmmaaaa(p.date_cheque)}` : ""}` : p.mode === "especes" ? "💵 Espèces" : "", p.personne || ""].filter(Boolean).join(" · ");
+
+/**
+ * Enregistre une avance avec son mode de paiement. Colonnes de supabase/avances_paiement.sql ; tant que ce SQL n'est
+ * pas collé, le mode, le nom et le numéro du chèque sont écrits dans la note (rien n'est perdu).
+ */
+export async function insererAvance(row: { fournisseur_id: string; date: string; montant: number; note: string | null }, p?: Paiement): Promise<string | null> {
+  if (!p) { const { error } = await supabase.from("avances").insert(row); return error ? error.message : null; }
+  const cheque = p.mode === "cheque";
+  const complet = {
+    ...row, mode: p.mode, personne: p.personne.trim() || null,
+    numero_cheque: cheque ? p.numero_cheque.trim() || null : null,
+    date_cheque: cheque && p.date_cheque ? p.date_cheque : null,
+    cheque_encaisse: cheque ? p.cheque_encaisse : false,
+  };
+  const { error } = await supabase.from("avances").insert(complet);
+  if (!error) return null;
+  if (!/column|colonne|schema cache|mode|personne|numero_cheque|date_cheque|cheque_encaisse/i.test(error.message)) return error.message;
+  const enNote = [textePaiement(complet), cheque ? (p.cheque_encaisse ? "encaissé" : "pas encore encaissé") : "", row.note].filter(Boolean).join(" · ");
+  const r2 = await supabase.from("avances").insert({ ...row, note: enNote || null });
+  return r2.error ? r2.error.message : null;
+}
+
+/** Chèque encaissé ou pas encore (colonne cheque_encaisse de supabase/avances_paiement.sql). */
+export async function marquerChequeEncaisse(avanceId: string, encaisse: boolean): Promise<string | null> {
+  const { error } = await supabase.from("avances").update({ cheque_encaisse: encaisse }).eq("id", avanceId);
+  return error ? (/column|schema cache/i.test(error.message) ? "Colle d'abord le SQL supabase/avances_paiement.sql dans Supabase." : error.message) : null;
+}
+
 /** L'argent compté du portefeuille est donné au fournisseur : UNE avance, puis le portefeuille de ce fournisseur se vide. */
-export async function donnerPortefeuille(fournisseurId: string, montantCompte: number, date: string): Promise<{ ok: boolean; error?: string; prevu: number; nb: number }> {
+export async function donnerPortefeuille(fournisseurId: string, montantCompte: number, date: string, paiement?: Paiement, noteLibre?: string): Promise<{ ok: boolean; error?: string; prevu: number; nb: number }> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return { ok: false, error: "Impossible hors-ligne.", prevu: 0, nb: 0 };
   const p = await lirePortefeuille();
   const bons = p.filter((b) => b.fournisseur_id === fournisseurId);
@@ -101,8 +134,8 @@ export async function donnerPortefeuille(fournisseurId: string, montantCompte: n
   const dates = bons.map((b) => b.bon_date).sort();
   const { vendu } = totauxPortefeuille(bons);
   const note = `Portefeuille : ${bons.length} bon${bons.length > 1 ? "s" : ""}${dates.length ? ` du ${dates[0]} au ${dates[dates.length - 1]}` : ""} · vendu ${vendu.toFixed(0)} MAD · coût dinoun ${prevu.toFixed(0)} MAD${Math.abs(montantCompte - prevu) >= 1 ? ` · donné ${montantCompte.toFixed(0)} MAD` : ""}`;
-  const { error } = await supabase.from("avances").insert({ fournisseur_id: fournisseurId, date, montant: montantCompte, note });
-  if (error) return { ok: false, error: error.message, prevu, nb: bons.length };
+  const erreur = await insererAvance({ fournisseur_id: fournisseurId, date, montant: montantCompte, note: [note, noteLibre?.trim()].filter(Boolean).join(" · ") }, paiement);
+  if (erreur) return { ok: false, error: erreur, prevu, nb: bons.length };
   const donnes = await lire<unknown>(CLE_DONNES).catch(() => []);
   await ecrire(CLE_DONNES, [...donnes, { le: new Date().toISOString(), date, fournisseur_id: fournisseurId, montant: montantCompte, prevu, bons }]);
   await ecrire(CLE, p.filter((b) => b.fournisseur_id !== fournisseurId));
