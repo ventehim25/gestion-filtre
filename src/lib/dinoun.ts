@@ -22,7 +22,16 @@ export function coutCreditParFournisseur(items: ItemCout[], creditIds: Set<strin
 }
 
 // ---------- Le portefeuille ----------
-export type BonPortefeuille = { sale_id: string; fournisseur_id: string; montant: number; bon_date: string; client: string; le: string };
+// montant = coût de la marchandise dinoun du bon ; vendu = total du bon (l'argent ramassé chez le client)
+export type BonPortefeuille = { sale_id: string; fournisseur_id: string; montant: number; vendu?: number; bon_date: string; client: string; le: string };
+
+/** Totaux d'un portefeuille : vendu (un bon compté une seule fois) et coût dinoun. */
+export function totauxPortefeuille(bons: BonPortefeuille[]): { vendu: number; cout: number; nb: number } {
+  const vus = new Set<string>();
+  let vendu = 0, cout = 0;
+  for (const b of bons) { cout += b.montant; if (!vus.has(b.sale_id)) { vus.add(b.sale_id); vendu += b.vendu ?? 0; } }
+  return { vendu, cout, nb: vus.size };
+}
 const CLE = "portefeuille_dinoun";
 const CLE_DONNES = "portefeuille_dinoun_donnes"; // trace des versements : { le, fournisseur_id, montant, prevu, bons }
 
@@ -64,12 +73,15 @@ export async function setBonRembourse(
     await supabase.from("avances").delete().eq("sale_id", bon.id); // anciens bons seulement (avant le 16/11)
     return { ok: true, montant: 0 };
   }
-  const { data } = await supabase.from("sale_items")
-    .select("quantite, cout_unitaire, fournisseur_id, product:products(prix_achat)").eq("sale_id", bon.id);
+  const [{ data }, { data: vente }] = await Promise.all([
+    supabase.from("sale_items").select("quantite, cout_unitaire, fournisseur_id, product:products(prix_achat)").eq("sale_id", bon.id),
+    supabase.from("sales").select("total").eq("id", bon.id).maybeSingle(),
+  ]);
   const parF = coutCreditParFournisseur((data ?? []) as unknown as ItemCout[], creditIds);
   const le = new Date().toISOString();
+  const vendu = Number((vente as { total?: number } | null)?.total ?? 0);
   const nouveaux: BonPortefeuille[] = [...parF].filter(([, m]) => m > 0)
-    .map(([fid, m]) => ({ sale_id: bon.id, fournisseur_id: fid, montant: Math.round(m * 100) / 100, bon_date: bon.date, client: bon.clientNom ?? "", le }));
+    .map(([fid, m]) => ({ sale_id: bon.id, fournisseur_id: fid, montant: Math.round(m * 100) / 100, vendu, bon_date: bon.date, client: bon.clientNom ?? "", le }));
   const p = (await lirePortefeuille()).filter((b) => b.sale_id !== bon.id);
   const err = await ecrire(CLE, [...p, ...nouveaux]);
   if (err) {
@@ -87,7 +99,8 @@ export async function donnerPortefeuille(fournisseurId: string, montantCompte: n
   const prevu = Math.round(bons.reduce((s, b) => s + b.montant, 0) * 100) / 100;
   if (!(montantCompte > 0)) return { ok: false, error: "Tape la somme comptée.", prevu, nb: bons.length };
   const dates = bons.map((b) => b.bon_date).sort();
-  const note = `Portefeuille : ${bons.length} bon${bons.length > 1 ? "s" : ""}${dates.length ? ` du ${dates[0]} au ${dates[dates.length - 1]}` : ""} · prévu ${prevu.toFixed(0)} MAD${Math.abs(montantCompte - prevu) >= 1 ? ` · compté ${montantCompte.toFixed(0)} MAD` : ""}`;
+  const { vendu } = totauxPortefeuille(bons);
+  const note = `Portefeuille : ${bons.length} bon${bons.length > 1 ? "s" : ""}${dates.length ? ` du ${dates[0]} au ${dates[dates.length - 1]}` : ""} · vendu ${vendu.toFixed(0)} MAD · coût dinoun ${prevu.toFixed(0)} MAD${Math.abs(montantCompte - prevu) >= 1 ? ` · donné ${montantCompte.toFixed(0)} MAD` : ""}`;
   const { error } = await supabase.from("avances").insert({ fournisseur_id: fournisseurId, date, montant: montantCompte, note });
   if (error) return { ok: false, error: error.message, prevu, nb: bons.length };
   const donnes = await lire<unknown>(CLE_DONNES).catch(() => []);

@@ -5,7 +5,7 @@ import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { FILTER_BRANDS, chargerMarques, ajouterMarque } from "@/lib/brands";
-import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, donnerPortefeuille, type BonPortefeuille } from "@/lib/dinoun";
+import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, donnerPortefeuille, totauxPortefeuille, type BonPortefeuille } from "@/lib/dinoun";
 import { ajouterReception, getReceptionsAttente, syncReceptions } from "@/lib/offlineReceptions";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
@@ -54,8 +54,8 @@ export default function FournisseursPage() {
   }
   async function donner(f: Fournisseur) {
     const bons = portefeuille.filter(b => b.fournisseur_id === f.id);
-    const prevu = bons.reduce((s, b) => s + b.montant, 0);
-    const saisi = window.prompt(`Combien d'argent donnes-tu à ${f.nom} ? (compté dans le portefeuille)\nPrévu d'après les ${bons.length} bons : ${prevu.toFixed(0)} MAD`, prevu.toFixed(0));
+    const { vendu, cout: prevu, nb } = totauxPortefeuille(bons);
+    const saisi = window.prompt(`Combien d'argent donnes-tu à ${f.nom} ?\n${nb} bons : vendu ${vendu.toFixed(0)} MAD · coût de la marchandise ${f.nom} ${prevu.toFixed(0)} MAD`, prevu.toFixed(0));
     if (saisi == null) return;
     const montant = Number(saisi.replace(",", ".").replace(/\s/g, ""));
     if (!(montant > 0)) { alert("Tape la somme comptée (ex. 1250)."); return; }
@@ -555,11 +555,12 @@ export default function FournisseursPage() {
                 {/* Portefeuille : argent mis de côté pour ce fournisseur, pas encore donné (la dette ne bouge pas) */}
                 {!cap && portefeuille.some(b => b.fournisseur_id === f.id) && (() => {
                   const bons = portefeuille.filter(b => b.fournisseur_id === f.id);
+                  const tot = totauxPortefeuille(bons);
                   return (
                     <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5">
                       <div className="px-3 py-2 flex flex-wrap items-center justify-between gap-2 text-xs">
-                        <button onClick={() => setPortefeuilleOuvert(portefeuilleOuvert === f.id ? null : f.id)} className="flex items-center gap-1.5 text-amber-300">
-                          👛 Portefeuille : <b>{money(bons.reduce((s, b) => s + b.montant, 0))}</b> ({bons.length} bon{bons.length > 1 ? "s" : ""}) {portefeuilleOuvert === f.id ? "▴" : "▾"}
+                        <button onClick={() => setPortefeuilleOuvert(portefeuilleOuvert === f.id ? null : f.id)} className="flex flex-wrap items-center gap-x-1.5 text-amber-300 text-start">
+                          👛 Portefeuille ({tot.nb} bon{tot.nb > 1 ? "s" : ""}) : vendu <b>{money(tot.vendu)}</b> · pour {f.nom} <b>{money(tot.cout)}</b> {portefeuilleOuvert === f.id ? "▴" : "▾"}
                         </button>
                         <button onClick={() => donner(f)} className="rounded-full bg-amber-500 hover:bg-amber-400 text-slate-900 px-2.5 py-1 font-semibold">
                           Donner à {f.nom}
@@ -570,7 +571,7 @@ export default function FournisseursPage() {
                         <div className="border-t border-amber-500/20 divide-y divide-slate-800">
                           {bons.map(b => (
                             <div key={`${b.sale_id}-${b.fournisseur_id}`} className="px-3 py-2 flex items-center justify-between gap-2 text-xs">
-                              <span className="text-slate-300 min-w-0 truncate">{b.bon_date.slice(5).split("-").reverse().join("/")} · {b.client || "—"} · {money(b.montant)}</span>
+                              <span className="text-slate-300 min-w-0 truncate">{b.bon_date.slice(5).split("-").reverse().join("/")} · {b.client || "—"} · vendu {b.vendu != null ? money(b.vendu) : "?"} · pour {f.nom} {money(b.montant)}</span>
                               <button onClick={() => sortirDuPortefeuille(b)} className="shrink-0 text-slate-400 hover:text-red-300 underline">Sortir</button>
                             </div>
                           ))}
