@@ -1102,6 +1102,11 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
   - Renault, Dacia (Filtron n'écrit pas leurs codes), Hyundai, Kia… : **apprentissage** : un VIN confirmé fait proposer son modèle aux VIN qui ont les mêmes caractères de modèle (constructeur + 2 caractères ; VW : 7-8 ; Mercedes : 4-6) ;
   - tout reste 🟠 à confirmer ; le 2e champ cherche d'abord parmi les voitures proposées ; rien n'est proposé qui n'existe pas dans les données.
 
+## 8.27 Nouvelles marques de filtres (16/11/2026)
+- **Demande de l'utilisateur** (après ses essais de FiltroPro) : ajouter SIMI, Meat & Doria, Gold Filter, Tech Filter, Fuji, « kraftstofffer ».
+- **Fait** : les 5 premières ajoutées à `FILTER_BRANDS` (`src/lib/brands.ts`) → proposées dans Réception (« + Autre marque »), Produits (variantes) et Vente (marque par ligne). Seulement les noms : aucune référence ni équivalence créée (elles viendront des boîtes scannées).
+- **En attente** : « kraftstofffer » pas ajouté — « Kraftstofffilter » est le mot allemand pour « filtre à carburant » sur les boîtes, pas une marque ; question posée (photo de la boîte, ou marque « Kraft » ?).
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 12/11/2026)*
