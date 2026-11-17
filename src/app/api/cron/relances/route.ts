@@ -190,5 +190,21 @@ export async function GET(req: Request) {
     }
   } catch { /* rappel facultatif */ }
 
+  // 9) Rappel : catalogue PDF Continental (kits de distribution) — site en panne (504) la nuit du 16 au 17/11/2026,
+  //    demande de l'utilisateur « rappelle-moi pour Continental » (BIBLE §8.34). À partir du 17/11/2026, tous les 2 jours,
+  //    jusqu'à ce que Claude note reglages « catalogue_continental_importe » (ou jusqu'au 15/12/2026).
+  try {
+    const debut = Date.parse("2026-11-17T00:00:00Z"), fin = Date.parse("2026-12-15T00:00:00Z");
+    const jours = Math.floor((Date.now() - debut) / 864e5);
+    if (jours >= 0 && Date.now() < fin && jours % 2 === 0) {
+      const { data } = await supabase.from("reglages").select("cle").eq("cle", "catalogue_continental_importe").maybeSingle();
+      if (!data) result.continental_sent = await sendToAll({
+        title: "🔧 Rappel : catalogue Continental",
+        body: "Sur le PC : ouvre continental-aftermarket.com → Catalogs → printed catalog → télécharge le PDF des kits de distribution (Timing belt kits) → pose-le sur le Bureau → dis à Claude « Continental sur le Bureau ». Et donne-lui les réf. SKF / INA de tes kits : il les relie aux kits Gates (mêmes voitures).",
+        url: "/", tag: "catalogue-continental",
+      });
+    }
+  } catch { /* rappel facultatif */ }
+
   return Response.json({ ok: true, ...result });
 }
