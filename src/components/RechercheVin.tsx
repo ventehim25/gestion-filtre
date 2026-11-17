@@ -20,11 +20,28 @@ const MAX_VOITURES = 30;
 
 type Resultat = { voitures: Voiture[]; note: string | null };
 
+// Toutes les lignes d'un motif — depuis les catalogues Gates / Metelli / Graf une voiture a 20 à 30 lignes (avant : 8-10) :
+// une limite fixe (600) coupait des voitures en deux (une partie de leurs pièces seulement). Toujours lire tout.
+// (paginé : un modèle courant peut avoir plus de 1000 lignes, une par filtre et par version)
+// Trié par identifiant : sans ordre fixe, deux pages peuvent se recouvrir (doublons) ou laisser des trous.
+type Requete = { order: (col: string) => { range: (debut: number, fin: number) => PromiseLike<{ data: unknown[] | null }> } };
+async function lignes(construire: () => Requete, max = 8000): Promise<Ligne[]> {
+  const out: Ligne[] = [];
+  for (let a = 0; a < max; a += 1000) {
+    const { data } = await construire().order("id").range(a, a + 999);
+    out.push(...((data ?? []) as Ligne[]));
+    if (!data || data.length < 1000) break;
+  }
+  return out;
+}
+
 async function parCode(motifs: string[], motifMarque?: string): Promise<Voiture[]> {
-  let q = supabase.from("applications").select(COLS).or(motifs.map((m) => `code_moteur.ilike.${m}`).join(","));
-  if (motifMarque) q = q.ilike("marque", motifMarque);
-  const { data } = await q.limit(600);
-  return grouper((data ?? []) as unknown as Ligne[]);
+  const rows = await lignes(() => {
+    let q = supabase.from("applications").select(COLS).or(motifs.map((m) => `code_moteur.ilike.${m}`).join(","));
+    if (motifMarque) q = q.ilike("marque", motifMarque);
+    return q as unknown as Requete;
+  });
+  return grouper(rows);
 }
 
 // Code moteur d'abord (le plus précis), sinon modèle / motorisation (tous les mots doivent correspondre).
@@ -46,10 +63,12 @@ async function chercherVoitures(texte: string, motifMarque?: string): Promise<Re
   const toks = t.split(/\s+/).map((s) => s.replace(/[^a-z0-9./]/gi, "")).filter((s) => s.length >= 2);
   if (!toks.length) return { voitures: [], note: null };
   const main = [...toks].sort((a, b) => b.length - a.length)[0];
-  let q = supabase.from("applications").select(COLS).or(`modele.ilike.%${main}%,moteur.ilike.%${main}%,code_moteur.ilike.%${main}%`);
-  if (motifMarque) q = q.ilike("marque", motifMarque);
-  const { data } = await q.limit(800);
-  const rows = ((data ?? []) as unknown as Ligne[]).filter((a) => {
+  const toutes = await lignes(() => {
+    let q = supabase.from("applications").select(COLS).or(`modele.ilike.%${main}%,moteur.ilike.%${main}%,code_moteur.ilike.%${main}%`);
+    if (motifMarque) q = q.ilike("marque", motifMarque);
+    return q as unknown as Requete;
+  });
+  const rows = toutes.filter((a) => {
     const hay = `${a.marque} ${a.modele} ${a.moteur ?? ""} ${a.code_moteur ?? ""}`.toLowerCase();
     return toks.every((tk) => hay.includes(tk.toLowerCase()));
   });
@@ -65,8 +84,8 @@ const deMarque = (motif?: string) => { const re = motif ? new RegExp(`^${motif.r
 async function parTypePsa(type: string, motifMarque?: string): Promise<Voiture[]> {
   // Le lien type ↔ code long se cherche chez Peugeot, Citroën et DS (même moteurs) : « RHW » n'est écrit que chez Peugeot
   // (« RHW/RHZ (DW10ATED) »), alors qu'une Citroën RHW est notée « DW10 ATED ». On n'affiche ensuite que la marque du VIN.
-  const { data: d1 } = await supabase.from("applications").select(COLS).or(MARQUES_PSA).ilike("code_moteur", `%${type}%`).limit(1000);
-  const tousType = ((d1 ?? []) as unknown as Ligne[]).filter((a) => motCode(type).test((a.code_moteur ?? "").toUpperCase()));
+  const d1 = await lignes(() => supabase.from("applications").select(COLS).or(MARQUES_PSA).ilike("code_moteur", `%${type}%`) as unknown as Requete);
+  const tousType = d1.filter((a) => motCode(type).test((a.code_moteur ?? "").toUpperCase()));
   const avecType = tousType.filter(deMarque(motifMarque));
   const longs = new Set<string>();
   for (const a of tousType) for (const tok of (a.code_moteur ?? "").toUpperCase().split(/[^0-9A-Z]+/)) if (tok.length >= 5 && /\d/.test(tok) && /[A-Z]/.test(tok)) longs.add(tok);
@@ -74,27 +93,17 @@ async function parTypePsa(type: string, motifMarque?: string): Promise<Voiture[]
   if (longs.size) {
     // « DW10ATED » → motif « %DW%10%ATED% » (trouve aussi « DW10 ATED »), puis on garde le code long exact (pas DW10ATED4)
     const motifs = [...longs].map((l) => `code_moteur.ilike.%${l.replace(/(\d+)/g, "%$1%").replace(/%+/g, "%")}%`.replace(/%%+/g, "%"));
-    let q2 = supabase.from("applications").select(COLS).or(motifs.join(","));
-    if (motifMarque) q2 = q2.ilike("marque", motifMarque);
-    const { data: d2 } = await q2.limit(800);
-    parLong = ((d2 ?? []) as unknown as Ligne[]).filter((a) => {
+    const d2 = await lignes(() => {
+      let q2 = supabase.from("applications").select(COLS).or(motifs.join(","));
+      if (motifMarque) q2 = q2.ilike("marque", motifMarque);
+      return q2 as unknown as Requete;
+    });
+    parLong = d2.filter((a) => {
       const n = (a.code_moteur ?? "").toUpperCase().replace(/[^0-9A-Z]/g, "");
       return [...longs].some((l) => { const i = n.indexOf(l); return i >= 0 && !/[0-9]/.test(n[i + l.length] ?? ""); });
     });
   }
   return grouper([...avecType, ...parLong]);
-}
-
-// Toutes les lignes d'un motif (paginé : un modèle courant peut avoir plus de 1000 lignes, une par filtre et par version)
-type Requete = { range: (debut: number, fin: number) => PromiseLike<{ data: unknown[] | null }> };
-async function lignes(construire: () => Requete, max = 4000): Promise<Ligne[]> {
-  const out: Ligne[] = [];
-  for (let a = 0; a < max; a += 1000) {
-    const { data } = await construire().range(a, a + 999);
-    out.push(...((data ?? []) as Ligne[]));
-    if (!data || data.length < 1000) break;
-  }
-  return out;
 }
 
 // VW, Audi, Seat, Fiat : le code de modèle du VIN (« 5G », « 169 ») parmi les codes Filtron entre parenthèses
@@ -113,10 +122,12 @@ async function parCodeModele(code: string, motifMarque?: string): Promise<Voitur
 
 // Mercedes : le modèle exact (« 203.008 ») écrit dans le moteur Filtron (« C 220 CDI (203.008) »)
 async function parBaumuster(code: string, motifMarque?: string): Promise<Voiture[]> {
-  let q = supabase.from("applications").select(COLS).ilike("moteur", `%${code}%`);
-  if (motifMarque) q = q.ilike("marque", motifMarque);
-  const { data } = await q.limit(1000);
-  return grouper((data ?? []) as unknown as Ligne[]);
+  const rows = await lignes(() => {
+    let q = supabase.from("applications").select(COLS).ilike("moteur", `%${code}%`);
+    if (motifMarque) q = q.ilike("marque", motifMarque);
+    return q as unknown as Requete;
+  });
+  return grouper(rows);
 }
 
 // Apprentissage : les modèles des VIN déjà confirmés qui ont les mêmes caractères de modèle (toutes marques)
@@ -137,11 +148,13 @@ function trierParAnnee(vs: Voiture[], annee: number | null): Voiture[] {
 
 // La voiture exacte enregistrée pour un VIN confirmé, avec ses filtres
 async function voitureDe(vc: VinConnu): Promise<Voiture> {
-  let q = supabase.from("applications").select(COLS).eq("marque", vc.marque).eq("modele", vc.modele);
-  q = vc.moteur ? q.eq("moteur", vc.moteur) : q.is("moteur", null);
-  q = vc.code_moteur ? q.eq("code_moteur", vc.code_moteur) : q.is("code_moteur", null);
-  const { data } = await q.limit(200);
-  const g = grouper((data ?? []) as unknown as Ligne[]);
+  const rows = await lignes(() => {
+    let q = supabase.from("applications").select(COLS).eq("marque", vc.marque).eq("modele", vc.modele);
+    q = vc.moteur ? q.eq("moteur", vc.moteur) : q.is("moteur", null);
+    q = vc.code_moteur ? q.eq("code_moteur", vc.code_moteur) : q.is("code_moteur", null);
+    return q as unknown as Requete;
+  }, 2000);
+  const g = grouper(rows);
   return g[0] ?? { cle: vc.vin, marque: vc.marque, modele: vc.modele, moteur: vc.moteur, code_moteur: vc.code_moteur, annee_debut: vc.annee_debut, annee_fin: vc.annee_fin, puissance: vc.puissance, filtres: [] };
 }
 

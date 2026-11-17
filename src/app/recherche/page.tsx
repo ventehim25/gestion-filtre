@@ -94,8 +94,10 @@ export default function RecherchePage() {
     if (toks.length === 0) { setSmartRes([]); setSmartDone(false); return; }
     setSmartLoading(true); setSmartDone(true);
     const main = [...toks].sort((a, b) => b.length - a.length)[0];
+    // Seulement les pièces du mode 🚗 / 🚛 (filtré par la base : moins de lignes, la limite coupe moins)
     const { data } = await supabase.from("applications")
-      .select("*, products(*)")
+      .select("*, products!inner(*)")
+      .eq("products.vehicule", lireTypeVehicule())
       .or(`marque.ilike.%${main}%,modele.ilike.%${main}%,moteur.ilike.%${main}%,code_moteur.ilike.%${main}%`)
       .limit(1000);
     const rows = (data ?? []) as unknown as (Application & { products: Product | null })[];
