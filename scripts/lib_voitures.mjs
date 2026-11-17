@@ -99,8 +99,13 @@ export async function marqueFiltron(sb, marqueCatalogue) {
 export function memesVoitures(voitures, { modele, codesMoteur, cv, d, f }) {
   const cles = clesModele(modele);
   const cg = codesMoteur.filter((c) => c.length >= 3);
-  const memes = (v) => v.cles.some((c) => cles.includes(c)) && Math.abs(Number(v.puissance) - cv) <= 2 && v.d <= f && d <= v.f;
-  let trouvees = voitures.filter((v) => memes(v) && v.codes.some((c) => cg.includes(c)));
+  const memeModeleAnnees = (v) => v.cles.some((c) => cles.includes(c)) && v.d <= f && d <= v.f;
+  const memes = (v) => memeModeleAnnees(v) && Math.abs(Number(v.puissance) - cv) <= 2;
+  // Code précis (« D7F730 », « K9K796 », VW « CJAA ») = une seule version du moteur : les catalogues donnent parfois
+  // une puissance un peu différente (Metelli 58 ch / Filtron 54 ch) → jusqu'à 8 %. Famille (« K4M », « M266 ») : ±2 ch.
+  const precis = (c) => c.length >= 5 || (c.length === 4 && /^[A-Z]+$/.test(c));
+  const tolerance = (c) => (precis(c) ? Math.max(3, Math.round(cv * 0.08)) : 2);
+  let trouvees = voitures.filter((v) => memeModeleAnnees(v) && v.codes.some((c) => cg.includes(c) && Math.abs(Number(v.puissance) - cv) <= tolerance(c)));
   if (trouvees.length) return { trouvees, famille: false };
   trouvees = voitures.filter((v) => memes(v) && cg.some((c) => v.codes.some((b) => b.length >= 3 && c.length > b.length && c.length - b.length <= 4 && c.startsWith(b))));
   return { trouvees, famille: trouvees.length > 0 };

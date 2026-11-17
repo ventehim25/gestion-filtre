@@ -2,17 +2,18 @@
 // Une voiture et ses filtres (huile, air, habitacle, carburant) avec prix et stock,
 // + l'huile moteur conseillée (guide Liqui Moly, BIBLE §8.19)
 // + le « kit » (un filtre par type, + l'huile) à vendre ou envoyer sur WhatsApp en 1 tap (BIBLE §8.17)
-// + la distribution moteur (catalogue officiel Gates, BIBLE §8.34) avec la remarque de montage de chaque pièce.
+// + les autres familles, une rubrique chacune : distribution moteur (catalogue officiel Gates, BIBLE §8.34),
+//   freinage (catalogue officiel Metelli, avant / arrière, BIBLE §8.35)… avec la remarque de montage de chaque pièce.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import { type Voiture, type ProdLite, libelle, annees, kitDeVoiture, messageKit } from "@/lib/voitures";
-import { estDistribution } from "@/lib/categories";
+import { FAMILLES, familleDe } from "@/lib/categories";
 import { type BidonHuile, bidonsConvenables, bidonsPourVidange, chargerHuiles, estCleVoiture, huilesDeLaVoiture, litresTexte, variantePrevue, versionsFap } from "@/lib/huiles";
 import type { HuileMoteur } from "@/types/database";
 import { sendWhatsApp } from "@/lib/whatsapp";
-import { Package, Send, Droplet, Cog } from "lucide-react";
+import { Package, Send, Droplet, Cog, Disc } from "lucide-react";
 
 export default function VoitureCarte({ v, action }: { v: Voiture; action?: React.ReactNode }) {
   const router = useRouter();
@@ -29,15 +30,18 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
   }, [v.code_moteur, v.moteur, v.marque, v.modele, v.annee_debut, v.puissance]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const kit = kitDeVoiture(v);
-  const filtres = v.filtres.filter((f) => !estDistribution(f.categorie));
-  const distribution = v.filtres.filter((f) => estDistribution(f.categorie));
+  const filtres = v.filtres.filter((f) => familleDe(f.categorie) === "filtres_huile");
+  // Autres familles (distribution, freinage…) : une rubrique chacune, dans l'ordre des familles
+  const rubriques = FAMILLES.filter((fa) => fa.k !== "filtres_huile")
+    .map((fa) => ({ fa, pieces: v.filtres.filter((f) => familleDe(f.categorie) === fa.k) }))
+    .filter((r) => r.pieces.length > 0);
   const piece = (f: ProdLite) => {
     const rem = v.remarques?.[f.id];
     return (
       <div key={f.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/40">
         <FilterImage reference={f.reference} categorie={f.categorie} imageUrl={f.image_url} wid={120} className="h-12 w-12 rounded object-contain bg-white shrink-0 p-0.5" />
         <div className="min-w-0 flex-1">
-          <div className="text-xs text-slate-400">{libelle(f.categorie)}{f.marque && estDistribution(f.categorie) ? ` · ${f.marque}` : ""}</div>
+          <div className="text-xs text-slate-400">{libelle(f.categorie)}{f.marque && familleDe(f.categorie) !== "filtres_huile" ? ` · ${f.marque}` : ""}</div>
           <div className="font-mono font-semibold truncate">{f.reference}</div>
           {rem && <div className="text-[11px] text-amber-300/90 leading-snug">⚠ {rem}</div>}
         </div>
@@ -86,17 +90,17 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
         </p>
       )}
 
-      {/* Distribution moteur (catalogue officiel Gates) : kit, kit + pompe, courroie, galets, kit chaîne.
-          Une voiture peut avoir plusieurs choix : la remarque (⚠) dit lequel prendre (date, climatisation, moteur exact). */}
-      {distribution.length > 0 && (
-        <div className="mt-3">
+      {/* Distribution (Gates), freinage (Metelli : avant / arrière)… Plusieurs choix pour une voiture : la remarque (⚠)
+          dit lequel prendre (date, ABS, climatisation, moteur exact). */}
+      {rubriques.map(({ fa, pieces }) => (
+        <div key={fa.k} className="mt-3">
           <div className="flex items-center gap-2 text-sm text-slate-200 font-medium">
-            <Cog size={14} className="text-amber-300" /> Distribution moteur
-            <span className="text-xs text-slate-500 font-normal">(catalogue officiel {[...new Set(distribution.map((f) => f.marque).filter(Boolean))].join(", ") || "fabricant"})</span>
+            {fa.k === "freinage" ? <Disc size={14} className="text-amber-300" /> : <Cog size={14} className="text-amber-300" />} {fa.court}
+            <span className="text-xs text-slate-500 font-normal">(catalogue officiel {[...new Set(pieces.map((f) => f.marque).filter(Boolean))].join(", ") || "fabricant"})</span>
           </div>
-          <div className="grid sm:grid-cols-2 gap-2 mt-1.5">{distribution.map(piece)}</div>
+          <div className="grid sm:grid-cols-2 gap-2 mt-1.5">{pieces.map(piece)}</div>
         </div>
-      )}
+      ))}
 
       {/* Huile moteur conseillée (guide Liqui Moly) */}
       {huiles.length > 0 && (

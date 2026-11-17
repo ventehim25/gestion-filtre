@@ -15,7 +15,7 @@ export type Voiture = {
 export const COLS = "marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, remarque, product_id, products(id, reference, marque, categorie, stock, stock_min, prix_vente, image_url)";
 export const ORDRE = ["filtre_huile", "filtre_air", "filtre_habitacle", "filtre_carburant", "filtre_refroidissement", "huile_moteur",
   "kit_distribution_pompe", "kit_distribution", "courroie_distribution", "galet_distribution", "chaine_distribution", "pompe_eau",
-  "kit_courroie_accessoire", "courroie_accessoire", "poulie", "autre"];
+  "kit_courroie_accessoire", "courroie_accessoire", "poulie", "plaquette_frein", "disque_frein", "autre"];
 /** Libellé d'une catégorie (les filtres en abrégé, les autres pièces avec le nom de la liste unique categories.ts) */
 export const libelle = (c: string) => LIBELLE[c] ?? libelleCategorie(c);
 export const LIBELLE: Record<string, string> = {

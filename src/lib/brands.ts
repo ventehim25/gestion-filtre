@@ -18,7 +18,7 @@ export const DISTRIBUTION_BRANDS = ["Gates", "Dayco", "Continental", "Dolz", "SK
 // (« Boge » volontairement absent : 27 codes OE portent ce nom).
 const ORIGINE = ["Eurorepar", "Motrio", "Renault Origine", "PSA Origine"];
 export const OIL_BRANDS = ["Castrol", "Total", "Motul", "Mannol", "Liqui Moly", "Shell", "Mobil", "Elf", "Petronas", "Fanfaro", "Pemko", "Kansler"];
-export const FREINAGE_BRANDS = ["Bosch", "TRW", "Brembo", "Ferodo", "ATE", "Textar", "Jurid", "Valeo", "Delphi", "Mintex", "Bendix", "ICER", ...ORIGINE];
+export const FREINAGE_BRANDS = ["Bosch", "TRW", "Metelli", "Brembo", "Ferodo", "ATE", "Textar", "Jurid", "Valeo", "Delphi", "Mintex", "Bendix", "ICER", ...ORIGINE];
 export const EMBRAYAGE_BRANDS = ["Valeo", "LuK", "Sachs", "Exedy", "Aisin", "SKF", "INA", "Febi", ...ORIGINE];
 export const TRAIN_BRANDS = ["Monroe", "Sachs", "KYB", "Bilstein", "TRW", "Lemförder", "Moog", "Delphi", "SKF", "FAG", "NTN-SNR", "Febi", "Meyle", "GSP", "Optimal", "Ruville", ...ORIGINE];
 export const ELECTRIQUE_BRANDS = ["Varta", "Bosch", "Exide", "Fulmen", "Tudor", "Electra", "Valeo", "Denso", "Magneti Marelli", "Hella", ...ORIGINE];
