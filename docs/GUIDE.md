@@ -299,3 +299,7 @@ Les **disques et plaquettes Metelli** sont dans l'appli avec **leurs voitures** 
 Les équivalences TRW / Bosch sont celles que **Metelli** déclare (« adaptable à ») : en cas de doute, compare la forme de la plaquette ou les cotes du disque.
 
 **Kits Graf et Metelli (depuis le 17/11/2026)** : sur les mêmes fiches voiture que Gates, avec le **nombre de dents / largeur** (ex. TP074 = 123/27). Le kit Metelli 29-0xxx est la variante de marque du kit Graf TPxxx (mêmes voitures). **Un garagiste donne un numéro d'origine** (ex. 9467611180) : tape-le dans Recherche → l'appli trouve le kit (Graf TP119).
+
+## 19. Voitures ou camions (depuis le 17/11/2026)
+
+En haut de chaque page, deux petits boutons **🚗 | 🚛** (et deux gros boutons en Vente et en Réception) : **Voitures** (choix normal) ou **Camions**. Toute l'appli suit ton choix : Vente, Réception, Produits, Stock, Recherche, VIN, Par marque… ne montrent que les pièces de ce type, et chargent plus vite. Les pièces camion ne sont pas supprimées : elles attendent le jour où tu vends pour les camions. Une nouvelle pièce est « voiture » ; après un import de catalogue, Claude relance le classement (`node scripts/classer_vehicules.mjs --ecrire`).

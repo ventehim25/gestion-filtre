@@ -5,7 +5,9 @@
 
 ---
 
-## ▶ REPRENDRE ICI (mis à jour le 16/11/2026)
+## ▶ REPRENDRE ICI (mis à jour le 17/11/2026)
+
+**Mode 🚗/🚛 (17/11) : FAIT** (BIBLE §8.37, GUIDE §19) — `products.vehicule` (SQL collé), `node scripts/classer_vehicules.mjs --ecrire` (965 camions) **à relancer après chaque import** ; `src/lib/typeVehicule.ts` (choix commun) + `Header` + `ChoixVehicule`. Camions = projet de l'utilisateur à court terme, pas vendu aujourd'hui. Fenêtres coupées en haut corrigées (13).
 
 **Freinage Metelli (17/11, nuit) : FAIT** (BIBLE §8.35, GUIDE §18) — `node scripts/import_metelli_freins.mjs "<pdf>"` (PDF officiel dans le dossier scratch de la session, à re-télécharger si besoin : metelligroup.it/it/support/getcatalogue/14) : 2 951 fiches, 103 519 liens (69 % reliés), TRW/Bosch/WVA 9 379. Module commun `scripts/lib_voitures.mjs` (Gates + Metelli ; tolérance de puissance code précis 8 % ajoutée APRÈS l'import Gates → un réimport Gates `--remplacer` relierait un peu plus, facultatif).
 

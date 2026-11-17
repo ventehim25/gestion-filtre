@@ -1209,6 +1209,12 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Vérifié** : numéro d'origine 9467611180 → kit Graf TP119 (116/25) ; Logan 1.5 dCi K9K 796 → Gates KP25578XSPK, KP25578XS, K025578XS + Graf TP074 (123/27, variante Metelli 29-0074). Base : 192 Mo / 500.
 - **À surveiller** : la page Commandes charge toutes les équivalences (≈ 53 000 maintenant) pour reconnaître une réf. d'origine dans une commande WhatsApp → plus lente au chargement ; si l'utilisateur la trouve lente : ne charger que les variantes de marque et chercher les codes d'origine dans la base au moment de lire la commande.
 
+## 8.37 Mode 🚗 voitures / 🚛 camions pour toute l'appli (17/11/2026)
+- **Demande de l'utilisateur** : « séparer les produits camions de leurs références des produits voitures pour que ce soit plus léger et facile », puis « deux colonnes pour sélectionner l'un des deux » (capture d'un site de pièces) et « même les ventes, stock, produits, recherche, VIN… affichent le mode sélectionné ». Précision : **les camions sont un projet à court terme, pas vendu aujourd'hui, mais un très bon marché** → rien n'est supprimé, juste caché par défaut.
+- **Base** : colonne `products.vehicule` ('voiture' par défaut / 'camion') — `supabase/products_vehicule.sql` **collé par l'utilisateur le 17/11 (capture « vehicule »)**. Classement : `node scripts/classer_vehicules.mjs [--ecrire]` (règle de `classifyKind` : préfixes Filtron camion + majorité de marques poids lourd/bus ; ajouts : FUSO, modèles Mercedes camion/bus Actros, Atego, Axor, Citaro… ; utilitaires Master/Jumper/Sprinter = voiture ; lecture des 380 000 voitures « à la suite » par identifiant, un saut loin dépassait le temps permis). Résultat : **965 camions** (688 Filtron, 260 Metelli, 12 Graf, 5 Gates) / 7 505 voitures. **À relancer après chaque import de catalogue.**
+- **Appli** : un seul choix pour toute l'appli (`src/lib/typeVehicule.ts` : gardé sur l'appareil, toutes les pages suivent) ; petit sélecteur 🚗 | 🚛 dans le bandeau du haut (`Header`) + deux gros boutons (`ChoixVehicule`) en Vente et en Réception. Ne chargent que le mode choisi : Vente, Réception (fiches + variantes de marque, filtre `products!inner(vehicule)`), Produits (« Tous » reste possible), Stock, Réappro, Commandes, Étiquettes ; Recherche par référence / recherche rapide ; fiche voiture (VIN, Par marque) : seulement les pièces du mode, avec « N pièces camion cachées : change le mode en haut ». Vérifié : voitures = 7 505 fiches + 6 374 variantes de marque ; camions = 965 + 488.
+- **Fenêtres coupées en haut** (signalé par l'utilisateur sur la Réception) : 13 fenêtres de formulaire centrées verticalement passaient au-dessus de l'écran quand elles étaient plus hautes que lui → maintenant elles commencent en haut et défilent (`items-start` + `my-auto`).
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 16/11/2026)*
@@ -1216,6 +1222,8 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 *(Faits : protection de la base le 12/11, les 9 familles de pièces le 16/11 — plus jamais de SQL pour ajouter une catégorie.)*
 
 **1. Ressaisis ta marchandise** : accueil → **Réception** → choisis **Chez** puis **Je reçois** (une des 9 familles : Filtres et huile, Distribution, Freinage…) → scanne une boîte par référence, tape la quantité, le prix d'achat et le prix de vente → Enregistrer. Le stock, les prix, la dette et le catalogue se mettent à jour tout seuls. Un kit / une courroie **Gates** est déjà dans l'appli (catalogue officiel importé, avec ses voitures) : tape sa réf. (ex. K025578XS). Une pièce pas encore dans l'appli (plaquettes, batterie…) : tape sa réf. → **« ➕ Nouvelle pièce »** → type + marque.
+
+**1 ter. Mode 🚗 / 🚛** : en haut de chaque page, choisis Voitures (normal) ou Camions (le jour où tu lances les pièces camion) : toute l'appli suit.
 
 **1 bis. Catalogues Gates** : télécharge le PDF Gates d'une marque (navigates.gates.com, « Applications véhicules particuliers ») sur le Bureau → dis-le à Claude → les kits de cette marque apparaissent sur les fiches voiture (§8.34). Priorité : **Dacia**, Citroën, Fiat, Hyundai, Kia, Ford, Opel, Mercedes, Nissan.
 
