@@ -155,9 +155,9 @@ function codes(s) {
   return [...out];
 }
 /** Clé du nom de modèle : 1er mot (2 si « GRAND »), pour chaque nom séparé par « / ».
- *  Mercedes : « CLASSE A », « A-Class », « A-Klasse » → « A ». */
+ *  Mercedes : « CLASSE A », « A-Class », « A-Klasse » → « A » ; « DS 3 » = « DS3 ». */
 const clesModele = (nom) => sansAccent(nom)
-  .replace(/\bCLASSE\s+([A-Z]+)\b/g, "$1").replace(/\b([A-Z]+)-(CLASS|KLASSE)\b/g, "$1")
+  .replace(/\bCLASSE\s+([A-Z]+)\b/g, "$1").replace(/\b([A-Z]+)-(CLASS|KLASSE)\b/g, "$1").replace(/\bDS\s+(\d)/g, "DS$1")
   .split("/").map((a) => {
   const mots = a.split(/[^A-Z0-9]+/).filter(Boolean);
   return mots[0] === "GRAND" ? mots.slice(0, 2).join(" ") : mots[0];
@@ -190,7 +190,10 @@ async function voituresFiltron(marque) {
 }
 
 /** Marque Filtron principale pour une marque Gates (« DACIA » → « DACIA (RENAULT GROUP) ») */
-const ALIAS = { VOLKSWAGEN: "VW (VOLKSWAGEN)", VW: "VW (VOLKSWAGEN)", CITROEN: "CITROEN", DACIA: "DACIA (RENAULT GROUP)", KIA: "KIA MOTORS", MERCEDES: "MERCEDES-BENZ", "MERCEDES-BENZ": "MERCEDES-BENZ" };
+const ALIAS = { VOLKSWAGEN: "VW (VOLKSWAGEN)", VW: "VW (VOLKSWAGEN)", CITROEN: "CITROEN", DACIA: "DACIA (RENAULT GROUP)", KIA: "KIA MOTORS", MERCEDES: "MERCEDES-BENZ", "MERCEDES-BENZ": "MERCEDES-BENZ",
+  CHEVROLET: "CHEVROLET EUROPE / DAEWOO (GM)", DS: "DS AUTOMOBILES" };
+// Autres noms Filtron dont les voitures sont aussi comparées (Chevrolet américaines ; DS 3 / DS 4 rangées chez Citroën)
+const AUSSI = { CHEVROLET: ["CHEVROLET"], DS: ["CITROEN"] };
 async function marqueFiltron(marqueGates) {
   const alias = ALIAS[sansAccent(marqueGates)];
   if (alias) {
@@ -254,8 +257,10 @@ const filtron = new Map();
 for (const mg of marquesGates) {
   const mf = await marqueFiltron(mg);
   const { lignes: n, voitures } = await voituresFiltron(mf);
-  filtron.set(mg, { marque: mf, voitures });
-  console.log(`Marque ${mg} → Filtron « ${mf} » : ${voitures.length} versions (${n} lignes)`);
+  const autres = AUSSI[sansAccent(mg)] ?? [];
+  for (const a of autres) voitures.push(...(await voituresFiltron(a)).voitures);
+  filtron.set(mg, { marque: mf, autres, voitures });
+  console.log(`Marque ${mg} → Filtron « ${[mf, ...autres].join(" » + « ")} » : ${voitures.length} versions (${n} lignes)`);
 }
 
 const apps = new Map(); // clé unique de la base → ligne
@@ -276,7 +281,7 @@ for (const l of lignes) {
     if (trouvees.length) { famille++; precision = `moteur ${l.moteurs}`; }
   }
   const rem = [precision, remarque(l.comm)].filter(Boolean).join(" · ");
-  const cibles = trouvees.length ? trouvees.map((v) => ({ marque: mf, modele: v.modele, moteur: v.moteur, code_moteur: v.code_moteur, annee_debut: v.annee_debut, annee_fin: v.annee_fin, puissance: v.puissance })) : null;
+  const cibles = trouvees.length ? trouvees.map((v) => ({ marque: v.marque, modele: v.modele, moteur: v.moteur, code_moteur: v.code_moteur, annee_debut: v.annee_debut, annee_fin: v.annee_fin, puissance: v.puissance })) : null;
   if (!cibles) {
     gates++;
     if (DEBUG && sansAccent(l.modele).includes(DEBUG) && debugVus++ < 12) {
