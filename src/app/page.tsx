@@ -115,7 +115,7 @@ export default function Dashboard() {
       const loadSales = async (): Promise<{ rows: SaleRow[]; error: string | null }> => {
         const rows: SaleRow[] = [];
         for (let i = 0; i < 30; i++) {
-          const { data, error } = await supabase.from("sales").select("total, montant_paye, statut, date, client_id").range(i * 1000, i * 1000 + 999);
+          const { data, error } = await supabase.from("sales").select("total, montant_paye, statut, date, client_id").order("id").range(i * 1000, i * 1000 + 999);
           if (error) return { rows, error: error.message };
           if (!data || data.length === 0) break;
           rows.push(...(data as SaleRow[]));
@@ -126,7 +126,7 @@ export default function Dashboard() {
       const loadItems = async (): Promise<ItemRow[]> => {
         const rows: ItemRow[] = [];
         for (let i = 0; i < 30; i++) {
-          const { data } = await supabase.from("sale_items").select("quantite, prix_unitaire, cout_unitaire, product:products(prix_achat)").range(i * 1000, i * 1000 + 999);
+          const { data } = await supabase.from("sale_items").select("quantite, prix_unitaire, cout_unitaire, product:products(prix_achat)").order("id").range(i * 1000, i * 1000 + 999);
           if (!data || data.length === 0) break;
           rows.push(...(data as unknown as ItemRow[]));
           if (data.length < 1000) break;
@@ -136,7 +136,7 @@ export default function Dashboard() {
       const loadProductsStock = async (): Promise<{ stock: number; stock_min: number }[]> => {
         const rows: { stock: number; stock_min: number }[] = [];
         for (let i = 0; i < 20; i++) {
-          const { data } = await supabase.from("products").select("stock, stock_min").range(i * 1000, i * 1000 + 999);
+          const { data } = await supabase.from("products").select("stock, stock_min").order("id").range(i * 1000, i * 1000 + 999);
           if (!data || data.length === 0) break;
           rows.push(...(data as { stock: number; stock_min: number }[]));
           if (data.length < 1000) break;
@@ -156,7 +156,7 @@ export default function Dashboard() {
           for (let i = 0; i < 30; i++) {
             const { data } = await supabase.from("sale_items")
               .select("quantite, prix_unitaire, cout_unitaire, product:products(prix_achat), fournisseur:fournisseurs(type), sale:sales!inner(id, client_id, total, montant_paye, fournisseur_paye)")
-              .in("sales.statut", ["en_attente", "partiel"]).range(i * 1000, i * 1000 + 999);
+              .in("sales.statut", ["en_attente", "partiel"]).order("id").range(i * 1000, i * 1000 + 999);
             if (!data || data.length === 0) break;
             rows.push(...(data as unknown as LigneImp[]));
             if (data.length < 1000) break;

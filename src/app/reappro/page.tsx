@@ -52,7 +52,7 @@ export default function ReapproPage() {
       for (let i = 0; i < 10; i++) {
         const { data, error } = await supabase.from("demandes_manquees")
           .select("id, reference, created_at").eq("traite", false)
-          .order("created_at", { ascending: false }).range(i * 1000, i * 1000 + 999);
+          .order("created_at", { ascending: false }).order("id").range(i * 1000, i * 1000 + 999);
         if (error) { setDemandesOk(false); return; }
         if (!data || data.length === 0) break;
         rows.push(...(data as typeof rows));

@@ -61,7 +61,7 @@ export default function ProspectsPage() {
 
   async function loadPage(from: number) {
     const { data, error, count } = await filtered("*", { count: "exact" })
-      .order("score", { ascending: false }).order("nom").range(from, from + PAGE - 1);
+      .order("score", { ascending: false }).order("nom").order("id").range(from, from + PAGE - 1);
     if (error) { setMissing(/schema cache|does not exist/i.test(error.message)); return; }
     setTotal(count ?? 0);
     setList((prev) => (from === 0 ? (data as unknown as Prospect[]) : [...prev, ...(data as unknown as Prospect[])]));

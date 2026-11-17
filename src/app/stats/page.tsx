@@ -56,7 +56,7 @@ export default function StatsPage() {
       for (let i = 0; i < 50; i++) {
         const { data } = await supabase.from("sales")
           .select("date, total, client:clients(ville), items:sale_items(quantite, cout_unitaire, product:products(reference, prix_achat))")
-          .range(i * 1000, i * 1000 + 999);
+          .order("id").range(i * 1000, i * 1000 + 999);
         if (!data || data.length === 0) break;
         withItems.push(...(data as unknown as typeof withItems));
         if (data.length < 1000) break;
@@ -109,7 +109,7 @@ export default function StatsPage() {
       for (let i = 0; i < 30; i++) {
         const { data } = await supabase.from("sale_items")
           .select("fournisseur_id, quantite, prix_unitaire, cout_unitaire, product:products(prix_achat), sale:sales(date)")
-          .not("fournisseur_id", "is", null).range(i * 1000, i * 1000 + 999);
+          .not("fournisseur_id", "is", null).order("id").range(i * 1000, i * 1000 + 999);
         if (!data || data.length === 0) break;
         attLines.push(...(data as unknown as typeof attLines));
         if (data.length < 1000) break;

@@ -31,7 +31,7 @@ export async function loadRelancesCatalogue(today = new Date().toISOString().sli
   type Cl = { id: string; nom: string; telephone: string | null; type?: string | null; derniere_relance_catalogue?: string | null };
   const clients: Cl[] = [];
   for (let i = 0; i < 10; i++) {
-    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, telephone, type, derniere_relance_catalogue").range(i * 1000, i * 1000 + 999);
+    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, telephone, type, derniere_relance_catalogue").order("id").range(i * 1000, i * 1000 + 999);
     if (res.error) res = await supabase.from("clients").select("id, nom, telephone").range(i * 1000, i * 1000 + 999); // colonne absente
     const data = res.data as Cl[] | null;
     if (!data || data.length === 0) break;
@@ -41,7 +41,7 @@ export async function loadRelancesCatalogue(today = new Date().toISOString().sli
 
   const lastSale = new Map<string, string>();
   for (let i = 0; i < 30; i++) {
-    const { data } = await supabase.from("sales").select("client_id, date").range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("sales").select("client_id, date").order("id").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     for (const s of data as { client_id: string | null; date: string | null }[]) {
       if (!s.client_id || !s.date) continue;
@@ -75,8 +75,8 @@ export async function loadImpayesRelance(days = 15, today = new Date().toISOStri
   type Cl = { id: string; nom: string; telephone: string | null; derniere_relance?: string | null };
   const clients: Cl[] = [];
   for (let i = 0; i < 10; i++) {
-    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, telephone, derniere_relance").range(i * 1000, i * 1000 + 999);
-    if (res.error) res = await supabase.from("clients").select("id, nom, telephone").range(i * 1000, i * 1000 + 999);
+    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, telephone, derniere_relance").order("id").range(i * 1000, i * 1000 + 999);
+    if (res.error) res = await supabase.from("clients").select("id, nom, telephone").order("id").range(i * 1000, i * 1000 + 999);
     const data = res.data as Cl[] | null;
     if (!data || data.length === 0) break;
     clients.push(...data);
@@ -86,7 +86,7 @@ export async function loadImpayesRelance(days = 15, today = new Date().toISOStri
 
   const debt = new Map<string, number>();
   for (let i = 0; i < 30; i++) {
-    const { data } = await supabase.from("sales").select("client_id, total, montant_paye, statut").range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("sales").select("client_id, total, montant_paye, statut").order("id").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     for (const s of data as { client_id: string | null; total: number; montant_paye: number; statut: string }[]) {
       if (!s.client_id || s.statut === "paye") continue;
@@ -118,7 +118,7 @@ export async function countReapproDue(): Promise<number> {
   const since90 = addDays(new Date().toISOString().slice(0, 10), -90);
   const sold = new Set<string>();
   for (let i = 0; i < 30; i++) {
-    const { data } = await supabase.from("sale_items").select("product_id, sales!inner(date)").gte("sales.date", since90).range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("sale_items").select("product_id, sales!inner(date)").gte("sales.date", since90).order("id").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     for (const r of data as { product_id: string | null }[]) if (r.product_id) sold.add(r.product_id);
     if (data.length < 1000) break;
@@ -127,7 +127,7 @@ export async function countReapproDue(): Promise<number> {
 
   let n = 0;
   for (let i = 0; i < 20; i++) {
-    const { data } = await supabase.from("products").select("id, stock, stock_min").range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("products").select("id, stock, stock_min").order("id").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     for (const p of data as { id: string; stock: number; stock_min: number }[]) if (sold.has(p.id) && p.stock <= p.stock_min) n++;
     if (data.length < 1000) break;
@@ -142,8 +142,8 @@ export async function loadEndormis(today = new Date().toISOString().slice(0, 10)
   type Cl = { id: string; nom: string; derniere_relance_com?: string | null };
   const clients: Cl[] = [];
   for (let i = 0; i < 10; i++) {
-    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, derniere_relance_com").range(i * 1000, i * 1000 + 999);
-    if (res.error) res = await supabase.from("clients").select("id, nom").range(i * 1000, i * 1000 + 999);
+    let res: { data: unknown; error: unknown } = await supabase.from("clients").select("id, nom, derniere_relance_com").order("id").range(i * 1000, i * 1000 + 999);
+    if (res.error) res = await supabase.from("clients").select("id, nom").order("id").range(i * 1000, i * 1000 + 999);
     const data = res.data as Cl[] | null;
     if (!data || data.length === 0) break;
     clients.push(...data);
@@ -153,7 +153,7 @@ export async function loadEndormis(today = new Date().toISOString().slice(0, 10)
 
   const byClient = new Map<string, string[]>();
   for (let i = 0; i < 30; i++) {
-    const { data } = await supabase.from("sales").select("client_id, date").range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("sales").select("client_id, date").order("id").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     for (const s of data as { client_id: string | null; date: string | null }[]) {
       if (!s.client_id || !s.date) continue;

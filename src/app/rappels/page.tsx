@@ -24,7 +24,7 @@ export default function RappelsPage() {
           .select("*, client:clients(*)")
           .in("statut", ["en_attente", "partiel"])
           .order("date", { ascending: false })
-          .range(i * 1000, i * 1000 + 999);
+          .order("id").range(i * 1000, i * 1000 + 999);
         if (!data || data.length === 0) break;
         sales.push(...(data as unknown as (Sale & { client: Client | null })[]));
         if (data.length < 1000) break;

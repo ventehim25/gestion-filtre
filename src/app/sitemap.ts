@@ -9,7 +9,7 @@ export const revalidate = 86400;
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const refs: string[] = [];
   for (let i = 0; i < 20; i++) {
-    const { data } = await supabase.from("products").select("reference").range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("products").select("reference").order("id").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     refs.push(...(data as { reference: string }[]).map(r => r.reference));
     if (data.length < 1000) break;

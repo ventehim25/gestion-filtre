@@ -62,7 +62,7 @@ export type ClientTournee = { id: string; nom: string; telephone: string | null;
 export async function chargerClients(): Promise<ClientTournee[]> {
   const out: ClientTournee[] = [];
   for (let i = 0; i < 20; i++) {
-    const { data, error } = await supabase.from("clients").select("id, nom, telephone, ville, quartier, type").order("nom").range(i * 1000, i * 1000 + 999);
+    const { data, error } = await supabase.from("clients").select("id, nom, telephone, ville, quartier, type").order("nom").order("id").range(i * 1000, i * 1000 + 999);
     if (error) throw error;
     out.push(...((data ?? []) as ClientTournee[]));
     if (!data || data.length < 1000) break;

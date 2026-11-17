@@ -177,7 +177,7 @@ export default function CommandesPage() {
     for (let i = 0; i < 10; i++) {
       const { data } = await supabase.from("sale_items")
         .select("quantite, equivalence_id, product:products(reference), equivalence:equivalences(reference, marque), sale:sales!inner(statut, client:clients(nom))")
-        .eq("sales.statut", "en_attente").range(i * 1000, i * 1000 + 999);
+        .eq("sales.statut", "en_attente").order("id").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       rows.push(...(data as unknown as typeof rows));
       if (data.length < 1000) break;

@@ -110,7 +110,7 @@ async function stockProducts(withPrice: boolean, manuels = false): Promise<ProdR
     : "id, reference, marque, categorie, stock, image_url, dimensions";
   const rows: ProdRow[] = [];
   for (let i = 0; i < 10; i++) {
-    const { data, error } = await supabase.from("products").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
+    const { data, error } = await supabase.from("products").select(cols).gt("stock", 0).order("id").range(i * 1000, i * 1000 + 999);
     if (error && manuels) return stockProducts(withPrice, false); // colonnes pas encore créées (SQL pas collé)
     if (!data || data.length === 0) break;
     rows.push(...(data as unknown as ProdRow[]));
@@ -125,7 +125,7 @@ async function stockEquivs(withPrice: boolean, manuels = false): Promise<EqRow[]
     : "product_id, marque, reference, stock, products(categorie, image_url, reference, dimensions)";
   const rows: EqRow[] = [];
   for (let i = 0; i < 10; i++) {
-    const { data, error } = await supabase.from("equivalences").select(cols).gt("stock", 0).range(i * 1000, i * 1000 + 999);
+    const { data, error } = await supabase.from("equivalences").select(cols).gt("stock", 0).order("id").range(i * 1000, i * 1000 + 999);
     if (error && manuels) return stockEquivs(withPrice, false);
     if (!data || data.length === 0) break;
     rows.push(...(data as unknown as EqRow[]));

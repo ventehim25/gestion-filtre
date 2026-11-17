@@ -90,7 +90,7 @@ export default function ClientsPage() {
     const qStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1).toISOString().slice(0, 10);
     const map: Record<string, number> = {};
     for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("sales").select("client_id, total").gte("date", qStart).range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("sales").select("client_id, total").gte("date", qStart).order("id").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       for (const s of data as { client_id: string; total: number }[]) map[s.client_id] = (map[s.client_id] ?? 0) + s.total;
       if (data.length < 1000) break;
@@ -116,7 +116,7 @@ export default function ClientsPage() {
     for (let i = 0; i < 30; i++) {
       const { data } = await supabase.from("sales")
         .select("client_id, items:sale_items(quantite, prix_unitaire, cout_unitaire, product:products(prix_achat))")
-        .range(i * 1000, i * 1000 + 999);
+        .order("id").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       for (const s of data as unknown as { client_id: string; items: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] }[]) {
         const cur = map[s.client_id] ?? { benefice: 0, cost: 0 };
@@ -135,7 +135,7 @@ export default function ClientsPage() {
   async function loadDebts() {
     const map: Record<string, { total: number; oldest: string }> = {};
     for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("sales").select("client_id, date, total, montant_paye").neq("statut", "paye").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("sales").select("client_id, date, total, montant_paye").neq("statut", "paye").order("id").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       for (const s of data as { client_id: string; date: string; total: number; montant_paye: number }[]) {
         const cur = map[s.client_id] ?? { total: 0, oldest: s.date };

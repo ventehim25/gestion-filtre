@@ -24,7 +24,7 @@ export async function buildBilanHebdo(): Promise<string> {
   // Ventes (toutes — sert aussi aux impayés)
   const sales: { date: string; total: number; montant_paye: number; statut: string }[] = [];
   for (let i = 0; i < 30; i++) {
-    const { data } = await supabase.from("sales").select("date, total, montant_paye, statut").range(i * 1000, i * 1000 + 999);
+    const { data } = await supabase.from("sales").select("date, total, montant_paye, statut").order("id").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     sales.push(...(data as typeof sales));
     if (data.length < 1000) break;
@@ -35,7 +35,7 @@ export async function buildBilanHebdo(): Promise<string> {
   for (let i = 0; i < 30; i++) {
     const { data } = await supabase.from("sale_items")
       .select("product_id, equivalence_id, quantite, prix_unitaire, cout_unitaire, product:products(reference, prix_achat), sales!inner(date)")
-      .gte("sales.date", since90).range(i * 1000, i * 1000 + 999);
+      .gte("sales.date", since90).order("id").range(i * 1000, i * 1000 + 999);
     if (!data || data.length === 0) break;
     items.push(...(data as unknown as Item[]));
     if (data.length < 1000) break;
@@ -75,7 +75,7 @@ export async function buildBilanHebdo(): Promise<string> {
     const cutoff60 = new Date(today.getTime() - 60 * 86400000).toISOString();
     const prods: { id: string; stock: number; prix_achat: number; created_at: string }[] = [];
     for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("products").select("id, stock, prix_achat, created_at").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("products").select("id, stock, prix_achat, created_at").order("id").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       prods.push(...(data as typeof prods));
       if (data.length < 1000) break;
@@ -83,7 +83,7 @@ export async function buildBilanHebdo(): Promise<string> {
     const prodById = new Map(prods.map(p => [p.id, p]));
     for (const p of prods) if (p.stock > 0 && !soldP.has(p.id) && p.created_at < cutoff60) valeurDormante += p.stock * p.prix_achat;
     for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("equivalences").select("id, product_id, stock, prix_achat").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("equivalences").select("id, product_id, stock, prix_achat").order("id").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       for (const e of data as { id: string; product_id: string; stock: number; prix_achat: number | null }[]) {
         const parent = prodById.get(e.product_id);

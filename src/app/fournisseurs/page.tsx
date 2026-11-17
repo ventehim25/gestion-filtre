@@ -156,7 +156,7 @@ export default function FournisseursPage() {
     // Portefeuille (depuis les ventes)
     const items: { date: string; items: { quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] }[] = [];
     for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("sales").select("date, items:sale_items(quantite, prix_unitaire, cout_unitaire, product:products(prix_achat))").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("sales").select("date, items:sale_items(quantite, prix_unitaire, cout_unitaire, product:products(prix_achat))").order("id").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       items.push(...(data as unknown as typeof items));
       if (data.length < 1000) break;
@@ -176,7 +176,7 @@ export default function FournisseursPage() {
     // Ventes attribuées à un fournisseur (source choisie à la vente)
     const attLines: { fournisseur_id: string; quantite: number; prix_unitaire: number; cout_unitaire: number | null; product: { prix_achat: number } | null }[] = [];
     for (let i = 0; i < 30; i++) {
-      const { data } = await supabase.from("sale_items").select("fournisseur_id, quantite, prix_unitaire, cout_unitaire, product:products(prix_achat)").not("fournisseur_id", "is", null).range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("sale_items").select("fournisseur_id, quantite, prix_unitaire, cout_unitaire, product:products(prix_achat)").not("fournisseur_id", "is", null).order("id").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       attLines.push(...(data as unknown as typeof attLines));
       if (data.length < 1000) break;
