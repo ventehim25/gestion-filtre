@@ -15,6 +15,8 @@ import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { basename, join } from "node:path";
 import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";
+import * as lib from "./lib_voitures.mjs";
+import { sansAccent, codes, clesModele, ecrireDate, ch, titreCase, AUSSI } from "./lib_voitures.mjs";
 
 const args = process.argv.slice(2);
 const PDF = args.find((a) => !a.startsWith("--"));
@@ -128,86 +130,11 @@ function remarque(comm) {
 const oeDe = (comm) => [...comm.matchAll(/pour numéro OE:\s*(?:BELT\s*)?([0-9][0-9A-Z]{7,}|[0-9A-Z]{3,}[0-9][0-9A-Z]{4,})/g)].map((m) => m[1]).filter((x) => /\d{4}/.test(x) && !/^HEIGHT/.test(x));
 
 // ───────────── 4. Voitures : Gates ↔ Filtron ─────────────
-const sansAccent = (s) => (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-const codeNorm = (s) => sansAccent(s).replace(/[^A-Z0-9]/g, "");
-/** Codes moteur écrits de toutes les façons (Filtron comme Gates) :
- *  « K9K 790/792 » → K9K790, K9K792 · « DV4TD/TED/TED4, DV4C » → DV4TD, DV4TED, DV4TED4, DV4C
- *  « HFZ / HFX (TU1JP) » → HFZ, HFX, TU1JP · « RHY (DW10TD) » → RHY, DW10TD · « K4M » → K4M.
- *  « CJAA, CFCA » (VW) → CJAA, CFCA · « OM 607.951 (K9K) » → OM607951, K9K.
- *  Suffixe (jamais gardé seul) : que des chiffres (« 792 », « 632 ») ou, après « / », un morceau court derrière
- *  une famille PSA/Renault qui contient un chiffre (« DV4TD/TED » → DV4TED). Entre parenthèses = toujours un code complet. */
-function codes(s) {
-  const out = new Set();
-  let base = "";
-  const txt = (s ?? "").replace(/\(([^)]*)\)/g, (m, x) => `,¤${x.split(/[,;\/]+/).join(",¤")},`);
-  let sep = ",";
-  for (const p of txt.split(/([,;\/])/)) {
-    if (p === "," || p === ";" || p === "/") { sep = p === "/" ? "/" : ","; continue; }
-    const entier = p.includes("¤");
-    const n = codeNorm(p.replace(/¤/g, ""));
-    if (!n) continue;
-    const suffixe = !entier && base && !n.startsWith(base) &&
-      (/^\d{1,4}$/.test(n) || (sep === "/" && n.length <= 4 && /\d/.test(base)));
-    if (suffixe) { out.add(base + n); continue; }
-    out.add(n);
-    if (!entier) base = n.length >= 4 ? n.slice(0, 3) : "";
-  }
-  return [...out];
-}
-/** Clé du nom de modèle : 1er mot (2 si « GRAND »), pour chaque nom séparé par « / ».
- *  Mercedes : « CLASSE A », « A-Class », « A-Klasse » → « A » ; « DS 3 » = « DS3 ». */
-const clesModele = (nom) => sansAccent(nom)
-  .replace(/\bCLASSE\s+([A-Z]+)\b/g, "$1").replace(/\b([A-Z]+)-(CLASS|KLASSE)\b/g, "$1").replace(/\bDS\s+(\d)/g, "DS$1")
-  .split("/").map((a) => {
-  const mots = a.split(/[^A-Z0-9]+/).filter(Boolean);
-  return mots[0] === "GRAND" ? mots.slice(0, 2).join(" ") : mots[0];
-}).filter(Boolean);
-const nomFiltron = (modele) => { const i = modele.lastIndexOf(" | "); return i > 0 ? modele.slice(0, i) : modele; };
 /** « 02/08 » → 200802 ; « on » ou vide → null */
 const dateGates = (s) => { const m = (s ?? "").match(/^(\d{2})\/(\d{2})$/); if (!m) return null; const a = Number(m[2]); return (a >= 50 ? 1900 + a : 2000 + a) * 100 + Number(m[1]); };
-const dateFiltron = (s) => { const m = (s ?? "").match(/(\d{1,2})\s*[/.-]\s*(\d{4})/); return m ? Number(m[2]) * 100 + Number(m[1]) : null; };
-const ecrireDate = (n) => (n ? `${String(n % 100).padStart(2, "0")}/${Math.floor(n / 100)}` : "");
-const ch = (kw) => Math.round(Number(kw) * 1.35962);
-const titreCase = (s) => s.toLowerCase().replace(/(^|[\s/(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
-
-// Seulement les voitures des filtres (pas celles déjà écrites par un import Gates : un réimport ne se compare pas à lui-même)
-async function voituresFiltron(marque) {
-  const base = () => sb.from("applications").select("marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, products!inner(marque)", { count: "exact" })
-    .eq("marque", marque).neq("products.marque", "Gates");
-  const { count, error } = await base().range(0, 0);
-  if (error) throw error;
-  const pages = await Promise.all(Array.from({ length: Math.ceil((count ?? 0) / 1000) }, (_, i) =>
-    base().range(i * 1000, i * 1000 + 999)));
-  const vus = new Map();
-  for (const p of pages) {
-    if (p.error) throw p.error;
-    for (const r of p.data) {
-      const k = [r.modele, r.moteur, r.code_moteur, r.annee_debut, r.annee_fin, r.puissance].join("|");
-      if (!vus.has(k)) vus.set(k, { ...r, cles: clesModele(nomFiltron(r.modele)), codes: codes(r.code_moteur), d: dateFiltron(r.annee_debut) ?? 0, f: dateFiltron(r.annee_fin) ?? 999912 });
-    }
-  }
-  return { lignes: count ?? 0, voitures: [...vus.values()] };
-}
-
-/** Marque Filtron principale pour une marque Gates (« DACIA » → « DACIA (RENAULT GROUP) ») */
-const ALIAS = { VOLKSWAGEN: "VW (VOLKSWAGEN)", VW: "VW (VOLKSWAGEN)", CITROEN: "CITROEN", DACIA: "DACIA (RENAULT GROUP)", KIA: "KIA MOTORS", MERCEDES: "MERCEDES-BENZ", "MERCEDES-BENZ": "MERCEDES-BENZ",
-  CHEVROLET: "CHEVROLET EUROPE / DAEWOO (GM)", DS: "DS AUTOMOBILES" };
-// Autres noms Filtron dont les voitures sont aussi comparées (Chevrolet américaines ; DS 3 / DS 4 rangées chez Citroën)
-const AUSSI = { CHEVROLET: ["CHEVROLET"], DS: ["CITROEN"] };
-async function marqueFiltron(marqueGates) {
-  const alias = ALIAS[sansAccent(marqueGates)];
-  if (alias) {
-    const { count } = await sb.from("applications").select("id", { count: "exact", head: true }).eq("marque", alias);
-    if (count) return alias;
-  }
-  const motif = `${sansAccent(marqueGates).replace(/[^A-Z0-9]/g, "_")}%`;
-  const { data, error } = await sb.from("applications").select("marque").ilike("marque", motif).limit(1000);
-  if (error) throw error;
-  const n = new Map();
-  for (const r of data) n.set(r.marque, (n.get(r.marque) ?? 0) + 1);
-  const exacte = [...n.keys()].find((m) => sansAccent(m) === sansAccent(marqueGates));
-  return exacte ?? [...n.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? marqueGates;
-}
+// Rapprochement avec les voitures Filtron : module commun (scripts/lib_voitures.mjs)
+const voituresFiltron = (marque) => lib.voituresFiltron(sb, marque);
+const marqueFiltron = (marque) => lib.marqueFiltron(sb, marque);
 
 // ───────────── 5. Programme ─────────────
 console.log(`Lecture de ${basename(PDF)}…`);
