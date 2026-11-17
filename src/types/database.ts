@@ -291,6 +291,7 @@ export type Product = {
   stock_min: number;
   notes: string | null;
   dimensions?: string | null;
+  vehicule?: "voiture" | "camion"; // supabase/products_vehicule.sql (scripts/classer_vehicules.mjs) — BIBLE §8.37
   image_url?: string | null;
   code_barre?: string | null;
   prix_promo?: number | null;

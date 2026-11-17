@@ -12,6 +12,8 @@ import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, donnerPort
 import { ajouterReception, getReceptionsAttente, syncReceptions, type NouvellePiece } from "@/lib/offlineReceptions";
 import type { Fournisseur, Reception, Avance, Product, FournisseurType, ProductCategory } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
+import ChoixVehicule from "@/components/ChoixVehicule";
+import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import {
   Plus, Truck, Phone, MessageCircle, Pencil, Trash2, X, PackagePlus, HandCoins,
@@ -106,13 +108,17 @@ export default function FournisseursPage() {
 
   // Sélecteur de la réception (produits + variantes de MARQUE, pas les ~23 000 codes OE) :
   // chargé en arrière-plan pour ne pas bloquer l'affichage des soldes sur réseau lent.
-  async function loadPicker() {
+  // 🚗 voitures par défaut, 🚛 camions au bouton (products.vehicule, BIBLE §8.37) : seules ces fiches sont chargées
+  const [typeV, setTypeV] = useTypeVehicule();
+  useChangementType(typeV, (t) => { loadPicker(t); });
+  async function loadPicker(type: TypeVehicule = lireTypeVehicule()) {
     try {
       const toutesMarques = await chargerMarques();
       setMarques(toutesMarques);
       const [all, eqs] = await Promise.all([
-        loadAll<Product>("products", "*", { filter: (q) => q.order("reference") }),
-        loadAll<VariantRow & { product_id: string }>("equivalences", "id, product_id, marque, reference, prix_achat, prix, code_barre", { filter: (q) => q.in("marque", toutesMarques).order("id") }),
+        loadAll<Product>("products", "*", { filter: (q) => q.eq("vehicule", type).order("reference") }),
+        loadAll<VariantRow & { product_id: string }>("equivalences", "id, product_id, marque, reference, prix_achat, prix, code_barre, products!inner(vehicule)",
+          { filter: (q) => q.in("marque", toutesMarques).eq("products.vehicule", type).order("id"), countSelect: "id, products!inner(vehicule)" }),
       ]);
       const vmap: Record<string, VariantRow[]> = {};
       for (const e of eqs) (vmap[e.product_id] ??= []).push({ id: e.id, marque: e.marque, reference: e.reference, prix_achat: e.prix_achat, prix: e.prix, code_barre: e.code_barre });
@@ -776,6 +782,7 @@ export default function FournisseursPage() {
                 <input type="date" className="input mt-1" value={recDate} onChange={e => setRecDate(e.target.value)} />
               </label>
             </div>
+            <ChoixVehicule value={typeV} onChange={setTypeV} className="mb-3" />
             {/* « Je reçois » : la recherche des lignes ne montre que cette famille (et ses marques) — BIBLE §8.30 */}
             <p className="text-[10px] uppercase text-slate-500 mb-1">Je reçois</p>
             <div className="grid grid-cols-3 gap-1.5 mb-3">

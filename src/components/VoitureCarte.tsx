@@ -10,13 +10,18 @@ import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import { type Voiture, type ProdLite, libelle, annees, kitDeVoiture, messageKit } from "@/lib/voitures";
 import { FAMILLES, familleDe } from "@/lib/categories";
+import { useTypeVehicule, duType } from "@/lib/typeVehicule";
 import { type BidonHuile, bidonsConvenables, bidonsPourVidange, chargerHuiles, estCleVoiture, huilesDeLaVoiture, litresTexte, variantePrevue, versionsFap } from "@/lib/huiles";
 import type { HuileMoteur } from "@/types/database";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { Package, Send, Droplet, Cog, Disc } from "lucide-react";
 
-export default function VoitureCarte({ v, action }: { v: Voiture; action?: React.ReactNode }) {
+export default function VoitureCarte({ v: voiture, action }: { v: Voiture; action?: React.ReactNode }) {
   const router = useRouter();
+  // Mode de l'appli (🚗 voitures / 🚛 camions, BIBLE §8.37) : seulement les pièces de ce mode
+  const [typeV] = useTypeVehicule();
+  const v: Voiture = { ...voiture, filtres: voiture.filtres.filter((f) => duType(f.vehicule, typeV)) };
+  const cachees = voiture.filtres.length - v.filtres.length;
   const [huiles, setHuiles] = useState<HuileMoteur[]>([]);
   const [bidons, setBidons] = useState<BidonHuile[]>([]);
   const [variante, setVariante] = useState<string | null>(null);
@@ -81,6 +86,7 @@ export default function VoitureCarte({ v, action }: { v: Voiture; action?: React
       <div className="grid sm:grid-cols-2 gap-2 mt-3">
         {filtres.map(piece)}
         {filtres.length === 0 && <p className="text-xs text-slate-400">Aucun filtre enregistré pour cette voiture.</p>}
+        {cachees > 0 && <p className="text-xs text-slate-500 sm:col-span-2">{cachees} pièce(s) {typeV === "voiture" ? "camion" : "voiture"} cachée(s) : change le mode 🚗 / 🚛 en haut pour les voir.</p>}
       </div>
       {/* Pas de filtre à carburant dans nos références : normal sur beaucoup d'essence (il est dans le réservoir),
           à vérifier chez Filtron sur un diesel. On ne devine jamais une référence. */}

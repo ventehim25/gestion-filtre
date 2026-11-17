@@ -17,6 +17,7 @@ import { constructeur, anneeProbable, nettoyerVin } from "@/lib/vin";
 import { CATEGORY_KEYS, estFiltre, familleDe, avecDents, normDents, dentsValides, MSG_DENTS, AVEC_DENTS, type Famille } from "@/lib/categories";
 import { DEPART, chargerMarques, marquesPour } from "@/lib/brands";
 import CategoryOptions from "@/components/CategoryOptions";
+import { lireTypeVehicule, useTypeVehicule, useChangementType, duType } from "@/lib/typeVehicule";
 
 type Vehicule = {
   id: string;
@@ -105,7 +106,7 @@ export default function RecherchePage() {
     const seen = new Set<string>();
     const out: { product: Product; app: Application }[] = [];
     for (const a of matched) {
-      if (a.products && !seen.has(a.product_id)) { seen.add(a.product_id); out.push({ product: a.products, app: a }); }
+      if (a.products && duType(a.products.vehicule, lireTypeVehicule()) && !seen.has(a.product_id)) { seen.add(a.product_id); out.push({ product: a.products, app: a }); }
     }
     setSmartRes(out.slice(0, 80));
     setSmartLoading(false);
@@ -145,6 +146,9 @@ export default function RecherchePage() {
 
   // ---------- Recherche par référence ----------
   const [refQuery, setRefQuery] = useState("");
+  // Mode de l'appli changé (bandeau 🚗 / 🚛) : relancer les recherches affichées
+  const [typeV] = useTypeVehicule();
+  useChangementType(typeV, () => { if (refQuery.trim().length >= 2) searchRef(refQuery); if (smartQ.trim()) smartSearch(smartQ); });
   const [refResults, setRefResults] = useState<RefResult[]>([]);
   const [refLoading, setRefLoading] = useState(false);
   const [searched, setSearched] = useState(false);
@@ -263,16 +267,16 @@ export default function RecherchePage() {
     const sel = "*, equivalences(*), applications(*), compatibilites(vehicules(*))";
     const dentsQ = normDents(q);
     const [{ data: direct }, { data: eqMatches }, { data: parDents }] = await Promise.all([
-      supabase.from("products").select(sel).ilike("reference", loose).limit(60),
+      supabase.from("products").select(sel).eq("vehicule", lireTypeVehicule()).ilike("reference", loose).limit(60),
       supabase.from("equivalences").select("product_id").ilike("reference", loose).limit(60),
-      dentsValides(dentsQ) ? supabase.from("products").select(sel).in("categorie", AVEC_DENTS).eq("dimensions", dentsQ).limit(60) : Promise.resolve({ data: [] }),
+      dentsValides(dentsQ) ? supabase.from("products").select(sel).eq("vehicule", lireTypeVehicule()).in("categorie", AVEC_DENTS).eq("dimensions", dentsQ).limit(60) : Promise.resolve({ data: [] }),
     ]);
     let all = [...((direct as unknown as RefResult[]) ?? [])];
     for (const p of ((parDents as unknown as RefResult[]) ?? [])) if (!all.some(x => x.id === p.id)) all.push(p);
     const ids = [...new Set((eqMatches ?? []).map((e: { product_id: string }) => e.product_id))]
       .filter(id => !all.some(p => p.id === id));
     if (ids.length) {
-      const { data: viaEq } = await supabase.from("products").select(sel).in("id", ids).limit(60);
+      const { data: viaEq } = await supabase.from("products").select(sel).eq("vehicule", lireTypeVehicule()).in("id", ids).limit(60);
       all = [...all, ...((viaEq as unknown as RefResult[]) ?? [])];
     }
     all.sort((a, b) => a.reference.localeCompare(b.reference, undefined, { numeric: true, sensitivity: "base" }));

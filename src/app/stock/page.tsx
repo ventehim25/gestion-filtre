@@ -11,6 +11,7 @@ import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import { queueStock, pendingStockCount, syncStock } from "@/lib/offlineStock";
+import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import { CATEGORY_KEYS as categoryKeys, correspondCategorie } from "@/lib/categories";
 import { DEPART } from "@/lib/brands";
 import CategoryOptions from "@/components/CategoryOptions";
@@ -59,11 +60,14 @@ export default function StockPage() {
   const scanFieldRef = useRef<HTMLInputElement | null>(null);
   const fbTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  async function load() {
+  // Mode de l'appli : 🚗 voitures ou 🚛 camions (BIBLE §8.37)
+  const [typeV] = useTypeVehicule();
+  useChangementType(typeV, (t) => { load(t); });
+  async function load(type: TypeVehicule = lireTypeVehicule()) {
     setLoading(true);
     const all: Product[] = [];
     for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("products").select("*").order("nom_fr").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("products").select("*").eq("vehicule", type).order("nom_fr").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       all.push(...data);
       if (data.length < 1000) break;

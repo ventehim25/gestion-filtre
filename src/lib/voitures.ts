@@ -3,7 +3,7 @@
 import type { Application, Product } from "@/types/database";
 import { libelleCategorie } from "@/lib/categories";
 
-export type ProdLite = Pick<Product, "id" | "reference" | "marque" | "categorie" | "stock" | "stock_min" | "prix_vente" | "image_url">;
+export type ProdLite = Pick<Product, "id" | "reference" | "marque" | "categorie" | "stock" | "stock_min" | "prix_vente" | "image_url" | "vehicule">;
 export type Ligne = Application & { products: ProdLite | null };
 export type Voiture = {
   cle: string; marque: string; modele: string; moteur: string | null; code_moteur: string | null;
@@ -12,7 +12,7 @@ export type Voiture = {
   remarques?: Record<string, string>;
 };
 
-export const COLS = "marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, remarque, product_id, products(id, reference, marque, categorie, stock, stock_min, prix_vente, image_url)";
+export const COLS = "marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, remarque, product_id, products(id, reference, marque, categorie, stock, stock_min, prix_vente, image_url, vehicule)";
 export const ORDRE = ["filtre_huile", "filtre_air", "filtre_habitacle", "filtre_carburant", "filtre_refroidissement", "huile_moteur",
   "kit_distribution_pompe", "kit_distribution", "courroie_distribution", "galet_distribution", "chaine_distribution", "pompe_eau",
   "kit_courroie_accessoire", "courroie_accessoire", "poulie", "plaquette_frein", "disque_frein", "autre"];

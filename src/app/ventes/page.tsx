@@ -8,6 +8,8 @@ import { loadAll } from "@/lib/pagedFetch";
 import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/types/database";
 import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
+import ChoixVehicule from "@/components/ChoixVehicule";
+import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import { chargerMarques } from "@/lib/brands";
 import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, retirerDuPortefeuille } from "@/lib/dinoun";
 import BarcodeScanner from "@/components/BarcodeScanner";
@@ -89,6 +91,19 @@ export default function VentesPage() {
     setRevealMargin(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
+  // Fiches du type choisi (🚗 voitures par défaut, 🚛 camions au bouton) + leurs variantes de marque : appli plus légère
+  const [typeV, setTypeV] = useTypeVehicule();
+  async function chargerProduits(type: TypeVehicule) {
+    const all = await loadAll<Product>("products", "*", { filter: q => q.eq("vehicule", type).order("reference") });
+    setProducts(all);
+    chargerMarques() // marques de départ + celles ajoutées par l'utilisateur
+      .then(marques => loadAll<PickerVariant>("equivalences", "id, product_id, marque, reference, products!inner(vehicule)",
+        { filter: q => q.in("marque", marques).eq("products.vehicule", type).order("id"), countSelect: "id, products!inner(vehicule)" }))
+      .then(setBrandVariants).catch(() => {});
+    return all;
+  }
+  useChangementType(typeV, (t) => { chargerProduits(t).catch(() => {}); });
+
   async function load() {
     // Tout en parallèle. Les ventes étaient chargées SANS pagination (tronquées à 1000) :
     // désormais paginées en pages parallèles, comme les produits.
@@ -97,16 +112,12 @@ export default function VentesPage() {
       loadAll<Sale & { client: Client }>("sales", salesSel, { filter: q => q.order("created_at", { ascending: false }) }),
       supabase.from("clients").select("*").order("nom"),
       supabase.from("fournisseurs").select("*").order("nom"),
-      loadAll<Product>("products", "*", { filter: q => q.order("reference") }),
+      chargerProduits(lireTypeVehicule()),
     ]);
     lirePortefeuille().then(p => setEnPortefeuille(new Set(p.map(b => b.sale_id)))).catch(() => {});
-    chargerMarques() // marques de départ + celles ajoutées par l'utilisateur
-      .then(marques => loadAll<PickerVariant>("equivalences", "id, product_id, marque, reference", { filter: q => q.in("marque", marques).order("id") }))
-      .then(setBrandVariants).catch(() => {});
     setSales(s);
     setClients(c.data ?? []);
     setFournisseurs((fr.data as Fournisseur[]) ?? []);
-    setProducts(all);
     return all;
   }
 
@@ -679,6 +690,7 @@ export default function VentesPage() {
             </div>
 
             <div className="mb-3">
+              <ChoixVehicule value={typeV} onChange={setTypeV} className="mb-2" />
               <div className="flex items-center justify-between mb-2">
                 <label className="text-xs text-slate-500">{t("products")}</label>
                 <div className="flex gap-2">

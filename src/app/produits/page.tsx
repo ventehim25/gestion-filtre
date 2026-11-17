@@ -16,8 +16,8 @@ import { uploadProductPhoto } from "@/lib/photoUpload";
 import FilterImage from "@/components/FilterImage";
 import StockBadge from "@/components/StockBadge";
 import CategoryIcon from "@/components/CategoryIcon";
-import { classifyKind } from "@/lib/vehicleType";
 import VoiceButton from "@/components/VoiceButton";
+import { lireTypeVehicule, useTypeVehicule, useChangementType } from "@/lib/typeVehicule";
 import { CATALOGUES, POURCENTAGES_DEFAUT, chargerPourcentages, prixPour, type Pourcentages, type TypeCatalogue } from "@/lib/prixCatalogues";
 
 // Prix corrigés à la main pour les 3 autres catalogues (0 = calculé avec le pourcentage)
@@ -59,7 +59,10 @@ export default function ProduitsPage() {
   const [vehMap, setVehMap] = useState<Record<string, { makes: string[]; nb: number }>>({});
   const [equivMap, setEquivMap] = useState<Record<string, { id: string; marque: string; reference: string; prix: number | null; prix_achat: number | null; stock: number }[]>>({});
 
-  async function load() {
+  // kind : « voiture » / « camion » (products.vehicule, BIBLE §8.37) → seules ces fiches sont chargées ; "" = tout
+  async function load(kind: "" | "voiture" | "camion" = kindFilter) {
+    const parType = (q: any) => (kind ? q.eq("vehicule", kind) : q); // eslint-disable-line @typescript-eslint/no-explicit-any
+    const eqParType = (q: any) => (kind ? q.eq("products.vehicule", kind) : q); // eslint-disable-line @typescript-eslint/no-explicit-any
     // Chargements en PARALLÈLE. IMPORTANT : sur 23 000+ équivalences, seules ~23 sont des
     // variantes de MARQUE (affichées) ; les 23 000 autres sont des codes OE constructeur qui
     // ne servent QU'À la recherche par référence. On charge donc d'abord les variantes de
@@ -75,8 +78,8 @@ export default function ProduitsPage() {
     const marquesChargees = await chargerMarques();
     setBrands(marquesChargees);
     const [all, brandedEq, vehRows] = await Promise.all([
-      loadAll<Product>("products", "*", { filter: q => q.order("nom_fr") }),
-      loadAll<EqRow>("equivalences", EQ_COLS, { filter: q => q.in("marque", marquesChargees) }),
+      loadAll<Product>("products", "*", { filter: q => parType(q).order("nom_fr") }),
+      loadAll<EqRow>("equivalences", EQ_COLS + ", products!inner(vehicule)", { filter: q => eqParType(q).in("marque", marquesChargees), countSelect: "id, products!inner(vehicule)" }),
       loadAll<VehRow>("product_vehicles", "*"),
     ]);
     setProducts(all);
@@ -89,7 +92,8 @@ export default function ProduitsPage() {
 
     // Recherche par n'importe quelle référence (codes OE inclus) : enrichi EN FOND,
     // non bloquant. L'affichage des variantes ne change pas (filtré aux marques connues).
-    loadAll<EqRow>("equivalences", EQ_COLS).then(full => setEquivMap(buildEqMap(full))).catch(() => {});
+    loadAll<EqRow>("equivalences", EQ_COLS + ", products!inner(vehicule)", { filter: eqParType, countSelect: "id, products!inner(vehicule)" })
+      .then(full => setEquivMap(buildEqMap(full))).catch(() => {});
   }
 
   function vehSummary(p: Product) {
@@ -99,7 +103,7 @@ export default function ProduitsPage() {
     return dash ? dash.trim() : "";
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { const t0 = lireTypeVehicule(); setKindFilter(t0); load(t0); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     let productId = editing?.id;
@@ -265,7 +269,9 @@ export default function ProduitsPage() {
   const [refSearch, setRefSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
   const [showCost, setShowCost] = useState(false);
-  const [kindFilter, setKindFilter] = useState<"" | "voiture" | "camion">("voiture"); // défaut : voitures
+  const [kindFilter, setKindFilter] = useState<"" | "voiture" | "camion">("voiture"); // défaut : voitures (mode de l'appli)
+  const [typeV, setTypeV] = useTypeVehicule();
+  useChangementType(typeV, (t) => { setKindFilter(t); load(t); });
 
   // Normalise une référence : sans espaces, en majuscules (wl 7510 ↔ wl7510)
   const norm = (s: string) => s.toUpperCase().replace(/\s+/g, "");
@@ -280,8 +286,8 @@ export default function ProduitsPage() {
     const matchRef = !refSearch || norm(p.reference).startsWith(refN) || eqs.some(e => norm(e.reference).startsWith(refN)) || (!!dentsP && dentsP.startsWith(refN));
     const matchBrand = !brandFilter || (p.marque ?? "Filtron").toLowerCase() === brandFilter.toLowerCase();
     const matchCat = correspondCategorie(catFilter, p.categorie); // une catégorie ou « toute la famille »
-    // Préfixes camion = règle des références FILTRON seulement (une réf Gates/Dolz n'en dit rien)
-    const matchKind = !kindFilter || classifyKind(estFiltre(p.categorie) ? p.reference : "", vehMap[p.id]?.makes) === kindFilter;
+    // Voiture / camion : étiquette calculée par scripts/classer_vehicules.mjs (règle de classifyKind, src/lib/vehicleType.ts)
+    const matchKind = !kindFilter || (p.vehicule ?? "voiture") === kindFilter;
     return matchSearch && matchRef && matchBrand && matchCat && matchKind;
   }).sort((a, b) => {
     // Disponibles en HAUT, ruptures en BAS (un produit est « dispo » si son stock
@@ -310,7 +316,7 @@ export default function ProduitsPage() {
           { v: "camion", label: t("vehTruck"), icon: Truck },
           { v: "", label: t("vehAll"), icon: null },
         ] as const).map(({ v, label, icon: Icon }) => (
-          <button key={v} onClick={() => setKindFilter(v)}
+          <button key={v} onClick={() => { if (v) setTypeV(v); else { setKindFilter(""); load(""); } }}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               kindFilter === v ? "bg-red-600 text-white shadow-lg shadow-red-950/40" : "btn-secondary"}`}>
             {Icon && <Icon size={16} />} {label}

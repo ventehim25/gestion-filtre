@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { Product } from "@/types/database";
 import { MessageCircle, Printer, AlertTriangle, Check, Plus, Eye } from "lucide-react";
+import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import StockBadge from "@/components/StockBadge";
 
@@ -75,11 +76,12 @@ export default function ReapproPage() {
     setDemandes(prev => prev.filter(x => x.reference !== d.reference));
   }
 
+  // Mode de l'appli : 🚗 voitures ou 🚛 camions (BIBLE §8.37)
+  const chargerFiches = async (type: TypeVehicule) => { setProducts(await loadAll<Product>("products", "*", { filter: q => q.eq("vehicule", type) })); setLoading(false); };
+  const [typeV] = useTypeVehicule();
+  useChangementType(typeV, (t) => { chargerFiches(t); });
   useEffect(() => {
-    (async () => {
-      setProducts(await loadAll<Product>("products", "*"));
-      setLoading(false);
-    })();
+    chargerFiches(lireTypeVehicule());
     loadDemandes();
     // Ventes des 90 derniers jours (pages parallèles) — sert au dormant et au prédictif
     (async () => {

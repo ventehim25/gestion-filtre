@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { Product, Garage, Client } from "@/types/database";
 import { Check, X, ClipboardPaste, Package, MessageCircle } from "lucide-react";
+import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import ProductPicker from "@/components/ProductPicker";
 
 const norm = (s: string) => s.toUpperCase().replace(/\s+/g, "");
@@ -38,13 +39,20 @@ export default function CommandesPage() {
   const [chargement, setChargement] = useState<ChargementLigne[]>([]);
   const [coches, setCoches] = useState<Set<string>>(new Set());
 
+  // Mode de l'appli : 🚗 voitures ou 🚛 camions (BIBLE §8.37) — fiches et équivalences de ce mode seulement
+  function chargerFiches(type: TypeVehicule) {
+    loadAll<Product>("products", "*", { filter: (q) => q.eq("vehicule", type).order("reference") }).then(setProducts).catch(() => {});
+    loadAll<EquivRow>("equivalences", "id, product_id, marque, reference, prix, prix_achat, products!inner(vehicule)",
+      { filter: (q) => q.eq("products.vehicule", type).order("id"), countSelect: "id, products!inner(vehicule)" })
+      .then(setEquivs).catch(() => {});
+  }
+  const [typeV] = useTypeVehicule();
+  useChangementType(typeV, (t) => chargerFiches(t));
   useEffect(() => {
     supabase.from("garages").select("*").order("nom").then(({ data }) => setGarages((data as Garage[]) ?? []));
     supabase.from("clients").select("*").order("nom").then(({ data }) => setClients((data as Client[]) ?? []));
     // Pages chargées en parallèle (23 000 équivalences = ~24 requêtes : en série c'était très lent sur mobile)
-    loadAll<Product>("products", "*", { filter: (q) => q.order("reference") }).then(setProducts).catch(() => {});
-    loadAll<EquivRow>("equivalences", "id, product_id, marque, reference, prix, prix_achat", { filter: (q) => q.order("id") })
-      .then(setEquivs).catch(() => {});
+    chargerFiches(lireTypeVehicule());
     loadChargement();
   }, []);
 

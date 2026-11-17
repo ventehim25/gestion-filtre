@@ -6,6 +6,7 @@ import { useLang } from "@/context/LangContext";
 import { loadAll } from "@/lib/pagedFetch";
 import { Product } from "@/types/database";
 import { Search, Printer, CheckSquare, Square } from "lucide-react";
+import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import JsBarcode from "jsbarcode";
 
 function barcodeSvg(value: string): string {
@@ -23,10 +24,12 @@ export default function EtiquettesPage() {
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadAll<Product>("products", "id, reference, nom_fr, code_barre", { filter: (q) => q.order("reference") })
-      .then(setProducts).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  // Mode de l'appli : 🚗 voitures ou 🚛 camions (BIBLE §8.37)
+  const charger = (type: TypeVehicule) => loadAll<Product>("products", "id, reference, nom_fr, code_barre", { filter: (q) => q.eq("vehicule", type).order("reference") })
+    .then(setProducts).catch(() => {}).finally(() => setLoading(false));
+  const [typeV] = useTypeVehicule();
+  useChangementType(typeV, (t) => { charger(t); });
+  useEffect(() => { charger(lireTypeVehicule()); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const filtered = useMemo(() => {
     const s = q.trim().toUpperCase();
