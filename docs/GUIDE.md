@@ -270,3 +270,18 @@ Tu tapes **un seul prix** : le prix garage (comme avant). Les autres se calculen
 - **Produits / Stock** : le menu « Catégorie » est rangé par famille ; « — Freinage (tout) — » montre toute la famille d'un coup.
 - **Catalogues** (/tarif, /catalogue) : rangés en **onglets par famille**. Une pièce avec stock (et prix pour /tarif) apparaît toute seule dans sa rubrique ; le client touche « ▼ détails » pour voir le type, la marque, le prix, les références équivalentes et la fiche complète. Une rubrique **sans stock** affiche « 🔄 Réapprovisionnement en cours » avec un bouton **Demander** (WhatsApp vers toi). Photo : prends la boîte en photo dans la fiche (photo automatique seulement pour les filtres).
 - **Vente** : rien ne change ; la marque affichée est la vraie.
+
+## 17. Distribution : les voitures et les kits Gates (depuis le 16/11/2026)
+
+Les kits de distribution, kits avec pompe à eau, courroies, galets et kits chaîne **Gates** sont dans l'appli avec **leurs voitures**, lus dans le **catalogue PDF officiel Gates** (rien d'inventé).
+
+**Voir la distribution d'une voiture** : Recherche → VIN / code moteur, ou « Par marque » → marque → modèle → moteur. Sous les filtres, la rubrique **⚙ Distribution moteur** montre les pièces Gates. Plusieurs choix pour la même voiture ? Lis le **⚠** sous la référence : « à partir de 09/2010 », « pour véhicules avec climatisation », « avec roue dentée », « moteur K9K 608 »… Il dit lequel prendre. Dans le doute, regarde la date de mise en circulation sur la carte grise ou demande au garagiste.
+
+**Recevoir un kit Gates** : Réception → Je reçois **Distribution** → tape la réf. de la boîte (ex. **K025578XS**) : la fiche existe déjà (avec ses voitures), pas besoin de « Nouvelle pièce ». Qté, prix d'achat, prix de vente → Enregistrer. Le kit apparaît alors dans tes catalogues.
+
+**Ajouter une marque de voiture** (ex. Dacia) :
+1. Ouvre **navigates.gates.com**, choisis le catalogue **« Applications véhicules particuliers »** de la marque (PAS « Electric and Hybrid »).
+2. Télécharge le PDF et pose-le sur le **Bureau** (nom conseillé : « gates distribution dacia.pdf »).
+3. Dis à Claude « PDF Dacia sur le Bureau ». Il fait un essai, vérifie, puis importe (`node scripts/import_gates_pdf.mjs "<PDF>" --ecrire`).
+
+**Pas encore** : les équivalences avec les autres marques (Dayco, SKF, INA, Continental…). Gates ne les donne pas. Il faudra le catalogue officiel PDF d'une autre marque : ses pièces viendront alors sur les mêmes fiches voiture.
