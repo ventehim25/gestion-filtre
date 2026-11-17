@@ -19,6 +19,7 @@ import { SUPABASE_URL, SUPABASE_CLE } from "./cle_supabase.mjs";
 const args = process.argv.slice(2);
 const PDF = args.find((a) => !a.startsWith("--"));
 const ECRIRE = args.includes("--ecrire");
+const REMPLACER = args.includes("--remplacer"); // avec --ecrire : efface d'abord les liens Gates de la marque
 const DEBUG = (args.find((a) => a.startsWith("--explique=")) ?? "").slice(11).toUpperCase(); // ex. --explique=CLIO
 let debugVus = 0;
 if (!PDF) { console.error('Usage : node scripts/import_gates_pdf.mjs "<catalogue Gates.pdf>" [--ecrire]'); process.exit(1); }
@@ -132,21 +133,32 @@ const codeNorm = (s) => sansAccent(s).replace(/[^A-Z0-9]/g, "");
 /** Codes moteur écrits de toutes les façons (Filtron comme Gates) :
  *  « K9K 790/792 » → K9K790, K9K792 · « DV4TD/TED/TED4, DV4C » → DV4TD, DV4TED, DV4TED4, DV4C
  *  « HFZ / HFX (TU1JP) » → HFZ, HFX, TU1JP · « RHY (DW10TD) » → RHY, DW10TD · « K4M » → K4M.
- *  Un morceau court juste après un code complet (« 792 », « TED ») est un suffixe : il n'est jamais gardé seul. */
+ *  « CJAA, CFCA » (VW) → CJAA, CFCA · « OM 607.951 (K9K) » → OM607951, K9K.
+ *  Suffixe (jamais gardé seul) : que des chiffres (« 792 », « 632 ») ou, après « / », un morceau court derrière
+ *  une famille PSA/Renault qui contient un chiffre (« DV4TD/TED » → DV4TED). Entre parenthèses = toujours un code complet. */
 function codes(s) {
   const out = new Set();
   let base = "";
-  for (const brut of (s ?? "").split(/[,;\/()]+/)) {
-    const n = codeNorm(brut);
+  const txt = (s ?? "").replace(/\(([^)]*)\)/g, (m, x) => `,¤${x.split(/[,;\/]+/).join(",¤")},`);
+  let sep = ",";
+  for (const p of txt.split(/([,;\/])/)) {
+    if (p === "," || p === ";" || p === "/") { sep = p === "/" ? "/" : ","; continue; }
+    const entier = p.includes("¤");
+    const n = codeNorm(p.replace(/¤/g, ""));
     if (!n) continue;
-    if (base && n.length <= 4 && !n.startsWith(base)) { out.add(base + n); continue; }
+    const suffixe = !entier && base && !n.startsWith(base) &&
+      (/^\d{1,4}$/.test(n) || (sep === "/" && n.length <= 4 && /\d/.test(base)));
+    if (suffixe) { out.add(base + n); continue; }
     out.add(n);
-    base = n.length >= 4 ? n.slice(0, 3) : "";
+    if (!entier) base = n.length >= 4 ? n.slice(0, 3) : "";
   }
   return [...out];
 }
-/** Clé du nom de modèle : 1er mot (2 si « GRAND »), pour chaque nom séparé par « / » */
-const clesModele = (nom) => sansAccent(nom).split("/").map((a) => {
+/** Clé du nom de modèle : 1er mot (2 si « GRAND »), pour chaque nom séparé par « / ».
+ *  Mercedes : « CLASSE A », « A-Class », « A-Klasse » → « A ». */
+const clesModele = (nom) => sansAccent(nom)
+  .replace(/\bCLASSE\s+([A-Z]+)\b/g, "$1").replace(/\b([A-Z]+)-(CLASS|KLASSE)\b/g, "$1")
+  .split("/").map((a) => {
   const mots = a.split(/[^A-Z0-9]+/).filter(Boolean);
   return mots[0] === "GRAND" ? mots.slice(0, 2).join(" ") : mots[0];
 }).filter(Boolean);
@@ -158,11 +170,14 @@ const ecrireDate = (n) => (n ? `${String(n % 100).padStart(2, "0")}/${Math.floor
 const ch = (kw) => Math.round(Number(kw) * 1.35962);
 const titreCase = (s) => s.toLowerCase().replace(/(^|[\s/(-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase());
 
+// Seulement les voitures des filtres (pas celles déjà écrites par un import Gates : un réimport ne se compare pas à lui-même)
 async function voituresFiltron(marque) {
-  const { count, error } = await sb.from("applications").select("id", { count: "exact", head: true }).eq("marque", marque);
+  const base = () => sb.from("applications").select("marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance, products!inner(marque)", { count: "exact" })
+    .eq("marque", marque).neq("products.marque", "Gates");
+  const { count, error } = await base().range(0, 0);
   if (error) throw error;
   const pages = await Promise.all(Array.from({ length: Math.ceil((count ?? 0) / 1000) }, (_, i) =>
-    sb.from("applications").select("marque, modele, moteur, code_moteur, annee_debut, annee_fin, puissance").eq("marque", marque).range(i * 1000, i * 1000 + 999)));
+    base().range(i * 1000, i * 1000 + 999)));
   const vus = new Map();
   for (const p of pages) {
     if (p.error) throw p.error;
@@ -256,7 +271,8 @@ for (const l of lignes) {
   if (trouvees.length) exactes++;
   else {
     // Filtron n'a que la famille du moteur (« K9K ») : on relie, en écrivant le code exact Gates dans la remarque
-    trouvees = voitures.filter((v) => memes(v) && v.codes.length > 0 && v.codes.every((c) => c.length === 3) && cg.some((c) => v.codes.some((b) => c.startsWith(b))));
+    // (« K9K » ou Mercedes « M 266 », « OM 640 » : le code Gates commence par la famille Filtron, + 1 à 4 caractères)
+    trouvees = voitures.filter((v) => memes(v) && cg.some((c) => v.codes.some((b) => b.length >= 3 && c.length > b.length && c.length - b.length <= 4 && c.startsWith(b))));
     if (trouvees.length) { famille++; precision = `moteur ${l.moteurs}`; }
   }
   const rem = [precision, remarque(l.comm)].filter(Boolean).join(" · ");
@@ -338,6 +354,27 @@ const aEcrire = [...apps.values()].filter((a) => fiches.get(a.ref)?.id).map((a) 
   product_id: fiches.get(a.ref).id, marque: a.marque, modele: a.modele, moteur: a.moteur, code_moteur: a.code_moteur,
   annee_debut: a.annee_debut, annee_fin: a.annee_fin, puissance: a.puissance, remarque: a.remarques.join(" — ou — ") || null,
 }));
+// --remplacer : réimport d'une marque (rapprochement amélioré) → ses anciens liens Gates sont effacés d'abord.
+// Seules les voitures de CETTE marque reliées à des fiches Gates (qui ne reçoivent des voitures que par ce script).
+if (REMPLACER) {
+  const gatesIds = [];
+  for (let i = 0; ; i += 1000) {
+    const { data, error } = await sb.from("products").select("id").eq("marque", "Gates").range(i, i + 999);
+    if (error) throw error;
+    gatesIds.push(...data.map((p) => p.id));
+    if (data.length < 1000) break;
+  }
+  let effaces = 0;
+  for (const mg of marquesGates) {
+    const mf = filtron.get(mg).marque;
+    for (let i = 0; i < gatesIds.length; i += 150) {
+      const { error, count } = await sb.from("applications").delete({ count: "exact" }).eq("marque", mf).in("product_id", gatesIds.slice(i, i + 150));
+      if (error) throw error;
+      effaces += count ?? 0;
+    }
+  }
+  console.log(`--remplacer : ${effaces} anciens liens Gates effacés pour ${marquesGates.join(", ")}`);
+}
 let ecrites = 0;
 for (let i = 0; i < aEcrire.length; i += 500) {
   const { error, count } = await sb.from("applications").upsert(aEcrire.slice(i, i + 500), {
