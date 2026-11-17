@@ -22,7 +22,7 @@ const ECRIRE = args.includes("--ecrire");
 const REMPLACER = args.includes("--remplacer");
 const DEBUG = (args.find((a) => a.startsWith("--explique=")) ?? "").slice(11).toUpperCase();
 if (!PDF) { console.error('Usage : node scripts/import_metelli_freins.mjs "<catalogue Metelli.pdf>" [--ecrire] [--remplacer]'); process.exit(1); }
-const sb = createClient(SUPABASE_URL, SUPABASE_CLE);
+const sb = createClient(SUPABASE_URL, SUPABASE_CLE, { global: { fetch: lib.fetchAvecReprise } }); // coupure réseau : réessaie (lectures, effacements, upserts)
 const DOSSIER = join(process.cwd(), "backups", "metelli");
 mkdirSync(DOSSIER, { recursive: true });
 
@@ -76,8 +76,11 @@ async function lirePdf(fichier) {
 
     // Voitures
     if (!its.some((i) => i.s === "Spare" && i.y > 730) || !its.some((i) => i.s === "METELLI" && i.y > 730)) continue;
-    const haut = its.filter((i) => i.y > 770 && i.x < 300 && /[A-Z]/.test(i.s) && !/^\d+$/.test(i.s));
-    if (haut.length) marque = haut.sort((a, b) => b.y - a.y)[0].s;
+    // Marque = gros titre (taille 15) SANS dates, à gauche ou à droite, en haut OU au milieu de la page (« ACURA » après
+    // « ABARTH ») ; modèle = gros titre AVEC ses dates (« RDX 1/12-1/70 »). Avant (17/11) : seule la marque en haut à gauche
+    // était lue → Acura, Aixam… restaient sous Abarth.
+    const titresMarque = its.filter((i) => i.h >= 13 && !RE_MODELE.test(i.s) && /[A-Z]/.test(i.s) && i.s === i.s.toUpperCase() && !/^\d+$/.test(i.s))
+      .map((i) => ({ y: i.y, type: "marque", nom: i.s }));
     const corps = its.filter((i) => i.y < 730 && i.y > 30).sort((a, b) => b.y - a.y || a.x - b.x);
     const gauche = corps.filter((i) => i.x < 35);
     for (const i of gauche) i.vu = false;
@@ -85,7 +88,7 @@ async function lirePdf(fichier) {
     const evts = [];
     for (let k = 0; k < gauche.length; k++) {
       const i = gauche[k];
-      if (i.h >= 13) { const m = i.s.match(RE_MODELE); evts.push({ y: i.y, type: "modele", nom: (m ? m[1] : i.s).trim() }); continue; }
+      if (i.h >= 13) { const m = i.s.match(RE_MODELE); if (m) evts.push({ y: i.y, type: "modele", nom: m[1].trim() }); continue; }
       if (/kW\)/.test(i.s) || /\(\s*\d+\s*kW/.test(i.s)) {
         let txt = i.s, m = txt.match(RE_MOTEUR), j = k;
         while (!m && j + 1 < gauche.length && gauche[j + 1].h < 13 && !/kW/.test(gauche[j + 1].s) && i.y - gauche[j + 1].y < 12) { j++; txt += " " + gauche[j].s; m = txt.match(RE_MOTEUR); }
@@ -95,8 +98,9 @@ async function lirePdf(fichier) {
     }
     // lignes de pièces : une icône (F disque, G plaquette…) à x ≈ 37
     const icones = corps.filter((i) => i.x >= 35 && i.x < 45 && i.s.length === 1);
-    const tout = [...evts.map((e) => ({ ...e, ordre: e.y })), ...icones.map((i) => ({ type: "piece", y: i.y, ordre: i.y }))].sort((a, b) => b.ordre - a.ordre);
+    const tout = [...titresMarque.map((e) => ({ ...e, ordre: e.y + 0.5 })), ...evts.map((e) => ({ ...e, ordre: e.y })), ...icones.map((i) => ({ type: "piece", y: i.y, ordre: i.y }))].sort((a, b) => b.ordre - a.ordre);
     for (const e of tout) {
+      if (e.type === "marque") { if (e.nom !== marque) { marque = e.nom; modele = null; moteur = null; } continue; }
       if (e.type === "modele") { modele = e.nom; moteur = null; continue; }
       if (e.type === "moteur") { moteur = e; continue; }
       const rang = corps.filter((i) => Math.abs(i.y - e.y) < 2.6 && i.x >= 45);
@@ -316,7 +320,8 @@ for (const [ref, liste] of equivs) {
   for (const e of liste) if (!dejaEq.has(`${id}|${e.marque}|${e.reference}`)) eqAEcrire.push({ product_id: id, marque: e.marque, reference: e.reference, prix: null, prix_achat: null, stock: 0 });
 }
 for (let i = 0; i < eqAEcrire.length; i += 500) {
-  const { error } = await sb.from("equivalences").insert(eqAEcrire.slice(i, i + 500));
+  // upsert « ignorer les doublons » : la liste dejaEq (par paquets limités à 1000 lignes) peut être incomplète
+  const { error } = await sb.from("equivalences").upsert(eqAEcrire.slice(i, i + 500), { onConflict: "product_id,marque,reference", ignoreDuplicates: true });
   if (error) throw new Error(`équivalences : ${error.message}`);
 }
 console.log(`Équivalences : ${eqAEcrire.length} ajoutées`);

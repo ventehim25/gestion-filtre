@@ -25,7 +25,7 @@ const REMPLACER = args.includes("--remplacer"); // avec --ecrire : efface d'abor
 const DEBUG = (args.find((a) => a.startsWith("--explique=")) ?? "").slice(11).toUpperCase(); // ex. --explique=CLIO
 let debugVus = 0;
 if (!PDF) { console.error('Usage : node scripts/import_gates_pdf.mjs "<catalogue Gates.pdf>" [--ecrire]'); process.exit(1); }
-const sb = createClient(SUPABASE_URL, SUPABASE_CLE);
+const sb = createClient(SUPABASE_URL, SUPABASE_CLE, { global: { fetch: lib.fetchAvecReprise } }); // coupure réseau : réessaie (lectures, effacements, upserts)
 
 // ───────────── 1. Lecture du PDF (position de chaque mot) ─────────────
 async function lireMots(fichier) {

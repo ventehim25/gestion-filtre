@@ -19,7 +19,7 @@ const [PDF_GRAF, PDF_METELLI] = args.filter((a) => !a.startsWith("--"));
 const ECRIRE = args.includes("--ecrire");
 const REMPLACER = args.includes("--remplacer");
 if (!PDF_GRAF || !PDF_METELLI) { console.error('Usage : node scripts/import_kits_graf_metelli.mjs "<GRAF.pdf>" "<METELLI.pdf>" [--ecrire] [--remplacer]'); process.exit(1); }
-const sb = createClient(SUPABASE_URL, SUPABASE_CLE);
+const sb = createClient(SUPABASE_URL, SUPABASE_CLE, { global: { fetch: lib.fetchAvecReprise } }); // coupure réseau : réessaie (lectures, effacements, upserts)
 const DOSSIER = join(process.cwd(), "backups", "metelli");
 mkdirSync(DOSSIER, { recursive: true });
 
@@ -58,12 +58,17 @@ async function lire(fichier, reRef) {
       continue;
     }
     if (!its.some((i) => /ref$/i.test(i.s) && i.y > 760) || !its.some((i) => i.s === "NOTE")) continue;
-    const grands = its.filter((i) => i.h >= 14);
-    const enTete = grands.filter((i) => i.y > 785);
-    if (enTete.length) marque = enTete[0].s;
-    const corps = its.filter((i) => i.y < 765 && i.y > 30).sort((a, b) => b.y - a.y || a.x - b.x);
+    // Marque = gros titre SANS dates (en haut OU au milieu de la page : 113 marques commencent en milieu de page) ;
+    // modèle = gros titre AVEC ses dates. Avant (17/11) : un titre de marque en milieu de page était pris pour un modèle
+    // → les Dacia qui suivaient restaient sous « CUPRA ».
+    const corps = its.filter((i) => i.y > 30 && !(i.y > 760 && i.h < 14)).sort((a, b) => b.y - a.y || a.x - b.x);
     for (const i of corps) {
-      if (i.h >= 14) { const m = i.s.match(RE_MODELE); modele = (m ? m[1] : i.s).trim(); mDe = m?.[2] ?? null; mA = m?.[3] ?? null; moteur = null; continue; }
+      if (i.h >= 14) {
+        const m = i.s.match(RE_MODELE);
+        if (m) { modele = m[1].trim(); mDe = m[2]; mA = m[3]; moteur = null; }
+        else if (/[A-Z]/.test(i.s) && i.s === i.s.toUpperCase()) { if (i.s !== marque) { marque = i.s; modele = null; moteur = null; } }
+        continue;
+      }
       if (i.x < 40 && /kW\)/.test(i.s)) {
         const m = i.s.match(RE_MOTEUR);
         if (!m) { inconnus["moteur illisible"] = (inconnus["moteur illisible"] ?? 0) + 1; moteur = null; continue; }
@@ -221,7 +226,8 @@ for (let i = 0; i < ids.length; i += 150) {
 const eq = [];
 for (const [m, g] of metelliVersGraf) { const id = fiches.get(g)?.id; if (id && !dejaEq.has(`${id}|Metelli|${m}`)) eq.push({ product_id: id, marque: "Metelli", reference: m, prix: null, prix_achat: null, stock: 0 }); }
 for (const [ref, set] of oe) { const id = fiches.get(ref)?.id; if (!id) continue; for (const c of set) if (!dejaEq.has(`${id}|OE|${c}`)) eq.push({ product_id: id, marque: "OE", reference: c, prix: null, prix_achat: null, stock: 0 }); }
-for (let i = 0; i < eq.length; i += 500) { const { error } = await sb.from("equivalences").insert(eq.slice(i, i + 500)); if (error) throw new Error(`équivalences : ${error.message}`); }
+// upsert « ignorer les doublons » : la liste dejaEq (par paquets limités à 1000 lignes) peut être incomplète
+for (let i = 0; i < eq.length; i += 500) { const { error } = await sb.from("equivalences").upsert(eq.slice(i, i + 500), { onConflict: "product_id,marque,reference", ignoreDuplicates: true }); if (error) throw new Error(`équivalences : ${error.message}`); }
 console.log(`Équivalences : ${eq.length} ajoutées (variantes Metelli ${eq.filter((e) => e.marque === "Metelli").length}, numéros d'origine ${eq.filter((e) => e.marque === "OE").length})`);
 if (REMPLACER) {
   let n = 0;

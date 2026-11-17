@@ -110,3 +110,19 @@ export function memesVoitures(voitures, { modele, codesMoteur, cv, d, f }) {
   trouvees = voitures.filter((v) => memes(v) && cg.some((c) => v.codes.some((b) => b.length >= 3 && c.length > b.length && c.length - b.length <= 4 && c.startsWith(b))));
   return { trouvees, famille: trouvees.length > 0 };
 }
+
+/** fetch qui réessaie après une coupure réseau (« fetch failed »), seulement pour ce qui peut être refait sans danger :
+ *  lecture (GET/HEAD), effacement (DELETE), écriture « ignorer les doublons » (upsert ignoreDuplicates).
+ *  Usage : createClient(URL, CLE, { global: { fetch: fetchAvecReprise } }). */
+export async function fetchAvecReprise(url, opts = {}) {
+  const methode = (opts.method ?? "GET").toUpperCase();
+  const prefer = String(new Headers(opts.headers ?? {}).get("Prefer") ?? "");
+  const rejouable = ["GET", "HEAD", "DELETE"].includes(methode) || /resolution=ignore-duplicates/.test(prefer);
+  for (let essai = 1; ; essai++) {
+    try { return await fetch(url, opts); }
+    catch (e) {
+      if (!rejouable || essai >= 5) throw e;
+      await new Promise((r) => setTimeout(r, 2000 * essai));
+    }
+  }
+}
