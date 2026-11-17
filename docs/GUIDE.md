@@ -285,3 +285,15 @@ Les kits de distribution, kits avec pompe à eau, courroies, galets et kits cha�
 3. Dis à Claude « PDF Dacia sur le Bureau ». Il fait un essai, vérifie, puis importe (`node scripts/import_gates_pdf.mjs "<PDF>" --ecrire`).
 
 **Pas encore** : les équivalences avec les autres marques (Dayco, SKF, INA, Continental…). Gates ne les donne pas. Il faudra le catalogue officiel PDF d'une autre marque : ses pièces viendront alors sur les mêmes fiches voiture.
+
+## 18. Freinage : disques et plaquettes Metelli, TRW, Bosch (depuis le 17/11/2026)
+
+Les **disques et plaquettes Metelli** sont dans l'appli avec **leurs voitures** (catalogue PDF officiel Metelli), et chaque fiche a ses **équivalences TRW et Bosch** (et le numéro européen WVA des plaquettes).
+
+**Voir les freins d'une voiture** : Recherche → VIN / code moteur ou « Par marque » → la voiture → rubrique **Freinage** : chaque pièce dit **avant** ou **arrière** (⚠), et parfois « avec / sans ABS », « jusqu'à 12/2012 », « jantes 16 pouces »… La fiche montre aussi la cote : Ø du disque (ventilé ou plein), système et épaisseur de la plaquette.
+
+**Recevoir des plaquettes TRW ou Bosch** : Réception → Je reçois **Freinage** → tape la réf. de la boîte (ex. **GDB2018** ou **0 986 494 697**) → l'appli trouve la fiche Metelli équivalente (22-0975-1) et règle la marque (TRW / Bosch) : chaque marque garde son prix et son stock.
+
+**Une réf. TRW / Bosch introuvable** : pas dans le catalogue Metelli → « ➕ Nouvelle pièce ». **LPR** n'est pas dans ce catalogue : donne la réf. à Claude, il la relie par le numéro WVA.
+
+Les équivalences TRW / Bosch sont celles que **Metelli** déclare (« adaptable à ») : en cas de doute, compare la forme de la plaquette ou les cotes du disque.

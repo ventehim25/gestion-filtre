@@ -7,6 +7,8 @@
 
 ## ▶ REPRENDRE ICI (mis à jour le 16/11/2026)
 
+**Freinage Metelli (17/11, nuit) : FAIT** (BIBLE §8.35, GUIDE §18) — `node scripts/import_metelli_freins.mjs "<pdf>"` (PDF officiel dans le dossier scratch de la session, à re-télécharger si besoin : metelligroup.it/it/support/getcatalogue/14) : 2 951 fiches, 103 519 liens (69 % reliés), TRW/Bosch/WVA 9 379. Module commun `scripts/lib_voitures.mjs` (Gates + Metelli ; tolérance de puissance code précis 8 % ajoutée APRÈS l'import Gates → un réimport Gates `--remplacer` relierait un peu plus, facultatif).
+
 **À FAIRE (promis à l'utilisateur le 17/11)** : après les freins Metelli, importer les **numéros d'origine (OE) des kits de distribution Graf et Metelli** (catalogues officiels « TIMING BELT KIT GRAF April 2024.pdf » et « … METELLI April 2024.pdf », metelligroup.it/it/support/getcatalogue/43 et /42 ; section « Adaptable to OE », 141 pages chacun) — « ça va nous servir ».
 
 **EN COURS (16/11, nuit) — références de distribution « comme Filtron »** (demande : kits, courroies de distribution et d'accessoire, Gates / Continental / Dolz…, avec équivalences + véhicules + moteurs). BIBLE §8.34.
