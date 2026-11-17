@@ -297,3 +297,5 @@ Les **disques et plaquettes Metelli** sont dans l'appli avec **leurs voitures** 
 **Une réf. TRW / Bosch introuvable** : pas dans le catalogue Metelli → « ➕ Nouvelle pièce ». **LPR** n'est pas dans ce catalogue : donne la réf. à Claude, il la relie par le numéro WVA.
 
 Les équivalences TRW / Bosch sont celles que **Metelli** déclare (« adaptable à ») : en cas de doute, compare la forme de la plaquette ou les cotes du disque.
+
+**Kits Graf et Metelli (depuis le 17/11/2026)** : sur les mêmes fiches voiture que Gates, avec le **nombre de dents / largeur** (ex. TP074 = 123/27). Le kit Metelli 29-0xxx est la variante de marque du kit Graf TPxxx (mêmes voitures). **Un garagiste donne un numéro d'origine** (ex. 9467611180) : tape-le dans Recherche → l'appli trouve le kit (Graf TP119).

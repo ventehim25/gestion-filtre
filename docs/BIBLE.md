@@ -1202,6 +1202,13 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Appli** : fiche voiture rangée par famille (Filtres, puis « ⚙ Distribution moteur », « 🛑 Freinage »…), marque affichée pour les pièces hors filtres ; « Metelli » ajouté aux marques de freinage (`FREINAGE_BRANDS`).
 - **À faire ensuite (promis)** : numéros d'origine des **kits Graf et Metelli** (catalogues « TIMING BELT KIT GRAF / METELLI April 2024 », 141 pages « Adaptable to OE » chacun) ; LPR (ex. 05P2187) : relier par le WVA quand on connaît le sien.
 
+## 8.36 Kits de distribution Graf et Metelli : numéros d'origine et dents / largeur (17/11/2026, nuit)
+- **Demande de l'utilisateur** : « n'oublie pas après de prendre les numéros d'origine des kits, ça va nous servir ». Source : catalogues PDF officiels « TIMING BELT KIT GRAF April 2024.pdf » et « TIMING BELT KIT METELLI April 2024.pdf » (metelligroup.it, 1 822 pages chacun, téléchargés avec l'accord de l'utilisateur). Ils ne citent **aucune** référence Gates / INA / SKF / Dayco : seulement les numéros d'origine (sans nom de constructeur) et les voitures.
+- **Outil** : `node scripts/import_kits_graf_metelli.mjs "<GRAF.pdf>" "<METELLI.pdf>"` (essai à blanc, `--ecrire`, `--remplacer` ; lecture gardée dans `backups/metelli/`). Les deux catalogues sont le même contenu (Metelli Group possède Graf) : le kit **Metelli 29-0xxx devient une variante de marque du kit Graf TPxxx seulement si ses voitures sont exactement les mêmes** dans les deux PDF et que le numéro est le même (deux kits Graf peuvent avoir les mêmes voitures : TP104 et TP444) → 396 sur 405 ; les 9 autres restent des fiches Metelli à part.
+- **Importé le 17/11** : **414 fiches** `kit_distribution` (405 Graf + 9 Metelli), toutes avec **dents / largeur** dans la case 🦷 (« 119 x 27 » → 119/27) ; **11 685 liens** voiture (77 % reliés aux voitures Filtron ; remarques : « courroie baignant dans l'huile » (BIO), « 2 courroies : … », « avec / sans climatisation ») ; **20 244 numéros d'origine** (marque « OE », 355 kits) + 396 variantes Metelli.
+- **Vérifié** : numéro d'origine 9467611180 → kit Graf TP119 (116/25) ; Logan 1.5 dCi K9K 796 → Gates KP25578XSPK, KP25578XS, K025578XS + Graf TP074 (123/27, variante Metelli 29-0074). Base : 192 Mo / 500.
+- **À surveiller** : la page Commandes charge toutes les équivalences (≈ 53 000 maintenant) pour reconnaître une réf. d'origine dans une commande WhatsApp → plus lente au chargement ; si l'utilisateur la trouve lente : ne charger que les variantes de marque et chercher les codes d'origine dans la base au moment de lire la commande.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 16/11/2026)*
