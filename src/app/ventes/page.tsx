@@ -240,7 +240,9 @@ export default function VentesPage() {
       const { data: apps } = await supabase.from("applications").select("marque, modele").eq("product_id", p.id).limit(1);
       if (!apps || apps.length === 0) return;
       const { marque, modele } = apps[0] as { marque: string; modele: string };
-      const { data: matches } = await supabase.from("applications").select("product_id, products(*)").eq("marque", marque).eq("modele", modele).limit(60);
+      // Seulement des pièces EN STOCK du mode 🚗 / 🚛 (sinon les milliers de kits / freins des catalogues, stock 0, prennent toute la place)
+      const { data: matches } = await supabase.from("applications").select("product_id, products!inner(*)").eq("marque", marque).eq("modele", modele)
+        .eq("products.vehicule", lireTypeVehicule()).gt("products.stock", 0).limit(200);
       const seen = new Set<string>();
       const out: Product[] = [];
       for (const m of (matches ?? []) as unknown as { product_id: string; products: Product | null }[]) {

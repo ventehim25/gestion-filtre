@@ -80,7 +80,7 @@ export default function ProduitsPage() {
     const [all, brandedEq, vehRows] = await Promise.all([
       loadAll<Product>("products", "*", { filter: q => parType(q).order("nom_fr") }),
       loadAll<EqRow>("equivalences", EQ_COLS + ", products!inner(vehicule)", { filter: q => eqParType(q).in("marque", marquesChargees), countSelect: "id, products!inner(vehicule)" }),
-      loadAll<VehRow>("product_vehicles", "*"),
+      loadAll<VehRow>("product_vehicles", "*", { cleUnique: "product_id" }),
     ]);
     setProducts(all);
     setEquivMap(buildEqMap(brandedEq)); // affichage des variantes prêt tout de suite

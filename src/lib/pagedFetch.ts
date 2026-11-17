@@ -17,6 +17,7 @@ export async function loadAll<T>(
     countSelect?: string;       // colonnes du comptage (pour un filtre sur jointure : ex. "sales!inner(date)")
     pageSize?: number;
     concurrency?: number;
+    cleUnique?: string | null;  // colonne unique ajoutée en dernier tri (défaut "id" ; une vue sans id : "product_id")
   },
 ): Promise<T[]> {
   const pageSize = opts?.pageSize ?? 1000;
@@ -24,7 +25,14 @@ export async function loadAll<T>(
   const applyFilter = opts?.filter ?? ((q: any) => q);
 
   const db = supabase as any; // nom de table dynamique : hors du typage strict
-  const page = (n: number) => (applyFilter(db.from(table).select(select)) as Q).range(n * pageSize, n * pageSize + pageSize - 1);
+  // Toujours finir par un tri sur une colonne UNIQUE : trier seulement sur « nom_fr » (1 695 fiches « Plaquettes de frein
+  // Metelli ») ou sans ordre laisse la base rendre les égalités dans un ordre différent d'une page à l'autre → doublons et trous.
+  const cle = opts?.cleUnique === undefined ? "id" : opts.cleUnique;
+  const page = (n: number) => {
+    let q = applyFilter(db.from(table).select(select));
+    if (cle) q = q.order(cle);
+    return (q as Q).range(n * pageSize, n * pageSize + pageSize - 1);
+  };
 
   const { count } = await applyFilter(
     db.from(table).select(opts?.countSelect ?? "*", { count: "exact", head: true }),

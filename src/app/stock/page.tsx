@@ -67,7 +67,7 @@ export default function StockPage() {
     setLoading(true);
     const all: Product[] = [];
     for (let i = 0; i < 20; i++) {
-      const { data } = await supabase.from("products").select("*").eq("vehicule", type).order("nom_fr").range(i * 1000, i * 1000 + 999);
+      const { data } = await supabase.from("products").select("*").eq("vehicule", type).order("nom_fr").order("id").range(i * 1000, i * 1000 + 999);
       if (!data || data.length === 0) break;
       all.push(...data);
       if (data.length < 1000) break;

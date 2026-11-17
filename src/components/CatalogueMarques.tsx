@@ -21,7 +21,7 @@ async function chargerModeles(motif: string): Promise<Groupe[]> {
   if (error) throw error;
   const pages = await Promise.all(
     Array.from({ length: Math.ceil((count ?? 0) / PAGE) }, (_, i) =>
-      supabase.from("applications").select("marque, modele").ilike("marque", motif).range(i * PAGE, i * PAGE + PAGE - 1)),
+      supabase.from("applications").select("marque, modele").ilike("marque", motif).order("id").range(i * PAGE, i * PAGE + PAGE - 1)), // trié : sans ordre fixe, une page peut en recouvrir une autre (modèle perdu)
   );
   const parMarque = new Map<string, Map<string, Modele>>();
   const lignes = new Map<string, number>();
@@ -50,7 +50,7 @@ async function chargerModeles(motif: string): Promise<Groupe[]> {
 async function chargerMoteurs(m: Modele): Promise<Voiture[]> {
   const rows: Ligne[] = [];
   for (let i = 0; ; i += PAGE) {
-    const { data, error } = await supabase.from("applications").select(COLS).eq("marque", m.marque).eq("modele", m.modele).range(i, i + PAGE - 1);
+    const { data, error } = await supabase.from("applications").select(COLS).eq("marque", m.marque).eq("modele", m.modele).order("id").range(i, i + PAGE - 1);
     if (error) throw error;
     rows.push(...((data ?? []) as unknown as Ligne[]));
     if (!data || data.length < PAGE) break;
