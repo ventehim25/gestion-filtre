@@ -270,6 +270,11 @@ export default function ProduitsPage() {
   const [catFilter, setCatFilter] = useState("");
   const [showCost, setShowCost] = useState(false);
   const [kindFilter, setKindFilter] = useState<"" | "voiture" | "camion">("voiture"); // défaut : voitures (mode de l'appli)
+  // Affichage par tranches de 100 : 7 500 fiches (catalogues Gates / Metelli / Graf) affichées d'un coup avec leur photo
+  // bloquaient le navigateur. La recherche et les filtres portent toujours sur TOUTES les fiches.
+  const PAR_TRANCHE = 100;
+  const [nbAffiches, setNbAffiches] = useState(PAR_TRANCHE);
+  useEffect(() => { setNbAffiches(PAR_TRANCHE); }, [search, refSearch, brandFilter, catFilter, kindFilter]);
   const [typeV, setTypeV] = useTypeVehicule();
   useChangementType(typeV, (t) => { setKindFilter(t); load(t); });
 
@@ -534,7 +539,7 @@ export default function ProduitsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {filtered.map(p => {
+            {filtered.slice(0, nbAffiches).map(p => {
               // Toutes les vraies marques (Flag, Mann, Wix…) s'affichent, même sans prix —
               // seuls les codes constructeur (OE) importés automatiquement restent masqués ici.
               const variants = (equivMap[p.id] ?? []).filter(e => KNOWN_BRANDS.has(e.marque.trim().toLowerCase()))
@@ -620,6 +625,14 @@ export default function ProduitsPage() {
           </tbody>
         </table>
         {filtered.length === 0 && <p className="text-center text-slate-400 py-10">{t("noData")}</p>}
+        {filtered.length > nbAffiches && (
+          <div className="text-center py-4">
+            <button type="button" onClick={() => setNbAffiches((n) => n + PAR_TRANCHE)} className="btn-secondary text-sm">
+              Afficher {Math.min(PAR_TRANCHE, filtered.length - nbAffiches)} de plus ({filtered.length - nbAffiches} restantes sur {filtered.length})
+            </button>
+            <p className="text-xs text-slate-500 mt-1">Astuce : tape une référence ou choisis une catégorie pour trouver plus vite.</p>
+          </div>
+        )}
       </div>
     </div>
   );
