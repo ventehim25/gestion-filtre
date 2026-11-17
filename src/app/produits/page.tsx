@@ -350,8 +350,8 @@ export default function ProduitsPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 overflow-y-auto bg-black/40 flex items-start justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto my-auto">
             <h3 className="font-semibold text-slate-800 mb-4">{editing ? t("edit") : t("addProduct")}</h3>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="text-xs text-slate-500 mb-1 block">{t("reference")}</label><input className="input font-mono uppercase" value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value.toUpperCase() })} /></div>

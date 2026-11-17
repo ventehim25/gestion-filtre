@@ -459,8 +459,8 @@ export default function TourneesPage() {
 
       {/* Formulaire */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-md max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 overflow-y-auto bg-black/60 flex items-start justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-md max-h-[92vh] overflow-y-auto my-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-100">{editing ? "Modifier le garage" : "Nouveau garage"}</h3>
               <button onClick={() => setShowForm(false)} className="text-slate-400 hover:text-white"><X size={18} /></button>

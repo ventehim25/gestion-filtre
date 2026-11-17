@@ -716,8 +716,8 @@ export default function FournisseursPage() {
 
       {/* Modal fournisseur */}
       {showSupplier && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-md">
+        <div className="fixed inset-0 overflow-y-auto bg-black/60 flex items-start justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-md my-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-100">{editingSupplier ? "Modifier le fournisseur" : "Nouveau fournisseur"}</h3>
               <button onClick={() => setShowSupplier(false)} className="text-slate-400 hover:text-white"><X size={18} /></button>
@@ -765,8 +765,8 @@ export default function FournisseursPage() {
 
       {/* Modal réception */}
       {recFor && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="card p-6 w-full max-w-lg my-4">
+        <div className="fixed inset-0 overflow-y-auto bg-black/60 flex items-start justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-lg my-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2"><PackagePlus size={18} className="text-orange-400" /> Marchandise prise</h3>
               <button onClick={() => setRecFor(null)} className="text-slate-400 hover:text-white"><X size={18} /></button>
@@ -962,8 +962,8 @@ export default function FournisseursPage() {
 
       {/* Modal avance */}
       {avFor && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-sm">
+        <div className="fixed inset-0 overflow-y-auto bg-black/60 flex items-start justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-sm my-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2"><HandCoins size={18} className="text-emerald-400" /> {avPortefeuille ? `Donner à ${avFor.nom}` : `Avance — ${avFor.nom}`}</h3>
               <button onClick={() => setAvFor(null)} className="text-slate-400 hover:text-white"><X size={18} /></button>

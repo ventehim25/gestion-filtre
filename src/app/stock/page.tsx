@@ -412,8 +412,8 @@ export default function StockPage() {
 
       {/* Association d'un code inconnu */}
       {linkCode && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-          <div className="card p-5 w-full max-w-md">
+        <div className="fixed inset-0 overflow-y-auto bg-black/60 flex items-start justify-center z-[60] p-4">
+          <div className="card p-5 w-full max-w-md my-auto">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2"><Link2 size={18} className="text-red-400" /> Associer un code-barres</h3>
               <button onClick={() => { setLinkCode(null); setTimeout(() => scanFieldRef.current?.focus(), 50); }} className="text-slate-400 hover:text-white"><X size={20} /></button>

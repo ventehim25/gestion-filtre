@@ -665,8 +665,8 @@ export default function VentesPage() {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="card p-6 w-full max-w-2xl my-4">
+        <div className="fixed inset-0 overflow-y-auto bg-black/40 flex items-start justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-2xl my-auto">
             <h3 className="font-semibold text-slate-800 mb-4">{editingSale ? "Modifier la vente" : t("addSale")}</h3>
             <div className="mb-4">
               <label className="text-xs text-slate-500 mb-1 block">{t("clients")}</label>
@@ -917,8 +917,8 @@ export default function VentesPage() {
 
       {/* Association d'un code inconnu */}
       {linkCode && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] p-4">
-          <div className="card p-5 w-full max-w-md">
+        <div className="fixed inset-0 overflow-y-auto bg-black/60 flex items-start justify-center z-[60] p-4">
+          <div className="card p-5 w-full max-w-md my-auto">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2"><Link2 size={18} className="text-red-400" /> Associer un code-barres</h3>
               <button onClick={() => setLinkCode(null)} className="text-slate-400 hover:text-white"><X size={20} /></button>
@@ -933,8 +933,8 @@ export default function VentesPage() {
 
       {/* Modification rapide du paiement */}
       {payEdit && (
-        <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-[60] p-4">
-          <div className="card p-6 w-full max-w-sm">
+        <div className="fixed inset-0 overflow-y-auto bg-black/55 flex items-start justify-center z-[60] p-4">
+          <div className="card p-6 w-full max-w-sm my-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-100 flex items-center gap-2"><Wallet size={18} className="text-amber-400" /> Paiement</h3>
               <button onClick={() => setPayEdit(null)} className="text-slate-400 hover:text-white"><X size={18} /></button>
@@ -968,8 +968,8 @@ export default function VentesPage() {
 
       {/* Confirmation après-vente + envoi de la fiche */}
       {lastSale && (
-        <div className="fixed inset-0 bg-black/55 flex items-center justify-center z-[60] p-4">
-          <div className="card p-6 w-full max-w-sm text-center">
+        <div className="fixed inset-0 overflow-y-auto bg-black/55 flex items-start justify-center z-[60] p-4">
+          <div className="card p-6 w-full max-w-sm text-center my-auto">
             <div className="text-4xl mb-2">{lastSale.offline ? "📴" : "✅"}</div>
             <h3 className="font-semibold text-slate-100 mb-1">
               {lastSale.offline ? "Vente enregistrée hors-ligne" : "Vente enregistrée"}

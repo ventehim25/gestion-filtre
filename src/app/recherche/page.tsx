@@ -669,8 +669,8 @@ export default function RecherchePage() {
 
       {/* ====== Modal : ajouter une référence ====== */}
       {showAdd && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setShowAdd(false)}>
-          <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 overflow-y-auto bg-black/40 flex items-start justify-center z-50 p-4" onClick={() => setShowAdd(false)}>
+          <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto my-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-slate-800 flex items-center gap-2"><Plus size={18} /> Ajouter une référence</h3>
               <button onClick={() => setShowAdd(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>

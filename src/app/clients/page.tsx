@@ -295,8 +295,8 @@ export default function ClientsPage() {
       </div>
 
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-md max-h-[92vh] overflow-y-auto">
+        <div className="fixed inset-0 overflow-y-auto bg-black/40 flex items-start justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-md max-h-[92vh] overflow-y-auto my-auto">
             <h3 className="font-semibold text-slate-800 mb-4">{editing ? t("edit") : t("addClient")}</h3>
             <div className="space-y-3">
               <div><label className="text-xs text-slate-500 mb-1 block">{t("name")}</label><input className="input" value={form.nom} onChange={e => setForm({ ...form, nom: e.target.value })} /></div>
@@ -476,8 +476,8 @@ export default function ClientsPage() {
 
       {/* Ancien impayé (dette d'avant l'app) */}
       {impayeFor && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="card p-6 w-full max-w-sm">
+        <div className="fixed inset-0 overflow-y-auto bg-black/50 flex items-start justify-center z-50 p-4">
+          <div className="card p-6 w-full max-w-sm my-auto">
             <h3 className="font-semibold text-slate-100 mb-1">Ancien impayé — {impayeFor.nom}</h3>
             <p className="text-xs text-slate-500 mb-4">Ce que ce garage te devait déjà <b>avant l&apos;app</b>. Il apparaîtra dans « À relancer », et tu le gères comme un impayé normal (relance, paiement).</p>
             <div className="space-y-3">
