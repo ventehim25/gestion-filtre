@@ -326,3 +326,12 @@ Menu **Caisse** (icône portefeuille).
 
 **Tu rends des pièces à dinoun / filtropro** : Fournisseurs → sur le fournisseur, **Rendre des pièces** → choisis les pièces (+ / −), vérifie le prix d'achat → **Valider**. Le stock baisse et la dette baisse (ou ton capital remonte). Erreur ? Historique → **✕** sur la ligne « ↩ » pour annuler.
 
+## 23. L'échéancier : chèques et crédits (depuis le 18/11/2026)
+
+Menu **Échéancier** (icône calendrier). Trois cases en haut, touche-en une :
+- **Chèques à encaisser** : les chèques que les clients t'ont donnés (quand tu encaisses un bon en « 🧾 Chèque » avec la date). Rouge = à déposer aujourd'hui ou en retard. Après la banque : **✓ Encaissé**. Si la banque le refuse : **❌ Rejeté** → le client redoit l'argent, son bon redevient « à payer ».
+- **Chèques donnés à couvrir** : les chèques que tu as donnés à dinoun / un fournisseur. Il faut l'argent sur ton compte avant la date. Quand il est passé : **✓ Débité**.
+- **Crédits clients** : qui te doit de l'argent, le plus ancien en haut (rouge = plus de 30 jours) → **Relancer** (WhatsApp prêt) ou **💰 Encaisser**.
+
+Chaque matin, ton téléphone reçoit « 🗓️ Échéancier » s'il y a un chèque à déposer ou à couvrir.
+
