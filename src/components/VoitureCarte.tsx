@@ -27,6 +27,22 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
   const [variante, setVariante] = useState<string | null>(null);
   const [huilesChargees, setHuilesChargees] = useState(false);
   const [boites, setBoites] = useState<HuileBoiteLigne[]>([]);
+  // Freinage : la référence TRW (celle que les garages connaissent) à la place de la réf. Metelli — demande du 18/11
+  const [trw, setTrw] = useState<Map<string, string[]>>(new Map());
+  const idsFreins = voiture.filtres.filter((f) => familleDe(f.categorie) === "freinage").map((f) => f.id).sort().join(",");
+  useEffect(() => {
+    if (!idsFreins) { setTrw(new Map()); return; }
+    let actif = true;
+    import("@/lib/supabase").then(({ supabase }) => supabase.from("equivalences").select("product_id, reference").eq("marque", "TRW").in("product_id", idsFreins.split(",")))
+      .then(({ data }) => {
+        if (!actif) return;
+        const m = new Map<string, string[]>();
+        for (const e of (data ?? []) as { product_id: string; reference: string }[]) (m.get(e.product_id) ?? m.set(e.product_id, []).get(e.product_id)!).push(e.reference);
+        for (const l of m.values()) l.sort((a, b) => a.length - b.length || a.localeCompare(b));
+        setTrw(m);
+      }, () => {});
+    return () => { actif = false; };
+  }, [idsFreins]);
   useEffect(() => {
     let actif = true;
     boitesDeLaVoiture(voiture).then((b) => { if (actif) setBoites(b); }).catch(() => {});
@@ -48,12 +64,23 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
     .filter((r) => r.pieces.length > 0);
   const piece = (f: ProdLite) => {
     const rem = v.remarques?.[f.id];
+    const refsTrw = familleDe(f.categorie) === "freinage" ? trw.get(f.id) ?? [] : [];
     return (
       <div key={f.id} className="flex items-center gap-3 p-2 rounded-lg bg-slate-800/40">
         <FilterImage reference={f.reference} categorie={f.categorie} imageUrl={f.image_url} wid={120} className="h-12 w-12 rounded object-contain bg-white shrink-0 p-0.5" />
         <div className="min-w-0 flex-1">
-          <div className="text-xs text-slate-400">{libelle(f.categorie)}{f.marque && familleDe(f.categorie) !== "filtres_huile" ? ` · ${f.marque}` : ""}</div>
-          <div className="font-mono font-semibold truncate">{f.reference}</div>
+          {refsTrw.length > 0 ? (
+            <>
+              <div className="text-xs text-slate-400">{libelle(f.categorie)} · TRW</div>
+              <div className="font-mono font-semibold truncate">{refsTrw.slice(0, 2).join(" · ")}</div>
+              <div className="text-[11px] text-slate-500 truncate">= {f.marque ?? ""} {f.reference}</div>
+            </>
+          ) : (
+            <>
+              <div className="text-xs text-slate-400">{libelle(f.categorie)}{f.marque && familleDe(f.categorie) !== "filtres_huile" ? ` · ${f.marque}` : ""}</div>
+              <div className="font-mono font-semibold truncate">{f.reference}</div>
+            </>
+          )}
           {rem && <div className="text-[11px] text-amber-300/90 leading-snug">⚠ {rem}</div>}
         </div>
         <div className="text-end shrink-0 space-y-1">
@@ -108,7 +135,7 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
         <div key={fa.k} className="mt-3">
           <div className="flex items-center gap-2 text-sm text-slate-200 font-medium">
             {fa.k === "freinage" ? <Disc size={14} className="text-amber-300" /> : <Cog size={14} className="text-amber-300" />} {fa.court}
-            <span className="text-xs text-slate-500 font-normal">(catalogue officiel {[...new Set(pieces.map((f) => f.marque).filter(Boolean))].join(", ") || "fabricant"})</span>
+            <span className="text-xs text-slate-500 font-normal">(catalogue officiel {[...new Set(pieces.map((f) => f.marque).filter(Boolean))].join(", ") || "fabricant"}{fa.k === "freinage" && pieces.some((f) => trw.has(f.id)) ? " · réf. TRW" : ""})</span>
           </div>
           <div className="grid sm:grid-cols-2 gap-2 mt-1.5">{pieces.map(piece)}</div>
         </div>

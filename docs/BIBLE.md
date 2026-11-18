@@ -1300,6 +1300,11 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Marques de freinage ajoutées** (réglage « marques_filtres », métier freinage) : Apec, Blue Print, Girling, Pagid, Raicam, Remsa, Roadhouse, Trusting, SBS → de vraies variantes (prix / stock à la réception).
 - **Outil réutilisable** : `node scripts/ajouter_equivalences.mjs <réf. de la fiche ou d'une équivalence> <liste.json> [--ecrire]` (liste = { "MARQUE": ["réf", …] }, essai à blanc d'abord, jamais de doublon) ; la liste de GDB1956 est gardée dans `backups/equivalences_ajoutees/GDB1956.json`.
 
+## 8.44 Fiche voiture : huile de boîte en ligne, référence TRW pour les freins (18/11/2026)
+- **Retour de l'utilisateur** (test VIN) : « ça marche très bien, sauf qu'il manque l'huile de boîte, et c'est mieux de montrer les références TRW des plaquettes et disques à la place de la référence Metelli ».
+- **Huile de boîte** : la table `huiles_boites` était VIDE (l'envoi attendait la fin du relevé). Lignes refaites depuis le relevé en cours (`huiles_boites.mjs lignes` puis `envoi`) : **5 314 lignes** (5 191 avec une huile). Vérifié : Logan 1.5 dCi 75 ch → JH3 / JR5 75W-80 2,8 L ; Sandero, Peugeot 301, C-Elysée, 208 (24/25), i10 (16/18), Classe C (16/25) OK. Renault, VW, Toyota… arrivent à la fin du relevé (ordre alphabétique des marques) → refaire `lignes` + `envoi` (upsert, sans doublon).
+- **Freins en référence TRW** (`VoitureCarte`) : pour chaque plaquette / disque, les réf. TRW de la fiche (`equivalences` marque TRW, les plus courtes d'abord, 2 au plus) en gros, et « = Metelli 22-0950-0K » en petit dessous ; en-tête « · réf. TRW ». Sans réf. TRW : la réf. Metelli reste. Couverture : **2 469 / 2 952 plaquettes et disques (84 %)**.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*
