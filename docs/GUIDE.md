@@ -346,3 +346,11 @@ Statistiques → bloc **💹 Rentabilité**. Choisis la période (Ce mois, 3 moi
 3. **Faire une facture** : **Ventes** → sur le bon, bouton **🧾**. Elle prend le numéro suivant (F2026-0001, F2026-0002…), calcule le HT et la TVA (tes prix sont TTC) et s'ouvre prête à **imprimer** ou **enregistrer en PDF** (pour l'envoyer sur WhatsApp). Toucher 🧾 à nouveau réimprime la même facture.
 4. **Annuler une facture** : menu **Factures** → **Avoir** sur la facture (A2026-0001). On ne supprime jamais une facture.
 
+## 26. Inventaire, corrections de stock, historique (depuis le 18/11/2026)
+
+**Faire l'inventaire** : menu **Inventaire** → **Commencer un inventaire**. La liste montre tout ce que l'appli croit avoir. Compte les boîtes et tape le nombre en face de chaque référence (vert ✓ = juste, rouge = il en manque, orange = il y en a plus). Une boîte qui n'est pas dans la liste : **➕ Boîte pas dans la liste**. Tu peux fermer et reprendre plus tard. À la fin : **✓ Valider l'inventaire** → le stock prend tes chiffres (ce que tu n'as pas compté ne change pas).
+
+**Une boîte cassée, perdue, volée, un cadeau** : Inventaire → **Historique d'un article** → tape la référence → **Corriger le stock** → choisis la boîte, Retirer ou Ajouter, combien, **pourquoi** → Enregistrer. Plus jamais un stock qui change sans raison.
+
+**Savoir ce qui s'est passé sur une pièce** : même onglet (ou bouton 🕘 dans **Produits**) : toutes les entrées, ventes, retours et corrections, la plus récente en haut.
+
