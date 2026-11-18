@@ -373,3 +373,5 @@ Le stock total de l'appli ne change pas quand tu charges ou décharges : la page
 
 **Banque** : menu **Banque**. D'abord **Autre / solde de départ** (le solde de ton relevé). Ensuite l'appli ajoute toute seule les chèques encaissés, les chèques donnés débités, les virements des clients et les dépenses payées par banque. Toi, tu ajoutes les **dépôts d'espèces** (ils sortent de la caisse du jour), les **retraits** et les **frais**.
 
+**Depuis le 18/11 au soir** : tape **n'importe quelle référence** (Mann HU7018Z, Bosch 0451103300, Purflux L330, UFI, Fram, numéro d'origine…), avec ou sans espaces. Une liste « Catalogue Filtron » s'affiche pendant que tu tapes, avec l'équivalent Filtron de chaque référence et ton stock. Touche une ligne pour voir la fiche. En Vente et en Réception, c'est pareil : la case de référence propose l'équivalent Filtron.
+
