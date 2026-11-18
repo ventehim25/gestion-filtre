@@ -92,7 +92,10 @@ const ANNEES: Record<string, number> = {
   A: 2010, B: 2011, C: 2012, D: 2013, E: 2014, F: 2015, G: 2016, H: 2017, J: 2018, K: 2019,
   L: 2020, M: 2021, N: 2022, P: 2023, R: 2024, S: 2025, T: 2026, V: 2027, W: 2028, X: 2029, Y: 2030,
 };
+// Mercedes (Europe) : le 10e caractère n'est PAS l'année (WDC1641221A451433 = ML W164 de 2005-2011, pas « 2001 »)
+const SANS_ANNEE = new Set(["WDB", "WDC", "WDD", "WDF", "WDY", "WD3", "WD4", "W1K", "W1N", "W1V", "W1T", "W1W", "WCD", "VSA"]);
 export function anneeProbable(vin: string): number | null {
+  if (SANS_ANNEE.has(vin.slice(0, 3).toUpperCase())) return null;
   const a = vin.length >= 10 ? ANNEES[vin[9]] ?? null : null;
   // Les lettres reviennent tous les 30 ans : « Y » = 2000 ou 2030 → jamais une année dans le futur
   return a && a > new Date().getFullYear() + 1 ? a - 30 : a;

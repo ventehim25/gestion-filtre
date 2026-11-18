@@ -654,21 +654,14 @@ export default function RecherchePage() {
       {/* ============ ONGLET VÉHICULE ============ */}
       {tab === "vehicule" && (
         <>
-          <div className="card p-5 mb-4">
-            <h3 className="font-semibold text-slate-700 mb-3 flex items-center gap-2"><Car size={18} /> {t("searchByVin")}</h3>
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input className="input ps-9 font-mono uppercase" placeholder={t("vinPlaceholder")} value={vin} maxLength={17} onChange={e => setVin(e.target.value.toUpperCase())} />
-            </div>
-            {vinDetected && (
-              <p className="mt-2 text-sm text-green-400 bg-green-500/10 px-3 py-1.5 rounded-md inline-flex items-center gap-2">
-                <Car size={14} /> <strong>{t("vinDetected")} :</strong> {vinDetected}{vinYear ? ` · année probable ${vinYear} (non appliquée)` : ""}
-                <span className="text-slate-400 text-xs">— choisissez le modèle, ou utilisez « VIN ou code moteur » dans Recherche rapide</span>
-              </p>
-            )}
-          </div>
+          {/* VIN ou code moteur → la voiture exacte et ses pièces (Filtron + Gates + Metelli). Avant (18/11) : cet onglet
+              n'avait que l'ancien VIN (marque seulement, année fausse chez Mercedes) et l'ancienne petite liste. */}
+          <RechercheVin />
+          <p className="text-xs text-slate-500 mb-3">Ou cherche par marque → modèle → moteur dans l&apos;onglet <button type="button" className="underline text-blue-400" onClick={() => setTab("marques")}>Par marque</button>.</p>
 
-          <div className="card p-5 mb-4">
+          <details className="mb-4">
+            <summary className="cursor-pointer text-xs text-slate-500">Ancienne liste (quelques voitures ajoutées à la main)</summary>
+          <div className="card p-5 mt-2">
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-4">
               <div>
                 <label className="text-xs text-slate-500 mb-1 block">{t("make")}</label>
@@ -753,6 +746,7 @@ export default function RecherchePage() {
               )}
             </div>
           )}
+          </details>
         </>
       )}
 

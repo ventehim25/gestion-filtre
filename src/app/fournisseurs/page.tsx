@@ -13,6 +13,7 @@ import { ajouterReception, getReceptionsAttente, syncReceptions, type NouvellePi
 import type { Fournisseur, Reception, Avance, Product, FournisseurType, ProductCategory } from "@/types/database";
 import ProductPicker from "@/components/ProductPicker";
 import ChoixVehicule from "@/components/ChoixVehicule";
+import FiltronDe from "@/components/FiltronDe";
 import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import {
@@ -289,6 +290,15 @@ export default function FournisseursPage() {
   }, [fournisseurs]); // eslint-disable-line react-hooks/exhaustive-deps
   function setRecProduct(i: number, p: Product) {
     setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, prix_vente: p.prix_vente, reference: p.reference, code_barre: l.code_barre || p.code_barre || "", nouvelleMarque: null, nouvelleRef: "", nouvellePiece: null } : l));
+  }
+  // Boîte d'une autre marque (Flag…) marquée d'un NUMÉRO D'ORIGINE (ex. 5801317097 = IVECO → Filtron AP085/1) : la ligne
+  // prend la fiche Filtron et crée la variante de la marque de la boîte avec la réf. tapée (BIBLE §8.39) — plus de
+  // « nouvelle pièce » en double. La fiche peut être un camion : on l'ajoute à la liste pour cette réception.
+  function choisirParOrigine(i: number, p: Product, refTapee: string) {
+    setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p]);
+    const marque = marqueVarianteDefaut(p.categorie, p.marque);
+    setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, reference: p.reference, prix_achat: p.prix_achat, prix_vente: p.prix_vente,
+      code_barre: l.code_barre || "", marque: "__new__", nouvelleMarque: marque, nouvelleRef: refTapee.trim().toUpperCase(), nouvellePiece: null } : l));
   }
   // Réf. tapée introuvable → nouvelle pièce sur cette ligne (type selon la famille choisie, marque à choisir)
   function nouvellePieceSurLigne(i: number, reference: string) {
@@ -687,6 +697,7 @@ export default function FournisseursPage() {
                       <div key={i} className="flex items-center justify-between gap-2 text-xs py-1">
                         <span className="text-slate-400 min-w-0">
                           {h.date} · <span className="text-slate-300">{h.text}</span>
+                          {h.rec && (h.rec.lignes ?? []).map((l, k) => <FiltronDe key={k} produit={products.find(p => p.id === l.product_id)} className="block" />)}
                           {h.av && textePaiement(h.av) && <span className="block text-slate-400">{textePaiement(h.av)}</span>}
                           {h.av?.mode === "cheque" && (
                             <button onClick={() => basculerEncaisse(h.av!)} title="Changer : encaissé / pas encore"
@@ -825,7 +836,7 @@ export default function FournisseursPage() {
                         <ProductPicker products={produitsFamille} variants={pickerVariants} value={l.product_id}
                           placeholder={famille === "filtres_huile" ? undefined : `Réf. ${marquesBase(FAMILLES.find(f => f.k === famille)?.nouveau).slice(0, 3).join(", ")}…`}
                           onCreate={pieceNouvellePossible ? (ref) => nouvellePieceSurLigne(i, ref) : undefined}
-                          onSelect={(p, v) => { setRecProduct(i, p); if (v) setRecVariant(i, v.marque); }} />
+                          onSelect={(p, v, o) => { if (o) choisirParOrigine(i, p, o.tape); else { setRecProduct(i, p); if (v) setRecVariant(i, v.marque); } }} />
                       )}
                     </div>
                     <button onClick={() => setRecLines(prev => prev.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center"><Trash2 size={14} /></button>

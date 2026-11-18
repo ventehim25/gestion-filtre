@@ -9,6 +9,7 @@ import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/type
 import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import ChoixVehicule from "@/components/ChoixVehicule";
+import FiltronDe from "@/components/FiltronDe";
 import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import { chargerMarques } from "@/lib/brands";
 import { coutCreditParFournisseur, setBonRembourse, lirePortefeuille, retirerDuPortefeuille } from "@/lib/dinoun";
@@ -719,7 +720,8 @@ export default function VentesPage() {
                 <div key={i} className="mb-2">
                   <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-5">
-                      <ProductPicker products={products} variants={brandVariants} value={l.product_id} onSelect={(p, v) => v ? setLineProductVariant(i, p, v.marque) : setLineProduct(i, p)} />
+                      <ProductPicker products={products} variants={brandVariants} value={l.product_id} onSelect={(p, v, o) => { if (o) setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p]); if (v) setLineProductVariant(i, p, v.marque); else setLineProduct(i, p); }} />
+                      <FiltronDe produit={productById(l.product_id)} className="block mt-0.5" />
                     </div>
                     <input type="number" className="input col-span-2" value={l.quantite} onChange={e => updateLine(i, "quantite", +e.target.value)} min={1} />
                     <input type="number" className="input col-span-3" value={l.prix_unitaire} onChange={e => updateLine(i, "prix_unitaire", +e.target.value)} />

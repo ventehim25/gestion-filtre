@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Product } from "@/types/database";
 import { avecDents } from "@/lib/categories";
+import { chercherParOrigine, type ParOrigine } from "@/lib/origine";
 
 export type PickerVariant = { id: string; product_id: string; marque: string; reference: string };
 
@@ -10,14 +11,26 @@ export type PickerVariant = { id: string; product_id: string; marque: string; re
 // Avec `variants` : on trouve aussi un filtre par la référence d'une variante de marque
 // (ex. « WL7009 » Wix → OE640/2) ; onSelect reçoit alors la variante en 2e argument.
 // Avec `onCreate` : la réf. tapée peut devenir une NOUVELLE pièce (Réception de distribution, BIBLE §8.30).
+// Numéro d'origine (IVECO 5801 317097…) : cherché dans la base, espaces ignorés, voitures ET camions → onSelect reçoit
+// alors { code, marqueCode } en 3e argument (BIBLE §8.39).
 export default function ProductPicker({
   products, value, onSelect, variants, placeholder, onCreate,
 }: {
-  products: Product[]; value: string; onSelect: (p: Product, v?: PickerVariant) => void; variants?: PickerVariant[];
+  products: Product[]; value: string; onSelect: (p: Product, v?: PickerVariant, origine?: { code: string; marqueCode: string; tape: string }) => void; variants?: PickerVariant[];
   placeholder?: string; onCreate?: (reference: string) => void;
 }) {
-  const selected = products.find((p) => p.id === value) || null;
+  const [externe, setExterne] = useState<Product | null>(null); // fiche choisie par numéro d'origine (peut être hors liste)
+  const selected = products.find((p) => p.id === value) || (externe?.id === value ? externe : null);
   const [q, setQ] = useState("");
+  const [origines, setOrigines] = useState<ParOrigine[]>([]);
+  // Numéros d'origine : demandé à la base 350 ms après la frappe (5 caractères au moins)
+  useEffect(() => {
+    const t = q.trim();
+    if (t.replace(/[^A-Za-z0-9]/g, "").length < 5) { setOrigines([]); return; }
+    let actif = true;
+    const id = setTimeout(() => { chercherParOrigine(t).then((r) => { if (actif) setOrigines(r); }).catch(() => {}); }, 350);
+    return () => { actif = false; clearTimeout(id); };
+  }, [q]);
   const [open, setOpen] = useState(false);
   const [hi, setHi] = useState(0);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -48,6 +61,7 @@ export default function ProductPicker({
     return all.sort((a, b) => Number(norm((b.v ?? b.p).reference) === s) - Number(norm((a.v ?? a.p).reference) === s)).slice(0, 30);
   }, [q, products, variants, byId]);
 
+  const originesAffichees = origines.filter((o) => !matches.some((m) => m.p.id === o.produit.id && !m.v));
   const label = selected ? selected.reference : "";
 
   function pick(m: { p: Product; v?: PickerVariant }) {
@@ -71,7 +85,7 @@ export default function ProductPicker({
           else if (e.key === "Escape") setOpen(false);
         }}
       />
-      {open && matches.length > 0 && (
+      {open && (matches.length > 0 || originesAffichees.length > 0) && (
         <div className="absolute z-[60] mt-1 w-full max-h-60 overflow-y-auto card p-1 shadow-xl">
           {matches.map((m, idx) => (
             <button
@@ -96,9 +110,25 @@ export default function ProductPicker({
               )}
             </button>
           ))}
+          {originesAffichees.length > 0 && <p className="px-2 pt-1.5 text-[10px] uppercase text-slate-500">Numéro d&apos;origine</p>}
+          {originesAffichees.map((o) => (
+            <button key={`o-${o.produit.id}`} type="button"
+              onClick={() => { setExterne(o.produit); onSelect(o.produit, undefined, { code: o.code, marqueCode: o.marqueCode, tape: q.trim() }); setQ(""); setOpen(false); }}
+              className="w-full text-left px-2 py-1.5 rounded-md flex items-center gap-2 hover:bg-slate-800/60">
+              <span className="font-mono text-xs text-slate-100 shrink-0">{o.code}</span>
+              <span className="text-xs text-indigo-300 shrink-0">{o.marqueCode}</span>
+              <span className="text-[11px] text-amber-300 truncate">= {o.produit.marque || "Filtron"} {o.produit.reference}{o.produit.vehicule === "camion" ? " · 🚛" : ""}</span>
+            </button>
+          ))}
+          {onCreate && originesAffichees.length > 0 && matches.length === 0 && (
+            <button type="button" onClick={() => { onCreate(q.trim()); setQ(""); setOpen(false); }}
+              className="w-full text-left px-2 py-1.5 rounded-md text-amber-300/80 hover:bg-amber-500/10 text-xs">
+              ➕ Ce n&apos;est pas ça : nouvelle pièce « {q.trim().toUpperCase()} »
+            </button>
+          )}
         </div>
       )}
-      {open && q.trim() && matches.length === 0 && (
+      {open && q.trim() && matches.length === 0 && originesAffichees.length === 0 && (
         <div className="absolute z-[60] mt-1 w-full card p-1 text-xs text-slate-400 shadow-xl">
           <p className="px-2 py-1.5">Aucune référence trouvée</p>
           {onCreate && (
