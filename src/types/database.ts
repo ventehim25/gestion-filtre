@@ -42,6 +42,7 @@ export type Database = {
       reglages: Table<{ cle: string; valeur: unknown; modifie_le: string }, "modifie_le">;
       // Huile moteur par moteur : viscosité, norme, litres (supabase/catalogues_huile_tournees.sql)
       huiles_moteurs: Table<HuileMoteur, "modifie_le" | "viscosites" | "variante">;
+      huiles_boites: Table<HuileBoiteLigne, "modifie_le" | "variante" | "boites">;
       // Décomptes de stock déjà faits par ligne de vente (supabase/protection.sql) : jamais deux fois
       stock_decomptes: Table<{ sale_id: string; ligne: number; cree_le: string }, "cree_le">;
       // Catégories permises (products.categorie → clé étrangère) — supabase/categories_produits.sql, BIBLE §8.31
@@ -214,6 +215,18 @@ export type HuileMoteur = {
   remarque: string | null;
   marques?: string[] | null; // marques où ce code a été relevé (vide = toutes), supabase/huiles_marques.sql
   modifie_le?: string; // idem
+};
+
+// Huile de boîte par voiture (guide Liqui Moly), supabase/huiles_boites.sql — BIBLE §8.40
+export type BoiteHuile = { nom: string; code: string; viscosites: string[]; atf: string[]; norme: string; produits: string[]; litres: number | null };
+export type HuileBoiteLigne = {
+  cle: string;
+  variante: string;
+  boites: BoiteHuile[];
+  description: string | null;
+  marques: string[] | null;
+  source?: string | null;
+  modifie_le?: string;
 };
 
 export type Application = {

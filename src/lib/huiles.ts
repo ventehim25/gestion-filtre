@@ -125,7 +125,7 @@ export function clesVoiture(v: VoitureHuile): string[] {
 }
 const anneeDe = (s: string | null) => { const m = (s ?? "").match(/(\d{4})/); return m ? Number(m[1]) : null; };
 // La voiture (année de début Filtron) est-elle dans la période de la ligne ? (1 an de marge)
-function dansPeriode(variante: string, annee: number | null): boolean {
+export function dansPeriode(variante: string, annee: number | null): boolean {
   const m = variante.match(/^(\d{4})-(\d{4})?/);
   if (!m || annee == null) return true;
   return annee >= Number(m[1]) - 1 && annee <= (m[2] ? Number(m[2]) : 9999) + 1;
@@ -261,4 +261,29 @@ export function chargerHuiles(): Promise<{ huiles: HuileMoteur[]; bidons: BidonH
     })().catch(() => ({ huiles: [], bidons: [] }));
   }
   return cache;
+}
+
+// ───────────── Huile de boîte (BIBLE §8.40) ─────────────
+/** Huile(s) de boîte d'une voiture Filtron : clé modèle + cylindrée + carburant + kW (comme l'huile moteur), période qui
+ *  contient l'année. Lue à la demande (quelques lignes) ; [] si la table n'existe pas encore ou si rien n'est relevé. */
+export async function boitesDeLaVoiture(v: VoitureHuile): Promise<import("@/types/database").HuileBoiteLigne[]> {
+  const cles = clesVoiture(v);
+  if (!cles.length) return [];
+  const { supabase } = await import("./supabase");
+  const { data, error } = await supabase.from("huiles_boites").select("cle, variante, boites, description, marques").in("cle", cles);
+  if (error || !data) return [];
+  const annee = anneeDe(v.annee_debut);
+  for (const cle of cles) { // puissance exacte d'abord, puis ± 1, ± 2 kW
+    const l = (data as import("@/types/database").HuileBoiteLigne[]).filter((x) => x.cle === cle && dansPeriode(x.variante, annee));
+    if (l.length) return l;
+  }
+  return [];
+}
+/** « Boîte-pont (transaxle), manuelle » → « Boîte manuelle » ; « Boîte de vitesses automatique » → « Boîte automatique » */
+export function nomBoite(nom: string): string {
+  if (/transfert/i.test(nom)) return "Boîte de transfert";
+  if (/diff[ée]rentiel|pont arri|essieu/i.test(nom)) return /avant/i.test(nom) ? "Pont avant" : "Pont arrière";
+  if (/automatique|CVT|DSG|double embrayage/i.test(nom)) return "Boîte automatique";
+  if (/manuelle/i.test(nom)) return "Boîte manuelle";
+  return nom;
 }
