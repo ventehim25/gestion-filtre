@@ -10,7 +10,7 @@ import { DEPART, chargerMarques, ajouterMarque, marquesPour, marqueVarianteDefau
 import { CATEGORY_KEYS as categoryKeys, estFiltre, familleDe, correspondCategorie, avecDents, normDents, dentsValides, MSG_DENTS } from "@/lib/categories";
 import CategoryOptions from "@/components/CategoryOptions";
 import { Product, ProductCategory, Equivalence } from "@/types/database";
-import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle, Camera } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, X, Repeat, Eye, EyeOff, Car, Truck, Megaphone, ChevronDown, ChevronUp, Barcode, MessageCircle, Camera, History } from "lucide-react";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { uploadProductPhoto } from "@/lib/photoUpload";
 import FilterImage from "@/components/FilterImage";
@@ -584,6 +584,7 @@ export default function ProduitsPage() {
                   <div className="flex gap-2">
                     <button onClick={() => ficheWhatsApp(p)} className="text-green-500 hover:text-green-400" title="Fiche produit WhatsApp"><MessageCircle size={15} /></button>
                     <button onClick={() => startEdit(p)} className="text-blue-500 hover:text-blue-700"><Pencil size={15} /></button>
+                    <a href={`/inventaire?article=${p.id}`} className="text-slate-400 hover:text-amber-300" title="Historique du stock (entrées, ventes, corrections)"><History size={15} /></a>
                     <button onClick={() => remove(p.id)} className="text-red-400 hover:text-red-600"><Trash2 size={15} /></button>
                   </div>
                 </td>

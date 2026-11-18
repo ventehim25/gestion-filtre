@@ -270,7 +270,7 @@ export type Facture = {
 };
 export type StockDepot = { id: string; product_id: string; equivalence_id: string | null; depot: string; quantite: number; maj_le: string };
 export type Transfert = { id: string; date: string; depot_de: string; depot_vers: string; lignes: { product_id: string; equivalence_id: string | null; ref: string; quantite: number }[]; note: string | null; created_at: string };
-export type Inventaire = { id: string; date: string; statut: "en_cours" | "valide"; lignes: { product_id: string; equivalence_id: string | null; compte: number }[]; note: string | null; valide_le: string | null; created_at: string };
+export type Inventaire = { id: string; date: string; statut: "en_cours" | "valide"; lignes: { product_id: string; equivalence_id: string | null; compte: number; ref?: string }[]; note: string | null; valide_le: string | null; created_at: string };
 export type Regularisation = {
   id: string; date: string; product_id: string; equivalence_id: string | null; quantite: number; stock_avant: number | null; stock_apres: number | null;
   motif: string; inventaire_id: string | null; note: string | null; created_at: string;
