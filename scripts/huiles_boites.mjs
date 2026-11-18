@@ -54,10 +54,23 @@ const cleLecture = (t) => `${t.marque}|${familleModele(t.modele)}|${t.cc}|${t.kw
 
 // Les boîtes d'une version : composants « boîte », « boîte-pont », « transmission », « boîte de transfert », « pont / différentiel »
 const EST_BOITE = /bo[iî]te|transaxle|transmission|transfert|diff[ée]rentiel|pont arri[eè]re|essieu/i;
-async function lireBoites(ty) {
+// + les autres liquides (présentation inspirée de la page « lubrifiants » de HaynesPro / webdatabays, demande de
+// l'utilisateur ; données = guide Liqui Moly, public) : liquide de frein, refroidissement, direction assistée, clim.
+const EST_FLUIDE = /frein|refroidissement|direction|climatisation/i;
+function fluide(c) {
+  const produits = (Array.isArray(c.products) ? c.products : Object.values(c.products || {})).map((p) => (p.name || "").replace(/­/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const caps = Object.values(c.capacities || {}).flat().filter((k) => /Capacit/i.test(k.item ?? "") && !/filtre/i.test(k.item ?? ""));
+  const quantites = caps.map((k) => `${String(k.value).trim()} L${k.condition ? " " + String(k.condition).trim() : ""}`.replace(/\s+/g, " "));
+  const dot = [...new Set(produits.map((p) => p.match(/DOT\s?(\d(?:\.\d)?)/i)).filter(Boolean).map((x) => `DOT ${x[1]}`))];
+  return { nom: c.name, produits: [...new Set(produits)].slice(0, 4), quantites: [...new Set(quantites)].slice(0, 3), dot };
+}
+async function lireFiche(ty) {
   const j = await json("/rest/V1/recommendations/" + ty); const r = Array.isArray(j) ? j[0] : j;
-  if (!r) return [];
+  if (!r) return { boites: [], fluides: [] };
   const comps = Array.isArray(r.components) ? r.components : Object.values(r.components || {});
+  return { boites: lireBoites(comps), fluides: comps.filter((c) => EST_FLUIDE.test(c.name ?? "") && !EST_BOITE.test(c.name ?? "")).map(fluide) };
+}
+function lireBoites(comps) {
   return comps.filter((c) => EST_BOITE.test(c.name ?? "") && !/direction/i.test(c.name ?? "")).map((c) => {
     const produits = (Array.isArray(c.products) ? c.products : Object.values(c.products || {})).map((p) => (p.name || "").replace(/­/g, "").replace(/\s+/g, " ").trim()).filter(Boolean);
     const visc = [...new Set(produits.map((p) => p.match(/\b(\d{2})W-?(\d{2,3})\b/)).filter(Boolean).map((x) => `${x[1]}W-${x[2]}`))];
@@ -77,8 +90,8 @@ async function collecte() {
   for (const t of vs) {
     const k = cleLecture(t);
     if (vus.has(k)) continue; vus.add(k);
-    if (brut[k]) continue;
-    try { brut[k] = { ty: t.ty, boites: await lireBoites(t.ty) }; lus++; } catch (e) { console.log("  ⚠", t.nom, e.message); }
+    if (brut[k] && brut[k].fluides) continue; // déjà lue (boîtes + liquides)
+    try { brut[k] = { ty: t.ty, ...(await lireFiche(t.ty)) }; lus++; } catch (e) { console.log("  ⚠", t.nom, e.message); }
     if (lus % 100 === 0) { ecrire("boites_brut.json", brut); console.log(`  … ${Object.keys(brut).length} / ${total}`); }
     await sleep(350);
   }
@@ -90,11 +103,11 @@ function lignes() {
   const brut = lire("boites_brut.json", {});
   const parCle = new Map();
   for (const t of versions()) {
-    const b = brut[cleLecture(t)]; if (!b || !b.boites.length) continue;
+    const b = brut[cleLecture(t)]; if (!b || (!b.boites.length && !(b.fluides ?? []).length)) continue;
     const cm = cleMarque(t.marque);
     const lesCles = [`~${cm}|${familleModele(t.modele)}|${(Math.round(t.cc / 100) / 10).toFixed(1)}|${t.carb}|${t.kw}`];
     const des = designation(cm, t.nom, t.modele); if (des) lesCles.push(`~${cm}|=${des}|${t.carb}|${t.kw}`);
-    for (const cle of lesCles) { const l = parCle.get(cle) ?? []; l.push({ ...t, boites: b.boites }); parCle.set(cle, l); }
+    for (const cle of lesCles) { const l = parCle.get(cle) ?? []; l.push({ ...t, boites: b.boites, fluides: b.fluides ?? [] }); parCle.set(cle, l); }
   }
   // Une signature = les boîtes possibles (code + huile + litres) ; versions consécutives de même signature = une période
   const sig = (bs) => bs.map((b) => `${b.nom}|${b.code}|${b.viscosites.join("/")}|${b.atf.join("/")}|${b.litres}`).sort().join(" ; ");
@@ -111,7 +124,8 @@ function lignes() {
       const boites = []; // boîtes distinctes (code + type)
       for (const b of g.vs[0].boites) if (!boites.some((x) => x.nom === b.nom && x.code === b.code && x.litres === b.litres)) boites.push(b);
       const nomMarque = NOM[g.vs[0].marque] ?? g.vs[0].marque;
-      out.push({ cle, variante: gs.length > 1 ? `${debut}-${fin}` : "", boites, description: `${nomMarque} ${g.vs[0].nom}${g.vs.length > 1 ? ` (+ ${g.vs.length - 1})` : ""}`, marques: [nomMarque], source: SOURCE });
+      const fluides = (g.vs[0].fluides ?? []).filter((f) => f.produits.length || f.quantites.length);
+      out.push({ cle, variante: gs.length > 1 ? `${debut}-${fin}` : "", boites, fluides, description: `${nomMarque} ${g.vs[0].nom}${g.vs.length > 1 ? ` (+ ${g.vs.length - 1})` : ""}`, marques: [nomMarque], source: SOURCE });
     }
   }
   // même (clé, période) en double → on garde la première

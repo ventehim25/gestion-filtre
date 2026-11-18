@@ -11,7 +11,7 @@ import StockBadge from "@/components/StockBadge";
 import { type Voiture, type ProdLite, libelle, annees, kitDeVoiture, messageKit } from "@/lib/voitures";
 import { FAMILLES, familleDe } from "@/lib/categories";
 import { useTypeVehicule, duType } from "@/lib/typeVehicule";
-import { type BidonHuile, bidonsConvenables, bidonsPourVidange, chargerHuiles, estCleVoiture, huilesDeLaVoiture, litresTexte, variantePrevue, versionsFap, boitesDeLaVoiture, nomBoite } from "@/lib/huiles";
+import { type BidonHuile, bidonsConvenables, bidonsPourVidange, chargerHuiles, estCleVoiture, huilesDeLaVoiture, litresTexte, variantePrevue, versionsFap, boitesDeLaVoiture, nomBoite, nomFluide } from "@/lib/huiles";
 import type { HuileMoteur, HuileBoiteLigne } from "@/types/database";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { Package, Send, Droplet, Cog, Disc } from "lucide-react";
@@ -156,11 +156,12 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
         </div>
       )}
 
-      {/* Huile de boîte (guide Liqui Moly) : chaque boîte possible avec son code, son huile et sa quantité (BIBLE §8.40) */}
+      {/* Boîte et liquides (guide Liqui Moly ; présentation inspirée de la page « lubrifiants » de HaynesPro) : chaque boîte
+          possible avec son code, son huile et sa quantité, puis liquide de frein, refroidissement, direction (BIBLE §8.40) */}
       {boites.length > 0 && (
         <div className="mt-3 rounded-lg bg-slate-800/40 px-3 py-2 text-sm">
           <div className="flex items-center gap-2 text-slate-200 font-medium">
-            <Cog size={14} className="text-amber-300" /> Huile de boîte <span className="text-xs text-slate-500 font-normal">(guide Liqui Moly{boites.length > 1 ? " · selon la période" : ""})</span>
+            <Cog size={14} className="text-amber-300" /> Boîte et liquides <span className="text-xs text-slate-500 font-normal">(guide Liqui Moly{boites.length > 1 ? " · selon la période" : ""})</span>
           </div>
           {boites.map((l) => (
             <div key={l.cle + l.variante} className="mt-1.5">
@@ -178,6 +179,14 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
                 );
               })}
               {l.boites.length > 1 && <div className="text-[11px] text-slate-500">Plusieurs boîtes possibles : regarde le code de la boîte (plaque sur la boîte ou carte grise).</div>}
+              {(l.fluides ?? []).map((f, k) => (
+                <div key={"f" + k} className="text-xs mt-0.5">
+                  <span className="text-slate-300">{nomFluide(f.nom)} : </span>
+                  {f.dot.length > 0 && <b className="text-amber-200">{f.dot.join(" · ")} </b>}
+                  {f.dot.length === 0 && f.produits.length > 0 && <span className="text-amber-200">{f.produits.slice(0, 2).join(" · ")} </span>}
+                  {f.quantites.length > 0 && <span className="text-slate-300">— {f.quantites.join(" · ").replace(/\./g, ",")}</span>}
+                </div>
+              ))}
             </div>
           ))}
         </div>

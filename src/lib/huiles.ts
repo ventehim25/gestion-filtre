@@ -270,7 +270,7 @@ export async function boitesDeLaVoiture(v: VoitureHuile): Promise<import("@/type
   const cles = clesVoiture(v);
   if (!cles.length) return [];
   const { supabase } = await import("./supabase");
-  const { data, error } = await supabase.from("huiles_boites").select("cle, variante, boites, description, marques").in("cle", cles);
+  const { data, error } = await supabase.from("huiles_boites").select("cle, variante, boites, fluides, description, marques").in("cle", cles);
   if (error || !data) return [];
   const annee = anneeDe(v.annee_debut);
   for (const cle of cles) { // puissance exacte d'abord, puis ± 1, ± 2 kW
@@ -278,6 +278,14 @@ export async function boitesDeLaVoiture(v: VoitureHuile): Promise<import("@/type
     if (l.length) return l;
   }
   return [];
+}
+/** « Circuit de freinage/d'embrayage hydraulique » → « Liquide de frein » ; « Système de refroidissement » → « Refroidissement » */
+export function nomFluide(nom: string): string {
+  if (/frein/i.test(nom)) return "Liquide de frein";
+  if (/refroidissement/i.test(nom)) return "Liquide de refroidissement";
+  if (/direction/i.test(nom)) return "Direction assistée";
+  if (/climatisation/i.test(nom)) return "Climatisation";
+  return nom;
 }
 /** « Boîte-pont (transaxle), manuelle » → « Boîte manuelle » ; « Boîte de vitesses automatique » → « Boîte automatique » */
 export function nomBoite(nom: string): string {
