@@ -7,6 +7,7 @@ import webpush from "web-push";
 import { supabase } from "@/lib/supabase";
 import { loadRelancesCatalogue, loadImpayesRelance, countReapproDue, loadEndormis } from "@/lib/relances";
 import { buildBilanHebdo } from "@/lib/bilan";
+import { resumeEcheancier } from "@/lib/echeancier";
 import { chargerClients, clientsDesVilles, dateMaroc, type ClientTournee } from "@/lib/tourneesPrevues";
 
 export const runtime = "nodejs";
@@ -205,6 +206,20 @@ export async function GET(req: Request) {
       });
     }
   } catch { /* rappel facultatif */ }
+
+  // 10) Échéancier (BIBLE §8.41, nouveauté n° 3) : chèques clients à déposer aujourd'hui / en retard,
+  //     chèques donnés aux fournisseurs qui passent dans les 3 jours (argent à avoir sur le compte).
+  try {
+    const e = await resumeEcheancier(supabase);
+    result.cheques_a_encaisser = e.aEncaisser; result.cheques_a_couvrir = e.aCouvrir;
+    if (e.aEncaisser || e.aCouvrir) {
+      const morceaux = [
+        e.aEncaisser ? `${e.aEncaisser} chèque(s) client à déposer à la banque (${Math.round(e.montantEncaisser)} MAD)` : "",
+        e.aCouvrir ? `${e.aCouvrir} chèque(s) fournisseur à couvrir d'ici 3 jours (${Math.round(e.montantCouvrir)} MAD)` : "",
+      ].filter(Boolean);
+      result.echeancier_sent = await sendToAll({ title: "🗓️ Échéancier", body: morceaux.join(" · ") + " 👉", url: "/echeancier", tag: "echeancier" });
+    }
+  } catch { /* tables pas encore créées : rien */ }
 
   return Response.json({ ok: true, ...result });
 }
