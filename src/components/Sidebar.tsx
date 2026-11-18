@@ -2,7 +2,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useLang } from "@/context/LangContext";
-import { LayoutDashboard, Package, Users, ShoppingCart, MapPin, Settings, Menu, X, AlertCircle, BarChart2, Car, Boxes, FileText, ClipboardList, Barcode, Truck, Target, Wallet, CalendarClock, Receipt, ClipboardCheck, CarFront } from "lucide-react";
+import { LayoutDashboard, Package, Users, ShoppingCart, MapPin, Settings, Menu, X, AlertCircle, BarChart2, Car, Boxes, FileText, ClipboardList, Barcode, Truck, Target, Wallet, CalendarClock, Receipt, ClipboardCheck, CarFront, Landmark, UserCog } from "lucide-react";
+import { estPagePatron, useRole } from "@/lib/role";
 import Logo from "@/components/Logo";
 import clsx from "clsx";
 import { useState } from "react";
@@ -25,6 +26,8 @@ const navItems = [
   { href: "/factures", icon: Receipt, key: "invoices" as const },
   { href: "/inventaire", icon: ClipboardCheck, key: "inventory" as const },
   { href: "/voiture", icon: CarFront, key: "vanStock" as const },
+  { href: "/banque", icon: Landmark, key: "bank" as const },
+  { href: "/equipe", icon: UserCog, key: "team" as const },
   { href: "/stats", icon: BarChart2, key: "stats" as const },
   { href: "/tournees", icon: MapPin, key: "tours" as const },
   { href: "/prospects", icon: Target, key: "prospects" as const },
@@ -34,6 +37,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { t, isRtl } = useLang();
   const [open, setOpen] = useState(false);
+  const role = useRole(); // vendeur : pages du patron cachées (BIBLE §8.41 n° 8)
 
   const nav = (
     <>
@@ -49,8 +53,8 @@ export default function Sidebar() {
           <X size={20} />
         </button>
       </div>
-      <nav className="flex-1 p-3 space-y-1">
-        {navItems.map(({ href, icon: Icon, key }) => (
+      <nav className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1">
+        {navItems.filter(({ href }) => role === "admin" || !estPagePatron(href)).map(({ href, icon: Icon, key }) => (
           <Link key={href} href={href} onClick={() => setOpen(false)}
             className={clsx(
               "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all",
@@ -63,7 +67,7 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
-      <div className="p-3 border-t border-slate-700">
+      <div className={clsx("p-3 border-t border-slate-700", role !== "admin" && "hidden")}>
         <Link href="/parametres" onClick={() => setOpen(false)} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors">
           <Settings size={18} />
           <span>{t("settings")}</span>

@@ -17,6 +17,7 @@ export type PendingSale = {
   statut: SaleStatus;
   montant_paye: number;
   mode_paiement?: "especes" | "cheque" | "virement"; // caisse du jour (BIBLE §8.41)
+  commercial_id?: string | null; // commercial du bon (BIBLE §8.41 n° 8)
   depuis_voiture?: boolean; // pièces sorties de la voiture (tournée) : enlevées aussi du stock voiture (BIBLE §8.41)
   voitureFaite?: boolean;
   notes: string | null;
@@ -90,7 +91,7 @@ async function envoyerUne(supabase: SupabaseClient<any>, localId: string): Promi
   if (!s) return true; // déjà envoyée
   {
     try {
-      const champs = { client_id: s.client_id, date: s.date, total: s.total, montant_paye: s.montant_paye, statut: s.statut, notes: s.notes };
+      const champs = { client_id: s.client_id, date: s.date, total: s.total, montant_paye: s.montant_paye, statut: s.statut, notes: s.notes, ...(s.commercial_id ? { commercial_id: s.commercial_id } : {}) };
       let saleId = s.saleId ?? (UUID.test(s.localId) ? s.localId : null);
 
       // 1) La vente

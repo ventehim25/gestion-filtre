@@ -21,6 +21,7 @@ import {
   ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank, ScanLine, ExternalLink, CloudOff, RefreshCw, Undo2,
 } from "lucide-react";
 import RetourFournisseurModal from "@/components/RetourFournisseurModal";
+import { noterBanque, enleverBanque } from "@/lib/banque";
 
 type RecLine = {
   product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; prix_vente: number; reference: string;
@@ -426,6 +427,9 @@ export default function FournisseursPage() {
     const erreur = await marquerChequeEncaisse(a.id, !a.cheque_encaisse);
     if (erreur) { alert(erreur); return; }
     setAvances(prev => prev.map(x => x.id === a.id ? { ...x, cheque_encaisse: !a.cheque_encaisse } : x));
+    // Chèque débité = sorti du compte en banque (BIBLE §8.41 n° 8) ; remis « pas encore » = mouvement enlevé
+    if (!a.cheque_encaisse) await noterBanque({ montant: -a.montant, type: "cheque", note: `Chèque n° ${a.numero_cheque ?? "?"} — ${fournisseurs.find(f => f.id === a.fournisseur_id)?.nom ?? "fournisseur"}`, lien: `avance:${a.id}` });
+    else await enleverBanque(`avance:${a.id}`);
   }
   async function saveAvance() {
     if (!avFor || avMontant <= 0) { alert("Montant requis"); return; }

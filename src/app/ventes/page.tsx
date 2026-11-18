@@ -15,6 +15,7 @@ import RetourClientModal from "@/components/RetourClientModal";
 import { chargerSociete, factureDeVente } from "@/lib/factures";
 import { ecrireFacture, ouvrirFenetre } from "@/lib/imprimerFacture";
 import { DEPOT, choisirVenteVoiture, lireVenteVoiture } from "@/lib/voiture";
+import { useRole } from "@/lib/role";
 import FiltronDe from "@/components/FiltronDe";
 import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import { chargerMarques } from "@/lib/brands";
@@ -36,6 +37,15 @@ type LineItem = { product_id: string; quantite: number; prix_unitaire: number; n
 
 export default function VentesPage() {
   const { t } = useLang();
+  const patron = useRole() === "admin"; // vendeur : pas de bénéfice ni de coût (BIBLE §8.41 n° 8)
+  // Commercial du bon (BIBLE §8.41 n° 8) : celui du compte connecté tout seul, sinon au choix
+  const [commerciaux, setCommerciaux] = useState<{ id: string; nom: string }[]>([]);
+  const [commercialId, setCommercialId] = useState("");
+  const [monCommercial, setMonCommercial] = useState("");
+  useEffect(() => {
+    supabase.from("commerciaux").select("id, nom").eq("actif", true).order("nom").then(({ data }) => setCommerciaux((data ?? []) as { id: string; nom: string }[]), () => {});
+    supabase.rpc("mon_commercial").then(({ data }) => { if (data) { setMonCommercial(data as string); setCommercialId(data as string); } }, () => {});
+  }, []);
   const [sales, setSales] = useState<(Sale & { client: Client })[]>([]);
   // Bons dont l'argent est mis de côté pour dinoun (portefeuille, pas encore donné)
   const [enPortefeuille, setEnPortefeuille] = useState<Set<string>>(new Set());
@@ -420,7 +430,7 @@ export default function VentesPage() {
 
   function resetForm() {
     setShowForm(false); setEditingSale(null); setOldLines([]);
-    setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye"); setVenteMode("especes");
+    setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye"); setVenteMode("especes"); setCommercialId(monCommercial);
     setCrossSell([]); setOilDismissed(false); setUseAvoir(false);
   }
 
@@ -603,6 +613,7 @@ export default function VentesPage() {
       lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
       total: saleTotal, statut, montant_paye: montant, notes: saleNotes || null, createdAt: Date.now(), mode_paiement: venteMode,
       depuis_voiture: depuisVoiture && piecesVoiture > 0,
+      commercial_id: commercialId || null,
     });
 
     let savedOnline = false;
@@ -638,7 +649,7 @@ export default function VentesPage() {
       lines: validLines.map(l => ({ nom: l.nom, quantite: l.quantite, prix_unitaire: l.prix_unitaire })),
       total: saleTotal, statut, montant_paye: montant, offline: !savedOnline, parrainMsg, clientId,
     });
-    setShowForm(false); setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye"); setVenteMode("especes");
+    setShowForm(false); setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye"); setVenteMode("especes"); setCommercialId(monCommercial);
     setOilDismissed(false); setUseAvoir(false);
     if (savedOnline) load();
   }
@@ -885,6 +896,14 @@ export default function VentesPage() {
                   <input type="number" className="input" value={montantPaye} onChange={e => setMontantPaye(+e.target.value)} />
                 </div>
               )}
+              {!editingSale && commerciaux.length > 0 && (
+                <label className="col-span-2 text-xs text-slate-500">Commercial du bon
+                  <select className="input mt-1" value={commercialId} onChange={e => setCommercialId(e.target.value)}>
+                    <option value="">— moi (pas de commercial)</option>
+                    {commerciaux.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
+                  </select>
+                </label>
+              )}
               {!editingSale && (piecesVoiture > 0 || depuisVoiture) && (
                 <label className="col-span-2 flex items-center gap-2 text-sm text-slate-300 rounded-lg bg-slate-800/50 px-3 py-2">
                   <input type="checkbox" checked={depuisVoiture} onChange={e => { setDepuisVoiture(e.target.checked); choisirVenteVoiture(e.target.checked); }} />
@@ -929,7 +948,7 @@ export default function VentesPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
-              {[t("date"), t("clients"), t("city"), t("total"), t("status"), t("profit")].map(h => (
+              {[t("date"), t("clients"), t("city"), t("total"), t("status"), ...(patron ? [t("profit")] : [])].map(h => (
                 <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase">{h}</th>
               ))}
             </tr>
@@ -951,7 +970,7 @@ export default function VentesPage() {
                   {facturees.has(s.id) && <span className="block text-[11px] font-medium text-sky-400">🧾 {facturees.get(s.id)}</span>}
                 </td>
                 <td className="px-4 py-3"><span className={badgeClass(s.statut)}>{t(s.statut === "paye" ? "paid" : s.statut === "partiel" ? "partial" : "pending")}</span></td>
-                <td className="px-4 py-3">
+                {patron && <td className="px-4 py-3">
                   {!hasItems ? (
                     <span className="text-xs text-slate-500" title="Ancien impayé / bon sans détail">—</span>
                   ) : revealMargin.has(s.id) ? (
@@ -964,7 +983,7 @@ export default function VentesPage() {
                       <Eye size={12} /> Afficher
                     </button>
                   )}
-                </td>
+                </td>}
               <td className="px-4 py-3">
                 <div className="flex items-center gap-3">
                   {/* Remboursement dinoun du bon : indépendant du paiement du client */}

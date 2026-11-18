@@ -1,6 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 import { Fragment, useEffect, useState } from "react";
+import { useRole } from "@/lib/role";
 import BarcodeScanner from "@/components/BarcodeScanner";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
@@ -42,6 +43,7 @@ function refCompare(a: string, b: string) {
 
 export default function ProduitsPage() {
   const { t } = useLang();
+  const patron = useRole() === "admin"; // vendeur : ni prix d'achat ni modification (BIBLE §8.41 n° 8)
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -268,7 +270,8 @@ export default function ProduitsPage() {
   const [brandFilter, setBrandFilter] = useState("");
   const [refSearch, setRefSearch] = useState("");
   const [catFilter, setCatFilter] = useState("");
-  const [showCost, setShowCost] = useState(false);
+  const [showCostBrut, setShowCost] = useState(false);
+  const showCost = showCostBrut && patron; // jamais de prix d'achat pour un vendeur
   const [kindFilter, setKindFilter] = useState<"" | "voiture" | "camion">("voiture"); // défaut : voitures (mode de l'appli)
   // Affichage par tranches de 100 : 7 500 fiches (catalogues Gates / Metelli / Graf) affichées d'un coup avec leur photo
   // bloquaient le navigateur. La recherche et les filtres portent toujours sur TOUTES les fiches.
@@ -308,7 +311,7 @@ export default function ProduitsPage() {
           <button onClick={promoWhatsApp} className="btn-secondary flex items-center gap-2" title="Diffuser les promos sur WhatsApp">
             <Megaphone size={15} /> <span className="hidden sm:inline">Promo WhatsApp</span>
           </button>
-          <button onClick={openNew} className="btn-primary flex items-center gap-2">
+          <button onClick={openNew} className={`btn-primary flex items-center gap-2 ${patron ? "" : "hidden"}`}>
             <Plus size={16} /> <span className="hidden sm:inline">{t("addProduct")}</span>
           </button>
         </div>
@@ -348,7 +351,7 @@ export default function ProduitsPage() {
           <CategoryOptions t={t} avecFamilles />
         </select>
         <button onClick={() => setShowCost(v => !v)} title={t("buyPrice")}
-          className="btn-secondary flex items-center gap-2 shrink-0">
+          className={`btn-secondary flex items-center gap-2 shrink-0 ${patron ? "" : "hidden"}`}>
           {showCost ? <EyeOff size={15} /> : <Eye size={15} />}
           <span className="hidden sm:inline">{showCost ? t("buyPrice") : t("buyPrice") + " 🔒"}</span>
         </button>
@@ -583,9 +586,9 @@ export default function ProduitsPage() {
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
                     <button onClick={() => ficheWhatsApp(p)} className="text-green-500 hover:text-green-400" title="Fiche produit WhatsApp"><MessageCircle size={15} /></button>
-                    <button onClick={() => startEdit(p)} className="text-blue-500 hover:text-blue-700"><Pencil size={15} /></button>
+                    {patron && <button onClick={() => startEdit(p)} className="text-blue-500 hover:text-blue-700"><Pencil size={15} /></button>}
                     <a href={`/inventaire?article=${p.id}`} className="text-slate-400 hover:text-amber-300" title="Historique du stock (entrées, ventes, corrections)"><History size={15} /></a>
-                    <button onClick={() => remove(p.id)} className="text-red-400 hover:text-red-600"><Trash2 size={15} /></button>
+                    {patron && <button onClick={() => remove(p.id)} className="text-red-400 hover:text-red-600"><Trash2 size={15} /></button>}
                   </div>
                 </td>
               </tr>
@@ -614,8 +617,8 @@ export default function ProduitsPage() {
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex gap-2">
-                      <button onClick={() => startEdit(p)} title="Modifier la variante (dans la fiche)" className="text-blue-500 hover:text-blue-700"><Pencil size={15} /></button>
-                      <button onClick={() => removeVariant(e.id, `${e.reference} ${e.marque}`)} title="Supprimer la variante" className="text-red-400 hover:text-red-600"><Trash2 size={15} /></button>
+                      {patron && <button onClick={() => startEdit(p)} title="Modifier la variante (dans la fiche)" className="text-blue-500 hover:text-blue-700"><Pencil size={15} /></button>}
+                      <button onClick={() => removeVariant(e.id, `${e.reference} ${e.marque}`)} title="Supprimer la variante" className={`text-red-400 hover:text-red-600 ${patron ? "" : "hidden"}`}><Trash2 size={15} /></button>
                     </div>
                   </td>
                 </tr>

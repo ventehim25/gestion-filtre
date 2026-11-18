@@ -78,6 +78,12 @@ export type Database = {
       // supabase/gestion_magasin.sql (BIBLE §8.41) : numéro de facture / avoir suivant, rôle de la personne connectée
       prochain_numero: { Args: { p_type: string }; Returns: string };
       mon_role: { Args: Record<string, never>; Returns: string };
+      // supabase/equipe.sql (BIBLE §8.41 n° 8) — patron seulement
+      est_patron: { Args: Record<string, never>; Returns: boolean };
+      liste_equipe: { Args: Record<string, never>; Returns: { email: string; nom: string | null; role: string; commercial_id: string | null; ajoute_le: string }[] };
+      enregistrer_membre: { Args: { p_email: string; p_nom: string; p_role: string; p_commercial: string | null }; Returns: undefined };
+      retirer_membre: { Args: { p_email: string }; Returns: undefined };
+      mon_commercial: { Args: Record<string, never>; Returns: string | null };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;

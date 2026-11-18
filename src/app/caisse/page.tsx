@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import { noterBanque, enleverBanque } from "@/lib/banque";
 import { CATEGORIES_DEPENSE, calculerCaisse, chargerJour, depensesEntre, libelleDepense, type JourCaisse } from "@/lib/caisse";
 import { ChevronLeft, ChevronRight, Plus, X, Wallet, Trash2, Lock } from "lucide-react";
 
@@ -41,13 +42,15 @@ export default function CaissePage() {
   async function ajouterDepense() {
     const montant = Number(dep.montant.replace(",", "."));
     if (!(montant > 0)) { setMsg("Écris le montant de la dépense."); return; }
-    const { error } = await supabase.from("depenses").insert({ date, montant, categorie: dep.categorie, mode: dep.mode, note: dep.note.trim() || null });
+    const { data: ins, error } = await supabase.from("depenses").insert({ date, montant, categorie: dep.categorie, mode: dep.mode, note: dep.note.trim() || null }).select("id").single();
+    // Payée par la banque ou par chèque : sort du compte en banque (BIBLE §8.41 n° 8)
+    if (!error && ins && dep.mode !== "especes") await noterBanque({ date, montant: -montant, type: dep.mode === "cheque" ? "cheque" : "autre", note: `Dépense : ${libelleDepense(dep.categorie).libelle}${dep.note.trim() ? " · " + dep.note.trim() : ""}`, lien: `depense:${(ins as { id: string }).id}` });
     if (error) { setMsg(error.code === "PGRST205" ? "Colle d'abord supabase/gestion_magasin.sql dans Supabase." : error.message); return; }
     setAjout(false); setDep({ montant: "", categorie: dep.categorie, mode: "especes", note: "" }); setMsg("Dépense ajoutée."); charger();
   }
   async function supprimerDepense(id: string) {
     if (!confirm("Supprimer cette dépense ?")) return;
-    await supabase.from("depenses").delete().eq("id", id); charger();
+    await supabase.from("depenses").delete().eq("id", id); await enleverBanque(`depense:${id}`); charger();
   }
   async function cloturer() {
     if (!c) return;
@@ -88,6 +91,7 @@ export default function CaissePage() {
               <div><div className="text-xs text-slate-500">− Dépenses (espèces)</div><div className="font-semibold text-red-400 mt-2">{money(c.depensesEspeces)}</div></div>
               <div><div className="text-xs text-slate-500">− Donné aux fournisseurs</div><div className="font-semibold text-red-400 mt-2">{money(c.avancesEspeces)}</div></div>
             </div>
+            {c.versBanque !== 0 && <p className="text-xs text-slate-400 mt-3">{c.versBanque > 0 ? `− ${money(c.versBanque)} déposés à la banque` : `+ ${money(-c.versBanque)} retirés de la banque`} (page Banque).</p>}
             {c.autresEntrees > 0 && <p className="text-xs text-slate-400 mt-3">+ {money(c.autresEntrees)} reçus en chèque / virement (pas dans la caisse : voir l&apos;échéancier).</p>}
             {/* Clôture */}
             <div className="mt-4 pt-4 border-t border-slate-700/60 flex flex-wrap items-end gap-2">

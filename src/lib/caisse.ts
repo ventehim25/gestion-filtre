@@ -4,7 +4,8 @@
 // fournisseurs en espèces. Si les tables n'existent pas encore (SQL pas collé), rien ne bloque : les ventes continuent.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import type { Avance, CaisseJournee, Depense, ModePaiement, PaiementClient } from "@/types/database";
+import type { Avance, BanqueMouvement, CaisseJournee, Depense, ModePaiement, PaiementClient } from "@/types/database";
+import { noterBanque } from "./banque";
 
 export const CATEGORIES_DEPENSE = [
   { cle: "essence", libelle: "Essence", icone: "⛽" },
@@ -41,6 +42,12 @@ export async function noterPaiement(db: SupabaseClient<any>, p: Paiement): Promi
   };
   const { error } = await db.from("paiements_clients").upsert(ligne, { onConflict: "sale_id,cle", ignoreDuplicates: true });
   if (error && error.code !== "PGRST205" && error.code !== "42P01") console.warn("paiement non noté :", error.message);
+  // Virement d'un client : arrive sur le compte en banque (BIBLE §8.41 n° 8)
+  if (!error && mode === "virement" && ligne.montant > 0 && p.sale_id) {
+    const { data } = await db.from("paiements_clients").select("id").eq("sale_id", p.sale_id).eq("cle", ligne.cle).maybeSingle();
+    const id = (data as { id: string } | null)?.id;
+    if (id) await noterBanque({ date: p.date, montant: ligne.montant, type: "virement_recu", note: "Virement client", lien: `paiement:${id}` }, db);
+  }
 }
 
 export type JourCaisse = {
@@ -48,18 +55,20 @@ export type JourCaisse = {
   paiements: (PaiementClient & { client_nom?: string })[];
   depenses: Depense[];
   avances: Avance[];
+  banque: BanqueMouvement[];   // dépôts / retraits d'espèces du jour (la caisse bouge)
   journee: CaisseJournee | null;
   fondPropose: number;   // fond de départ proposé = argent compté à la dernière clôture
   tablesAbsentes: boolean;
 };
 
 export async function chargerJour(date: string): Promise<JourCaisse> {
-  const [p, d, a, j, avant] = await Promise.all([
+  const [p, d, a, j, avant, b] = await Promise.all([
     supabase.from("paiements_clients").select("*, clients(nom)").eq("date", date).order("created_at"),
     supabase.from("depenses").select("*").eq("date", date).order("created_at"),
     supabase.from("avances").select("*").eq("date", date),
     supabase.from("caisse_journees").select("*").eq("date", date).maybeSingle(),
     supabase.from("caisse_journees").select("date, compte_fin").lt("date", date).not("compte_fin", "is", null).order("date", { ascending: false }).limit(1),
+    supabase.from("banque_mouvements").select("*").eq("date", date).in("type", ["depot", "retrait"]).order("created_at"),
   ]);
   const absent = (e: { code?: string } | null) => !!e && (e.code === "PGRST205" || e.code === "42P01");
   return {
@@ -67,6 +76,7 @@ export async function chargerJour(date: string): Promise<JourCaisse> {
     paiements: ((p.data ?? []) as unknown as (PaiementClient & { clients?: { nom: string } | null })[]).map((x) => ({ ...x, client_nom: x.clients?.nom })),
     depenses: (d.data ?? []) as Depense[],
     avances: (a.data ?? []) as Avance[],
+    banque: (b.data ?? []) as BanqueMouvement[],
     journee: (j.data as CaisseJournee | null) ?? null,
     fondPropose: Number((avant.data?.[0] as { compte_fin: number } | undefined)?.compte_fin ?? 0),
     tablesAbsentes: absent(p.error) || absent(d.error),
@@ -81,8 +91,10 @@ export function calculerCaisse(j: JourCaisse) {
   const depensesEspeces = j.depenses.filter((d) => d.mode === "especes").reduce((s, d) => s + Number(d.montant), 0);
   // argent donné aux fournisseurs en espèces (mode vide = avant le 16/11 : compté en espèces)
   const avancesEspeces = j.avances.filter((a) => !a.mode || a.mode === "especes").reduce((s, a) => s + Number(a.montant), 0);
-  const theorique = fond + entrees - depensesEspeces - avancesEspeces;
-  return { fond, entrees, autresEntrees, depensesEspeces, avancesEspeces, theorique, ecart: j.journee?.compte_fin != null ? Number(j.journee.compte_fin) - theorique : null };
+  // Dépôt à la banque (+ sur le compte) = espèces sorties du tiroir ; retrait (− sur le compte) = espèces entrées
+  const versBanque = (j.banque ?? []).reduce((s, m) => s + Number(m.montant), 0);
+  const theorique = fond + entrees - depensesEspeces - avancesEspeces - versBanque;
+  return { fond, entrees, autresEntrees, depensesEspeces, avancesEspeces, versBanque, theorique, ecart: j.journee?.compte_fin != null ? Number(j.journee.compte_fin) - theorique : null };
 }
 
 /** Dépenses d'une période (bénéfice net dans Statistiques, résumé du mois). */

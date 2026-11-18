@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 import type { Avance, PaiementClient } from "@/types/database";
+import { noterBanque } from "./banque";
 
 export type ChequeClient = PaiementClient & { client_nom: string; client_tel: string | null };
 export type ChequeFournisseur = Avance & { fournisseur_nom: string };
@@ -80,8 +81,9 @@ export async function creditsClients(db: Db = supabase): Promise<CreditClient[]>
 }
 
 /** Chèque client encaissé à la banque. */
-export async function encaisserCheque(id: string): Promise<string | null> {
-  const { error } = await supabase.from("paiements_clients").update({ encaisse: true }).eq("id", id);
+export async function encaisserCheque(p: ChequeClient): Promise<string | null> {
+  const { error } = await supabase.from("paiements_clients").update({ encaisse: true }).eq("id", p.id);
+  if (!error) await noterBanque({ montant: Number(p.montant), type: "cheque", note: `Chèque n° ${p.numero_cheque ?? "?"} — ${p.client_nom}`, lien: `paiement:${p.id}` });
   return error?.message ?? null;
 }
 

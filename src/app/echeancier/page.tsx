@@ -8,6 +8,7 @@ import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { marquerChequeEncaisse } from "@/lib/dinoun";
+import { noterBanque } from "@/lib/banque";
 import {
   aujourdhui, chequesClients, chequesFournisseurs, creditsClients, encaisserCheque, etatEcheance, joursEntre, rejeterCheque,
   type ChequeClient, type ChequeFournisseur, type CreditClient,
@@ -36,7 +37,7 @@ export default function EcheancierPage() {
   useEffect(() => { charger(); }, []);
 
   async function encaisse(p: ChequeClient) {
-    const e = await encaisserCheque(p.id);
+    const e = await encaisserCheque(p);
     if (e) { setMsg("Erreur : " + e); return; }
     setMsg(`Chèque de ${p.client_nom} (${money(Number(p.montant))}) noté encaissé ✓`);
     setCc((prev) => prev?.filter((x) => x.id !== p.id) ?? null);
@@ -51,6 +52,7 @@ export default function EcheancierPage() {
   async function debite(a: ChequeFournisseur) {
     const e = await marquerChequeEncaisse(a.id, true);
     if (e) { setMsg("Erreur : " + e); return; }
+    await noterBanque({ montant: -Number(a.montant), type: "cheque", note: `Chèque n° ${a.numero_cheque ?? "?"} — ${a.fournisseur_nom}`, lien: `avance:${a.id}` });
     setMsg(`Chèque n° ${a.numero_cheque ?? ""} à ${a.fournisseur_nom} noté débité ✓`);
     setCf((prev) => prev?.filter((x) => x.id !== a.id) ?? null);
   }
