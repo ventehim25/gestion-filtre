@@ -6,6 +6,7 @@ import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { buildBilanHebdo } from "@/lib/bilan";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import Rentabilite from "@/components/Rentabilite";
 
 type MonthlyStat = { mois: string; total: number; count: number };
 type CityStat = { ville: string; total: number };
@@ -309,6 +310,9 @@ export default function StatsPage() {
           </div>
         )}
       </div>
+
+      {/* Rentabilité par article / client / marque / famille (BIBLE §8.41, nouveauté n° 4) */}
+      <Rentabilite />
 
       {/* Capital vs Crédit */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
