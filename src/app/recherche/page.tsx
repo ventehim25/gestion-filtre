@@ -1,6 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { equivalentsFiltron, type EquivTrouve } from "@/lib/equivalenceFiltron";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
@@ -157,6 +158,15 @@ export default function RecherchePage() {
   const [refResults, setRefResults] = useState<RefResult[]>([]);
   const [refLoading, setRefLoading] = useState(false);
   const [searched, setSearched] = useState(false);
+  // Catalogue officiel Filtron (toutes marques, BIBLE §8.42) : équivalents de la réf. tapée, même absents de la base
+  const [filtronEq, setFiltronEq] = useState<EquivTrouve[]>([]);
+  const seqRef = useRef(0);
+  const minuterieRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Une recherche 250 ms après la dernière touche (avant : une par touche, et une réponse lente pouvait écraser la bonne)
+  function lancerRecherche(v: string) {
+    if (minuterieRef.current) clearTimeout(minuterieRef.current);
+    minuterieRef.current = setTimeout(() => searchRef(v), 250);
+  }
 
   // ---------- Registre « j'ai pas » (Bible §4.12) : noter la demande perdue en 1 tap ----------
   const [missedNoted, setMissedNoted] = useState<string | null>(null);
@@ -288,9 +298,12 @@ export default function RecherchePage() {
 
   async function searchRef(raw: string) {
     const q = raw.trim();
-    if (q.length < 2) { setRefResults([]); setSearched(false); return; }
+    const seq = ++seqRef.current;
+    if (q.length < 2) { setRefResults([]); setSearched(false); setFiltronEq([]); setRefLoading(false); return; }
     setRefLoading(true);
     setSearched(true);
+    const normQ = q.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const filtronP = normQ.length >= 4 ? equivalentsFiltron(q, 30).catch(() => [] as EquivTrouve[]) : Promise.resolve([] as EquivTrouve[]);
     // On enlève les espaces et on cherche le numéro N'IMPORTE OÙ dans la référence,
     // en tolérant les espaces dans la réf stockée (wl 7510 ↔ wl7510).
     // -> permet aussi de taper juste "540" pour trouver OP540, AP540, etc.
@@ -311,7 +324,21 @@ export default function RecherchePage() {
       const { data: viaEq } = await supabase.from("products").select(sel).eq("vehicule", lireTypeVehicule()).in("id", ids).limit(60);
       all = [...all, ...((viaEq as unknown as RefResult[]) ?? [])];
     }
-    all.sort((a, b) => a.reference.localeCompare(b.reference, undefined, { numeric: true, sensitivity: "base" }));
+    // Équivalents du catalogue Filtron : fiches de l'appli pas encore trouvées (toutes, voitures et camions)
+    const eqF = await filtronP;
+    if (seq !== seqRef.current) return; // une recherche plus récente est partie
+    const manquants = [...new Set(eqF.filter(e => e.produit && !all.some(p => p.id === e.produit!.id)).map(e => e.produit!.id))].slice(0, 30);
+    if (manquants.length) {
+      const { data: viaF } = await supabase.from("products").select(sel).in("id", manquants);
+      if (seq !== seqRef.current) return;
+      all = [...all, ...((viaF as unknown as RefResult[]) ?? [])];
+    }
+    // La référence exacte d'abord (fiche, équivalence de la base ou catalogue Filtron), puis l'ordre des références
+    const n = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+    const exact = (p: RefResult) => n(p.reference) === normQ || (p.equivalences ?? []).some(e => n(e.reference) === normQ)
+      || eqF.some(e => e.produit?.id === p.id && n(e.numero) === normQ);
+    all.sort((a, b) => Number(exact(b)) - Number(exact(a)) || a.reference.localeCompare(b.reference, undefined, { numeric: true, sensitivity: "base" }));
+    setFiltronEq(eqF);
     setRefResults(all);
     setRefLoading(false);
   }
@@ -411,13 +438,38 @@ export default function RecherchePage() {
                   className="input ps-10 text-lg font-mono uppercase"
                   placeholder="Tape ou dis juste le numéro (ex : 540, 82, 1175…)"
                   value={refQuery}
-                  onChange={e => { const v = e.target.value.toUpperCase(); setRefQuery(v); searchRef(v); }}
+                  onChange={e => { const v = e.target.value.toUpperCase(); setRefQuery(v); lancerRecherche(v); }}
                 />
               </div>
               <VoiceButton className="w-12 rounded-lg" onResult={(txt) => { const v = txt.replace(/\s+/g, "").toUpperCase(); setRefQuery(v); searchRef(v); }} />
             </div>
-            <p className="text-xs text-slate-400 mt-2">Pas besoin de dire « OP » ou « AP » — juste le numéro, et choisis dans la liste.</p>
+            <p className="text-xs text-slate-400 mt-2">Toutes marques : Filtron, Mann, Bosch, Purflux, Mahle, UFI, Fram, Wix, numéro d&apos;origine… (catalogue officiel Filtron). Pas besoin des espaces.</p>
           </div>
+
+          {/* Liste « comme sur filtron.eu » : les références qui commencent par ce que tu tapes, avec leur Filtron */}
+          {!refLoading && filtronEq.length > 0 && (() => {
+            const n = (s: string) => s.toUpperCase().replace(/[^A-Z0-9]/g, "");
+            const tq = n(refQuery);
+            const liste = filtronEq.filter(e => e.marque.toUpperCase() !== "FILTRON");
+            if (!liste.length || (liste.length === 1 && n(liste[0].numero) === tq && liste[0].produit)) return null;
+            return (
+              <div className="card p-3">
+                <p className="text-[11px] uppercase text-slate-500 mb-1.5">Catalogue Filtron : {liste.length} correspondance(s)</p>
+                <div className="divide-y divide-slate-800">
+                  {liste.slice(0, 15).map((e, i) => (
+                    <button key={i} type="button" onClick={() => { setRefQuery(e.numero.toUpperCase()); searchRef(e.numero); }}
+                      className={`w-full grid grid-cols-[1fr_auto] gap-2 items-center text-left px-2 py-1.5 hover:bg-slate-800/60 rounded ${n(e.numero) === tq ? "bg-amber-500/10" : ""}`}>
+                      <span className="min-w-0 truncate"><span className="font-mono text-sm text-slate-100">{e.numero}</span> <span className="text-xs text-indigo-300">{e.marque}</span></span>
+                      <span className="text-xs shrink-0">= <span className="font-mono font-semibold text-amber-300">Filtron {e.filtron}</span>
+                        {e.produit ? <span className={`ms-1.5 ${e.produit.stock > 0 ? "text-emerald-400" : "text-slate-500"}`}>{e.produit.stock > 0 ? `stock ${e.produit.stock}` : "stock 0"}</span> : <span className="ms-1.5 text-slate-500">pas dans l&apos;appli</span>}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                {liste.length > 15 && <p className="text-[11px] text-slate-500 mt-1">Tape plus de caractères pour réduire la liste.</p>}
+              </div>
+            );
+          })()}
 
           {refLoading && <p className="text-center text-slate-400 py-6">{t("loading")}</p>}
 
@@ -467,6 +519,15 @@ export default function RecherchePage() {
                       <span className="font-mono font-semibold">{viaEquiv.reference}</span> ({viaEquiv.marque}) = <span className="font-mono font-semibold">{p.marque ?? "Filtron"} {p.reference}</span>
                     </div>
                   )}
+                  {!viaEquiv && !correspond(p.reference) && (() => {
+                    const f = filtronEq.find(e => e.produit?.id === p.id && correspond(e.numero)) ?? filtronEq.find(e => e.produit?.id === p.id);
+                    return f ? (
+                      <div className="mb-2 text-sm text-amber-300">
+                        <span className="font-mono font-semibold">{f.numero}</span> ({f.marque}) = <span className="font-mono font-semibold">Filtron {p.reference}</span>
+                        <span className="ms-2 text-[11px] text-slate-500">catalogue officiel Filtron{p.vehicule === "camion" ? " · 🚛 camion" : ""}</span>
+                      </div>
+                    ) : null;
+                  })()}
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>

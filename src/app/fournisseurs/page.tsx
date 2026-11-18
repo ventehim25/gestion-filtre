@@ -298,9 +298,10 @@ export default function FournisseursPage() {
   // Boîte d'une autre marque (Flag…) marquée d'un NUMÉRO D'ORIGINE (ex. 5801317097 = IVECO → Filtron AP085/1) : la ligne
   // prend la fiche Filtron et crée la variante de la marque de la boîte avec la réf. tapée (BIBLE §8.39) — plus de
   // « nouvelle pièce » en double. La fiche peut être un camion : on l'ajoute à la liste pour cette réception.
-  function choisirParOrigine(i: number, p: Product, refTapee: string) {
+  function choisirParOrigine(i: number, p: Product, refTapee: string, marqueBoite?: string | null) {
     setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p]);
-    const marque = marqueVarianteDefaut(p.categorie, p.marque);
+    // Marque connue (catalogue Filtron : MANN-FILTER → Mann…) sinon la marque par défaut des boîtes à n° d'origine (Flag)
+    const marque = marqueBoite && marqueBoite !== "Filtron" ? marqueBoite : marqueVarianteDefaut(p.categorie, p.marque);
     setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, reference: p.reference, prix_achat: p.prix_achat, prix_vente: p.prix_vente,
       code_barre: l.code_barre || "", marque: "__new__", nouvelleMarque: marque, nouvelleRef: refTapee.trim().toUpperCase(), nouvellePiece: null } : l));
   }
@@ -856,7 +857,7 @@ ${r.details ?? ""}
                         <ProductPicker products={produitsFamille} variants={pickerVariants} value={l.product_id}
                           placeholder={famille === "filtres_huile" ? undefined : `Réf. ${marquesBase(FAMILLES.find(f => f.k === famille)?.nouveau).slice(0, 3).join(", ")}…`}
                           onCreate={pieceNouvellePossible ? (ref) => nouvellePieceSurLigne(i, ref) : undefined}
-                          onSelect={(p, v, o) => { if (o) choisirParOrigine(i, p, o.tape); else { setRecProduct(i, p); if (v) setRecVariant(i, v.marque); } }} />
+                          onSelect={(p, v, o) => { if (o) choisirParOrigine(i, p, o.marqueApp ? o.code : o.tape, o.marqueApp); else { setRecProduct(i, p); if (v) setRecVariant(i, v.marque); } }} />
                       )}
                     </div>
                     <button onClick={() => setRecLines(prev => prev.filter((_, j) => j !== i))} className="col-span-1 text-red-400 hover:text-red-300 flex justify-center"><Trash2 size={14} /></button>

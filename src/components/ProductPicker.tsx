@@ -16,7 +16,7 @@ export type PickerVariant = { id: string; product_id: string; marque: string; re
 export default function ProductPicker({
   products, value, onSelect, variants, placeholder, onCreate,
 }: {
-  products: Product[]; value: string; onSelect: (p: Product, v?: PickerVariant, origine?: { code: string; marqueCode: string; tape: string }) => void; variants?: PickerVariant[];
+  products: Product[]; value: string; onSelect: (p: Product, v?: PickerVariant, origine?: { code: string; marqueCode: string; tape: string; marqueApp?: string | null }) => void; variants?: PickerVariant[];
   placeholder?: string; onCreate?: (reference: string) => void;
 }) {
   const [externe, setExterne] = useState<Product | null>(null); // fiche choisie par numéro d'origine (peut être hors liste)
@@ -26,7 +26,7 @@ export default function ProductPicker({
   // Numéros d'origine : demandé à la base 350 ms après la frappe (5 caractères au moins)
   useEffect(() => {
     const t = q.trim();
-    if (t.replace(/[^A-Za-z0-9]/g, "").length < 5) { setOrigines([]); return; }
+    if (t.replace(/[^A-Za-z0-9]/g, "").length < 4) { setOrigines([]); return; }
     let actif = true;
     const id = setTimeout(() => { chercherParOrigine(t).then((r) => { if (actif) setOrigines(r); }).catch(() => {}); }, 350);
     return () => { actif = false; clearTimeout(id); };
@@ -110,14 +110,14 @@ export default function ProductPicker({
               )}
             </button>
           ))}
-          {originesAffichees.length > 0 && <p className="px-2 pt-1.5 text-[10px] uppercase text-slate-500">Numéro d&apos;origine</p>}
+          {originesAffichees.length > 0 && <p className="px-2 pt-1.5 text-[10px] uppercase text-slate-500">Équivalences (autre marque ou numéro d&apos;origine)</p>}
           {originesAffichees.map((o) => (
             <button key={`o-${o.produit.id}`} type="button"
-              onClick={() => { setExterne(o.produit); onSelect(o.produit, undefined, { code: o.code, marqueCode: o.marqueCode, tape: q.trim() }); setQ(""); setOpen(false); }}
+              onClick={() => { setExterne(o.produit); onSelect(o.produit, undefined, { code: o.code, marqueCode: o.marqueCode, tape: q.trim(), marqueApp: o.marqueApp ?? null }); setQ(""); setOpen(false); }}
               className="w-full text-left px-2 py-1.5 rounded-md flex items-center gap-2 hover:bg-slate-800/60">
               <span className="font-mono text-xs text-slate-100 shrink-0">{o.code}</span>
               <span className="text-xs text-indigo-300 shrink-0">{o.marqueCode}</span>
-              <span className="text-[11px] text-amber-300 truncate">= {o.produit.marque || "Filtron"} {o.produit.reference}{o.produit.vehicule === "camion" ? " · 🚛" : ""}</span>
+              <span className="text-[11px] text-amber-300 truncate">= {o.produit.marque || "Filtron"} {o.produit.reference}{o.produit.vehicule === "camion" ? " · 🚛" : ""}{o.source === "filtron" ? " · catalogue Filtron" : ""}</span>
             </button>
           ))}
           {onCreate && originesAffichees.length > 0 && matches.length === 0 && (
