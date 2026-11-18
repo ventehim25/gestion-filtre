@@ -2,6 +2,7 @@
 // synchronisée vers Supabase dès que le réseau revient.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { noterPaiement } from "./caisse";
+import { ajusterVoiture } from "./voiture";
 import type { SaleStatus } from "@/types/database";
 
 export type PendingLine = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string | null; equivalence_id?: string | null; cout_unitaire?: number | null };
@@ -16,6 +17,8 @@ export type PendingSale = {
   statut: SaleStatus;
   montant_paye: number;
   mode_paiement?: "especes" | "cheque" | "virement"; // caisse du jour (BIBLE §8.41)
+  depuis_voiture?: boolean; // pièces sorties de la voiture (tournée) : enlevées aussi du stock voiture (BIBLE §8.41)
+  voitureFaite?: boolean;
   notes: string | null;
   createdAt: number;
   // Avancement de l'envoi (reprise sans doublon si le réseau coupe au milieu)
@@ -135,6 +138,12 @@ async function envoyerUne(supabase: SupabaseClient<any>, localId: string): Promi
         if (r.error && (!r.status || r.status >= 500)) throw r.error;
         faits.add(i);
         avancer(s.localId, { stockFait: [...faits] });
+      }
+
+      // 3 bis) Vendu depuis la voiture : la voiture se vide d'autant (une seule fois ; ne bloque jamais la vente)
+      if (s.depuis_voiture && !s.voitureFaite) {
+        try { for (const l of s.lines) await ajusterVoiture(supabase, { product_id: l.product_id, equivalence_id: l.equivalence_id ?? null }, -l.quantite); } catch { /* stock voiture : indicatif */ }
+        avancer(s.localId, { voitureFaite: true });
       }
 
       // 4) L'argent reçu à la vente (caisse du jour, BIBLE §8.41) — ne bloque jamais la vente

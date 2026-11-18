@@ -14,6 +14,7 @@ import { retoursParVente } from "@/lib/retours";
 import RetourClientModal from "@/components/RetourClientModal";
 import { chargerSociete, factureDeVente } from "@/lib/factures";
 import { ecrireFacture, ouvrirFenetre } from "@/lib/imprimerFacture";
+import { DEPOT, choisirVenteVoiture, lireVenteVoiture } from "@/lib/voiture";
 import FiltronDe from "@/components/FiltronDe";
 import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import { chargerMarques } from "@/lib/brands";
@@ -57,6 +58,14 @@ export default function VentesPage() {
   const [statut, setStatut] = useState<SaleStatus>("paye");
   const [montantPaye, setMontantPaye] = useState(0);
   const [venteMode, setVenteMode] = useState<"especes" | "cheque" | "virement">("especes"); // argent reçu à la vente (caisse, BIBLE §8.41)
+  // Tournée : pièces sorties de la voiture (stock voiture, BIBLE §8.41 n° 7) — choix gardé sur le téléphone
+  const [depuisVoiture, setDepuisVoiture] = useState(false);
+  const [piecesVoiture, setPiecesVoiture] = useState(0);
+  useEffect(() => {
+    setDepuisVoiture(lireVenteVoiture());
+    supabase.from("stock_depots").select("quantite").eq("depot", DEPOT).gt("quantite", 0).order("id").range(0, 4999)
+      .then(({ data }) => setPiecesVoiture(((data ?? []) as { quantite: number }[]).reduce((a, r) => a + r.quantite, 0)), () => {});
+  }, []);
   const [notes, setNotes] = useState("");
   // Scan code-barres
   const [camOpen, setCamOpen] = useState(false);
@@ -593,6 +602,7 @@ export default function VentesPage() {
       client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
       lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
       total: saleTotal, statut, montant_paye: montant, notes: saleNotes || null, createdAt: Date.now(), mode_paiement: venteMode,
+      depuis_voiture: depuisVoiture && piecesVoiture > 0,
     });
 
     let savedOnline = false;
@@ -874,6 +884,12 @@ export default function VentesPage() {
                   <label className="text-xs text-slate-500 mb-1 block">Montant payé (MAD)</label>
                   <input type="number" className="input" value={montantPaye} onChange={e => setMontantPaye(+e.target.value)} />
                 </div>
+              )}
+              {!editingSale && (piecesVoiture > 0 || depuisVoiture) && (
+                <label className="col-span-2 flex items-center gap-2 text-sm text-slate-300 rounded-lg bg-slate-800/50 px-3 py-2">
+                  <input type="checkbox" checked={depuisVoiture} onChange={e => { setDepuisVoiture(e.target.checked); choisirVenteVoiture(e.target.checked); }} />
+                  🚗 Sorti de la voiture <span className="text-[11px] text-slate-500">({piecesVoiture} pièce(s) chargée(s) — la voiture se vide d&apos;autant)</span>
+                </label>
               )}
               {(statut === "paye" || montantPaye > 0) && (
                 <div className="col-span-2">
