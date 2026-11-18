@@ -18,8 +18,9 @@ import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule
 import BarcodeScanner from "@/components/BarcodeScanner";
 import {
   Plus, Truck, Phone, MessageCircle, Pencil, Trash2, X, PackagePlus, HandCoins,
-  ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank, ScanLine, ExternalLink, CloudOff, RefreshCw,
+  ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank, ScanLine, ExternalLink, CloudOff, RefreshCw, Undo2,
 } from "lucide-react";
+import RetourFournisseurModal from "@/components/RetourFournisseurModal";
 
 type RecLine = {
   product_id: string; equivalence_id: string | null; marque: string; quantite: number; prix_achat: number; prix_vente: number; reference: string;
@@ -91,6 +92,8 @@ export default function FournisseursPage() {
 
   // Formulaire réception (marchandise prise)
   const [recFor, setRecFor] = useState<Fournisseur | null>(null);
+  const [retourFor, setRetourFor] = useState<Fournisseur | null>(null); // rendre des pièces (BIBLE §8.41)
+  const [retourMsg, setRetourMsg] = useState("");
   const [recDate, setRecDate] = useState(todayStr());
   const [recLines, setRecLines] = useState<RecLine[]>([]);
 
@@ -482,7 +485,13 @@ export default function FournisseursPage() {
       ? `Annuler la réception du ${r.date} ?\n${r.details ?? ""}\n\n→ le stock de ces articles est retiré et ${quoi}.`
       : `Annuler la réception du ${r.date} ?\n${r.details ?? ""}\n\n⚠ Réception sans détail enregistré : ${quoi}, mais le STOCK ne sera pas retiré (corrige-le dans Stock).`)
       + (negatifs.length ? `\n\n⚠ Déjà vendu en partie — le stock passera en NÉGATIF :\n• ${negatifs.join("\n• ")}\n(À corriger ensuite dans Stock, ou annule plutôt les ventes concernées.)` : "");
-    if (!confirm(msg)) return;
+    const estRetour = r.type === "retour";
+    if (!confirm(estRetour
+      ? `Annuler le retour du ${r.date} ?
+${r.details ?? ""}
+
+→ les pièces reviennent dans le stock et ${(-r.montant).toFixed(0)} MAD ${quoi.includes("capital") ? "repartent du capital" : "remontent sur la dette"}.`
+      : msg)) return;
     for (const l of lignes) {
       if (l.equivalence_id) await supabase.rpc("decrement_equiv_stock", { e_id: l.equivalence_id, qty: l.quantite });
       else await supabase.rpc("decrement_stock", { p_id: l.product_id, qty: l.quantite });
@@ -659,6 +668,7 @@ export default function FournisseursPage() {
 
                 <div className="flex flex-wrap gap-2 mt-3">
                   <button onClick={() => openReception(f)} className="flex items-center gap-1.5 text-xs bg-orange-500/15 text-orange-300 px-3 py-1.5 rounded-lg hover:bg-orange-500/25"><PackagePlus size={14} /> Marchandise prise</button>
+                  <button onClick={() => setRetourFor(f)} className="flex items-center gap-1.5 text-xs bg-amber-500/15 text-amber-300 px-3 py-1.5 rounded-lg hover:bg-amber-500/25"><Undo2 size={14} /> Rendre des pièces</button>
                   {!cap && <button onClick={() => openAvance(f)} className="flex items-center gap-1.5 text-xs bg-emerald-500/15 text-emerald-300 px-3 py-1.5 rounded-lg hover:bg-emerald-500/25"><HandCoins size={14} /> Avance / paiement</button>}
                   <button onClick={() => setExpanded(open ? null : f.id)} className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200 ms-auto">
                     Historique {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
@@ -707,8 +717,8 @@ export default function FournisseursPage() {
                           )}
                         </span>
                         <span className="flex items-center gap-2 shrink-0">
-                          <span className={h.type === "rec" ? "text-orange-300 font-medium" : "text-emerald-300 font-medium"}>
-                            {h.type === "rec" ? "+" : "−"}{money(h.montant)}
+                          <span className={h.rec?.type === "retour" ? "text-amber-300 font-medium" : h.type === "rec" ? "text-orange-300 font-medium" : "text-emerald-300 font-medium"}>
+                            {h.rec?.type === "retour" ? "↩ −" + money(-h.montant) : (h.type === "rec" ? "+" : "−") + money(h.montant)}
                           </span>
                           <button onClick={() => h.rec ? annulerReception(h.rec) : h.av && annulerAvance(h.av)}
                             className="text-slate-500 hover:text-red-400" title={h.type === "rec" ? "Annuler cette réception" : "Annuler ce paiement"}><X size={13} /></button>
@@ -775,6 +785,12 @@ export default function FournisseursPage() {
       )}
 
       {/* Modal réception */}
+      {retourFor && (
+        <RetourFournisseurModal fournisseur={retourFor} receptions={receptions} onClose={() => setRetourFor(null)}
+          onDone={(m) => { setRetourFor(null); setRetourMsg(m); setTimeout(() => setRetourMsg(""), 6000); load(); }} />
+      )}
+      {retourMsg && <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[70] rounded-xl bg-emerald-600 text-white text-sm px-4 py-2 shadow-lg max-w-[90vw]">{retourMsg}</div>}
+
       {recFor && (
         <div className="fixed inset-0 overflow-y-auto bg-black/60 flex items-start justify-center z-50 p-4">
           <div className="card p-6 w-full max-w-lg my-auto">

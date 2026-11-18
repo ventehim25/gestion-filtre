@@ -91,8 +91,21 @@ export default function StatsPage() {
         deps.push(...(data as { date: string; montant: number }[]));
         if (data.length < 1000) break;
       }
+      // Retours clients (pièces rendues) : enlevés des ventes et du coût le jour du retour (BIBLE §8.41)
+      const rets: { date: string; montant: number; cout: number }[] = [];
+      for (let i = 0; i < 50; i++) {
+        const { data, error } = await supabase.from("retours_clients").select("id, date, montant, cout").order("id").range(i * 1000, i * 1000 + 999);
+        if (error || !data || data.length === 0) break;
+        rets.push(...(data as { date: string; montant: number; cout: number }[]));
+        if (data.length < 1000) break;
+      }
       const agg = (keyFn: (d: string) => string): Record<string, PnlRow> => {
         const m: Record<string, PnlRow> = {};
+        for (const r of rets) {
+          const k = keyFn(r.date);
+          if (!m[k]) m[k] = { key: k, ca: 0, cost: 0, benef: 0, dep: 0 };
+          m[k].ca -= Number(r.montant); m[k].cost -= Number(r.cout); m[k].benef -= Number(r.montant) - Number(r.cout);
+        }
         for (const d of deps) {
           const k = keyFn(d.date);
           if (!m[k]) m[k] = { key: k, ca: 0, cost: 0, benef: 0, dep: 0 };
@@ -275,7 +288,7 @@ export default function StatsPage() {
                     <td className="px-3 py-2 text-slate-300">{pnlLabel(r.key)}</td>
                     <td className="px-3 py-2 text-right font-medium text-sky-400">{r.ca.toFixed(0)}</td>
                     <td className="px-3 py-2 text-right text-orange-400">{r.cost.toFixed(0)}</td>
-                    <td className="px-3 py-2 text-right font-semibold text-emerald-400">+{r.benef.toFixed(0)}</td>
+                    <td className="px-3 py-2 text-right font-semibold text-emerald-400">{r.benef >= 0 ? "+" : ""}{r.benef.toFixed(0)}</td>
                     <td className="px-3 py-2 text-right text-rose-400">{r.dep ? "−" + r.dep.toFixed(0) : "—"}</td>
                     <td className={`px-3 py-2 text-right font-bold ${r.benef - r.dep >= 0 ? "text-amber-300" : "text-rose-400"}`}>{(r.benef - r.dep).toFixed(0)}</td>
                   </tr>
@@ -292,7 +305,7 @@ export default function StatsPage() {
                 </tr>
               </tfoot>
             </table>
-            <p className="text-[11px] text-slate-500 mt-2">Montants en MAD. Coût = prix d&apos;achat des articles vendus · Bénéfice = ventes − coût · Dépenses = page Caisse (essence, loyer…) · Net = bénéfice − dépenses.</p>
+            <p className="text-[11px] text-slate-500 mt-2">Montants en MAD. Coût = prix d&apos;achat des articles vendus · Bénéfice = ventes − coût · Dépenses = page Caisse (essence, loyer…) · Net = bénéfice − dépenses · Pièces rendues par les clients enlevées le jour du retour.</p>
           </div>
         )}
       </div>

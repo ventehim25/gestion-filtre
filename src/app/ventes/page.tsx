@@ -6,10 +6,12 @@ import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/types/database";
-import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
+import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck, Undo2 } from "lucide-react";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import ChoixVehicule from "@/components/ChoixVehicule";
 import { MODES_PAIEMENT, noterPaiement } from "@/lib/caisse";
+import { retoursParVente } from "@/lib/retours";
+import RetourClientModal from "@/components/RetourClientModal";
 import FiltronDe from "@/components/FiltronDe";
 import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import { chargerMarques } from "@/lib/brands";
@@ -69,6 +71,9 @@ export default function VentesPage() {
   const [oldLines, setOldLines] = useState<{ product_id: string; quantite: number; equivalence_id: string | null }[]>([]);
   // Modification rapide du paiement
   const [payEdit, setPayEdit] = useState<(Sale & { client: Client }) | null>(null);
+  // Retours de pièces (BIBLE §8.41, nouveauté n° 2)
+  const [retourSale, setRetourSale] = useState<(Sale & { client: Client }) | null>(null);
+  const [retours, setRetours] = useState<Map<string, number>>(new Map());
   const [payStatut, setPayStatut] = useState<SaleStatus>("paye");
   const [payMontant, setPayMontant] = useState(0);
   // Pack vidange (Bible §4.11) : rangée « + l'huile ? » refermée par l'utilisateur
@@ -118,6 +123,7 @@ export default function VentesPage() {
       chargerProduits(lireTypeVehicule()),
     ]);
     lirePortefeuille().then(p => setEnPortefeuille(new Set(p.map(b => b.sale_id)))).catch(() => {});
+    retoursParVente().then(setRetours).catch(() => {});
     setSales(s);
     setClients(c.data ?? []);
     setFournisseurs((fr.data as Fournisseur[]) ?? []);
@@ -371,8 +377,9 @@ export default function VentesPage() {
     // receptions.lignes = [{ product_id, equivalence_id, … }] (dans l'ordre des dates : la plus récente gagne)
     supabase.from("receptions").select("fournisseur_id, lignes").order("date").order("created_at").then(({ data }) => {
       const m = new Map<string, string>();
-      for (const r of (data ?? []) as { fournisseur_id: string; lignes: { product_id: string; equivalence_id: string | null }[] | null }[]) {
+      for (const r of (data ?? []) as { fournisseur_id: string; lignes: { product_id: string; equivalence_id: string | null; quantite?: number }[] | null }[]) {
         for (const l of r.lignes ?? []) {
+          if ((l.quantite ?? 1) < 0) continue; // ligne d'un retour au fournisseur (BIBLE §8.41)
           m.set(`${l.product_id}|${l.equivalence_id ?? ""}`, r.fournisseur_id);
           m.set(`${l.product_id}|*`, r.fournisseur_id);
         }
@@ -905,7 +912,9 @@ export default function VentesPage() {
                 <td className="px-4 py-3 text-slate-600">{s.date}</td>
                 <td className="px-4 py-3 font-medium">{s.client?.nom}</td>
                 <td className="px-4 py-3 text-slate-500">{s.client?.ville}</td>
-                <td className="px-4 py-3 font-semibold">{s.total.toFixed(2)} MAD</td>
+                <td className="px-4 py-3 font-semibold">{s.total.toFixed(2)} MAD
+                  {retours.has(s.id) && <span className="block text-[11px] font-medium text-amber-400" title="Pièces rendues par le client">↩ −{(retours.get(s.id) ?? 0).toFixed(0)} rendu</span>}
+                </td>
                 <td className="px-4 py-3"><span className={badgeClass(s.statut)}>{t(s.statut === "paye" ? "paid" : s.statut === "partiel" ? "partial" : "pending")}</span></td>
                 <td className="px-4 py-3">
                   {!hasItems ? (
@@ -933,6 +942,7 @@ export default function VentesPage() {
                   )}
                   <button onClick={() => openPayEdit(s)} className="text-amber-500 hover:text-amber-400" title="Modifier le paiement"><Wallet size={16} /></button>
                   <button onClick={() => openEditSale(s)} className="text-blue-400 hover:text-blue-300" title="Modifier la vente"><Pencil size={15} /></button>
+                  {hasItems && <button onClick={() => setRetourSale(s)} className="text-amber-300 hover:text-amber-200" title="Retour de pièces (le client rend)"><Undo2 size={15} /></button>}
                   <button onClick={() => whatsForSale(s)} className="text-green-500 hover:text-green-400" title="Envoyer la fiche sur WhatsApp"><MessageCircle size={16} /></button>
                   <button onClick={() => printReceipt(s)} className="text-slate-400 hover:text-blue-600" title={t("printReceipt")}><Printer size={15} /></button>
                   <button onClick={() => deleteSale(s)} className="text-red-400 hover:text-red-300" title="Supprimer la vente"><Trash2 size={15} /></button>
@@ -945,6 +955,12 @@ export default function VentesPage() {
         </table>
         {sales.filter(s => !impayesOnly || s.statut !== "paye").length === 0 && <p className="text-center text-slate-400 py-10">{impayesOnly ? "Aucun impayé 🎉" : t("noData")}</p>}
       </div>
+
+      {/* Retour de pièces d'un bon (BIBLE §8.41) */}
+      {retourSale && (
+        <RetourClientModal sale={retourSale} onClose={() => setRetourSale(null)}
+          onDone={(m) => { setRetourSale(null); flash(m); load(); }} />
+      )}
 
       {/* Scanner caméra */}
       {camOpen && <BarcodeScanner onScan={handleScan} onClose={() => setCamOpen(false)} />}
