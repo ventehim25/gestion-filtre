@@ -335,3 +335,7 @@ Menu **Échéancier** (icône calendrier). Trois cases en haut, touche-en une :
 
 Chaque matin, ton téléphone reçoit « 🗓️ Échéancier » s'il y a un chèque à déposer ou à couvrir.
 
+## 24. Ce qui rapporte vraiment (depuis le 18/11/2026)
+
+Statistiques → bloc **💹 Rentabilité**. Choisis la période (Ce mois, 3 mois, Cette année, Tout) puis **Par article**, **Par client**, **Par marque** ou **Par famille**. Pour chaque ligne : combien tu as vendu, ton **bénéfice** et ta **marge %**. En rouge : marge de moins de 10 % (à vendre plus cher ou à acheter moins cher). « Trier par » change l'ordre (bénéfice, ventes, marge). Si un message dit « lignes sans prix d'achat », mets le prix d'achat sur la fiche (Réception ou Produits) : sinon le bénéfice est trop beau.
+

@@ -1261,6 +1261,7 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
   - **Chèques donnés à couvrir** : avances fournisseur en chèque pas encore débitées (`cheque_encaisse` vide ou faux), par date du chèque ; **✓ Débité** (même bascule que l'historique Fournisseurs).
   - **Crédits clients** : bons pas payés regroupés par client, le plus ancien en haut (rouge > 30 j, orange > 15 j), **Relancer** (WhatsApp, même message que l'accueil, note `derniere_relance`) et **💰 Encaisser** (Ventes → impayés).
   - **Notification du matin** (cron `/api/cron/relances`, point 10) : « 🗓️ Échéancier » quand un chèque client est à déposer (échéance passée ou aujourd'hui) ou qu'un chèque fournisseur passe dans les 3 jours → ouvre `/echeancier`.
+- **✅ N° 4 — Rentabilité (18/11)** (Statistiques, bloc « 💹 Rentabilité — ce qui rapporte », `src/components/Rentabilite.tsx`) : par **article** (fiche ou variante « Wa9520 (Wix) »), **client**, **marque** ou **famille** (les 9 familles) ; période ce mois / 3 mois / cette année / tout ; quantités, ventes, bénéfice, **marge %** (rouge < 10 %, orange < 20 %), barre = part du bénéfice total ; tri par bénéfice / ventes / marge ; 15 premières lignes puis « Voir les N ». Coût = `cout_unitaire` figé à la vente, sinon prix d'achat de la variante ou de la fiche ; pièces rendues (retours clients) enlevées de leur ligne ; alerte « N lignes vendues sans prix d'achat : bénéfice surestimé ». Lecture par paquets de 1000 triés par id (`sales!inner` filtré par date).
 
 ---
 

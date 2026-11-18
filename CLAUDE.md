@@ -84,7 +84,7 @@ Colonnes ajoutées (migrations dans `supabase/`) :
 - `/caisse` : caisse du jour (fond + espèces reçues − dépenses espèces − avances fournisseurs espèces), dépenses par catégorie, clôture du soir avec écart (`src/lib/caisse.ts`, tables depenses / paiements_clients / caisse_journees, BIBLE §8.41). Tout argent reçu d'un client passe par `noterPaiement()` (mode espèces/chèque/virement ; clé « vente » à la création = jamais en double).
 - **Retours** (`src/lib/retours.ts`, BIBLE §8.41) : client = bouton ↩ sur un bon (`retours_clients`, stock remis, avoir / rendu (paiement négatif) / déduit (montant_paye)) ; fournisseur = « Rendre des pièces » → `receptions` type « retour », montant et quantités négatifs (l'annulation ✕ marche telle quelle). Le bon d'origine n'est jamais modifié.
 - `/echeancier` : chèques clients à encaisser (✓ / ❌ rejeté → bon redevient à payer), chèques fournisseurs à couvrir, crédits clients par ancienneté + relance ; notification du matin (cron point 10) — `src/lib/echeancier.ts`, BIBLE §8.41.
-- `/stats` : coûts/bénéfices jour/semaine/mois + dépenses + net (retours clients enlevés le jour du retour), par fournisseur, capital vs crédit, évolution du capital. Bénéfices basés sur `cout_unitaire` (fallback `products.prix_achat`).
+- `/stats` : coûts/bénéfices jour/semaine/mois + dépenses + net (retours clients enlevés le jour du retour) + **Rentabilité** par article / client / marque / famille (`src/components/Rentabilite.tsx`), par fournisseur, capital vs crédit, évolution du capital. Bénéfices basés sur `cout_unitaire` (fallback `products.prix_achat`).
 - PWA installable (bannière), `manifest.json` orientation `any`.
 
 ## Scripts (dossier scripts/, reprenables)
