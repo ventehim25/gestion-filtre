@@ -1,6 +1,7 @@
 // File d'attente des ventes enregistrées hors-ligne (stockée dans localStorage),
 // synchronisée vers Supabase dès que le réseau revient.
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { noterPaiement } from "./caisse";
 import type { SaleStatus } from "@/types/database";
 
 export type PendingLine = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string | null; equivalence_id?: string | null; cout_unitaire?: number | null };
@@ -14,6 +15,7 @@ export type PendingSale = {
   total: number;
   statut: SaleStatus;
   montant_paye: number;
+  mode_paiement?: "especes" | "cheque" | "virement"; // caisse du jour (BIBLE §8.41)
   notes: string | null;
   createdAt: number;
   // Avancement de l'envoi (reprise sans doublon si le réseau coupe au milieu)
@@ -134,6 +136,9 @@ async function envoyerUne(supabase: SupabaseClient<any>, localId: string): Promi
         faits.add(i);
         avancer(s.localId, { stockFait: [...faits] });
       }
+
+      // 4) L'argent reçu à la vente (caisse du jour, BIBLE §8.41) — ne bloque jamais la vente
+      if (s.montant_paye > 0) await noterPaiement(supabase, { sale_id: saleId!, client_id: s.client_id, date: s.date, montant: s.montant_paye, mode: s.mode_paiement ?? "especes", cle: "vente" });
 
       removePending(s.localId);
       return true;

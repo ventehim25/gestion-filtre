@@ -33,7 +33,7 @@ export type Database = {
       compatibilites: Table<Compatibilite, "id", [Fk<"product_id", "products">, Fk<"vehicule_id", "vehicules">]>;
       prospects: Table<Prospect, "created_at" | "score" | "statut_prospection" | "premiere_vue" | "derniere_vue">;
       // Sécurité (supabase/securite.sql) : emails autorisés. Non lisible depuis l'appli (géré dans l'éditeur SQL).
-      utilisateurs_autorises: Table<{ email: string; ajoute_le: string }, "ajoute_le">;
+      utilisateurs_autorises: Table<{ email: string; ajoute_le: string; role?: "admin" | "vendeur"; nom?: string | null; commercial_id?: string | null }, "ajoute_le" | "role">;
       // Mémoire des VIN confirmés (supabase/vin_connus.sql)
       vin_connus: Table<VinConnu, "famille" | "confirme_le">;
       // Tournées prévues : prévenir les clients la veille (supabase/tournees_prevues.sql)
@@ -43,6 +43,19 @@ export type Database = {
       // Huile moteur par moteur : viscosité, norme, litres (supabase/catalogues_huile_tournees.sql)
       huiles_moteurs: Table<HuileMoteur, "modifie_le" | "viscosites" | "variante">;
       huiles_boites: Table<HuileBoiteLigne, "modifie_le" | "variante" | "boites" | "fluides">;
+      // Les 8 nouveautés (supabase/gestion_magasin.sql, BIBLE §8.41)
+      depenses: Table<Depense, "id" | "created_at" | "date" | "categorie" | "mode">;
+      paiements_clients: Table<PaiementClient, "id" | "created_at" | "date" | "mode" | "cle" | "encaisse">;
+      caisse_journees: Table<CaisseJournee, "fond_debut" | "note" | "compte_fin" | "ecart" | "cloture_le">;
+      retours_clients: Table<RetourClient, "id" | "created_at" | "date" | "lignes" | "montant" | "cout">;
+      factures: Table<Facture, "id" | "created_at" | "date" | "type" | "lignes" | "taux_tva" | "total_ht" | "tva" | "total_ttc">;
+      compteurs: Table<{ cle: string; valeur: number }, "valeur">;
+      stock_depots: Table<StockDepot, "id" | "depot" | "quantite" | "maj_le">;
+      transferts: Table<Transfert, "id" | "created_at" | "date" | "lignes">;
+      inventaires: Table<Inventaire, "id" | "created_at" | "date" | "statut" | "lignes">;
+      regularisations: Table<Regularisation, "id" | "created_at" | "date" | "motif">;
+      commerciaux: Table<Commercial, "id" | "created_at" | "commission_pct" | "actif">;
+      banque_mouvements: Table<BanqueMouvement, "id" | "created_at" | "date" | "type">;
       // Décomptes de stock déjà faits par ligne de vente (supabase/protection.sql) : jamais deux fois
       stock_decomptes: Table<{ sale_id: string; ligne: number; cree_le: string }, "cree_le">;
       // Catégories permises (products.categorie → clé étrangère) — supabase/categories_produits.sql, BIBLE §8.31
@@ -62,6 +75,9 @@ export type Database = {
       // supabase/protection.sql (clé serveur seulement) : taille de la base en octets, structure complète en SQL
       taille_base: { Args: Record<string, never>; Returns: number };
       schema_complet: { Args: Record<string, never>; Returns: string };
+      // supabase/gestion_magasin.sql (BIBLE §8.41) : numéro de facture / avoir suivant, rôle de la personne connectée
+      prochain_numero: { Args: { p_type: string }; Returns: string };
+      mon_role: { Args: Record<string, never>; Returns: string };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
@@ -136,6 +152,7 @@ export type Reception = {
   montant: number;
   details: string | null;
   lignes?: ReceptionLigne[] | null; // détail pour annuler la réception (receptions_lignes.sql)
+  type?: "reception" | "retour";    // retour au fournisseur = montant et quantités négatifs (BIBLE §8.41)
 };
 export type ReceptionLigne = { product_id: string; equivalence_id: string | null; quantite: number; ref: string };
 
@@ -231,6 +248,35 @@ export type HuileBoiteLigne = {
   source?: string | null;
   modifie_le?: string;
 };
+
+// ───────────── Les 8 nouveautés (supabase/gestion_magasin.sql, BIBLE §8.41) ─────────────
+export type ModePaiement = "especes" | "cheque" | "virement" | "avoir";
+export type Depense = { id: string; date: string; montant: number; categorie: string; mode: "especes" | "banque" | "cheque"; note: string | null; created_at: string };
+export type PaiementClient = {
+  id: string; sale_id: string | null; client_id: string | null; date: string; montant: number; mode: ModePaiement; cle: string;
+  numero_cheque: string | null; banque: string | null; date_echeance: string | null; encaisse: boolean; note: string | null; created_at: string;
+};
+export type CaisseJournee = { date: string; fond_debut: number; compte_fin: number | null; ecart: number | null; note: string | null; cloture_le: string | null };
+export type LigneRetour = { product_id: string; equivalence_id: string | null; ref: string; quantite: number; prix_unitaire: number; cout_unitaire: number };
+export type RetourClient = {
+  id: string; sale_id: string | null; client_id: string | null; date: string; lignes: LigneRetour[]; montant: number; cout: number;
+  mode: "avoir" | "rembourse" | "deduit"; note: string | null; created_at: string;
+};
+export type LigneFacture = { reference: string; designation: string; quantite: number; prix_ttc: number };
+export type Facture = {
+  id: string; numero: string; type: "facture" | "avoir"; sale_id: string | null; facture_origine: string | null; client_id: string | null; date: string;
+  client_nom: string | null; client_ice: string | null; client_adresse: string | null; lignes: LigneFacture[]; taux_tva: number;
+  total_ht: number; tva: number; total_ttc: number; note: string | null; created_at: string;
+};
+export type StockDepot = { id: string; product_id: string; equivalence_id: string | null; depot: string; quantite: number; maj_le: string };
+export type Transfert = { id: string; date: string; depot_de: string; depot_vers: string; lignes: { product_id: string; equivalence_id: string | null; ref: string; quantite: number }[]; note: string | null; created_at: string };
+export type Inventaire = { id: string; date: string; statut: "en_cours" | "valide"; lignes: { product_id: string; equivalence_id: string | null; compte: number }[]; note: string | null; valide_le: string | null; created_at: string };
+export type Regularisation = {
+  id: string; date: string; product_id: string; equivalence_id: string | null; quantite: number; stock_avant: number | null; stock_apres: number | null;
+  motif: string; inventaire_id: string | null; note: string | null; created_at: string;
+};
+export type Commercial = { id: string; nom: string; telephone: string | null; commission_pct: number; actif: boolean; created_at: string };
+export type BanqueMouvement = { id: string; date: string; montant: number; type: "depot" | "retrait" | "virement_recu" | "virement_emis" | "cheque" | "frais" | "autre"; note: string | null; lien: string | null; created_at: string };
 
 export type Application = {
   id: string;
@@ -337,6 +383,7 @@ export type Client = {
   derniere_relance_com?: string | null; // relance commerciale « client endormi » (Bible §4.14)
   derniere_relance_catalogue?: string | null; // relance « catalogue » (push_notifications.sql)
   avoir?: number;                       // crédit à déduire sur une prochaine vente (Bible §4.15)
+  ice?: string | null;                  // ICE du client (factures, BIBLE §8.41)
   quartier?: string | null;             // quartier dans la ville (clients_quartier.sql)
   origine?: "terrain" | "prospection";   // pris en déplacement / venu de /prospects à sa 1re commande (clients_origine.sql)
   latitude?: number | null;             // position exacte du local (clients_localisation.sql)
@@ -366,6 +413,7 @@ export type Sale = {
   statut: SaleStatus;
   notes: string | null;
   fournisseur_paye?: boolean; // j'ai payé le fournisseur (dinoun) pour ce bon (Bible §5, roulement)
+  commercial_id?: string | null; // commercial de la vente (BIBLE §8.41)
   client?: Client;
   items?: SaleItem[];
 };

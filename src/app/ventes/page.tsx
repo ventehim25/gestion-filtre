@@ -9,6 +9,7 @@ import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/type
 import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck } from "lucide-react";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import ChoixVehicule from "@/components/ChoixVehicule";
+import { MODES_PAIEMENT, noterPaiement } from "@/lib/caisse";
 import FiltronDe from "@/components/FiltronDe";
 import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import { chargerMarques } from "@/lib/brands";
@@ -51,6 +52,7 @@ export default function VentesPage() {
   const [lines, setLines] = useState<LineItem[]>([]);
   const [statut, setStatut] = useState<SaleStatus>("paye");
   const [montantPaye, setMontantPaye] = useState(0);
+  const [venteMode, setVenteMode] = useState<"especes" | "cheque" | "virement">("especes"); // argent reçu à la vente (caisse, BIBLE §8.41)
   const [notes, setNotes] = useState("");
   // Scan code-barres
   const [camOpen, setCamOpen] = useState(false);
@@ -384,7 +386,7 @@ export default function VentesPage() {
 
   function resetForm() {
     setShowForm(false); setEditingSale(null); setOldLines([]);
-    setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye");
+    setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye"); setVenteMode("especes");
     setCrossSell([]); setOilDismissed(false); setUseAvoir(false);
   }
 
@@ -429,6 +431,12 @@ export default function VentesPage() {
       await supabase.from("sales").update({
         client_id: clientId, total: saleTotal, montant_paye: montant, statut, notes: notes || null,
       }).eq("id", editingSale.id);
+      // Écart d'argent payé (caisse du jour, BIBLE §8.41)
+      const ecartPaye = Math.round((montant - editingSale.montant_paye) * 100) / 100;
+      if (ecartPaye !== 0) await noterPaiement(supabase, {
+        sale_id: editingSale.id, client_id: clientId, date: new Date().toISOString().slice(0, 10), montant: ecartPaye, mode: venteMode,
+        note: ecartPaye < 0 ? "correction du montant payé (modification de la vente)" : "modification de la vente",
+      });
       await supabase.from("sale_items").insert(
         validLines.map(l => ({ sale_id: editingSale.id, product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null }))
       );
@@ -503,12 +511,23 @@ export default function VentesPage() {
   // Modification rapide du paiement uniquement
   function openPayEdit(s: Sale & { client: Client }) {
     setPayEdit(s); setPayStatut(s.statut); setPayMontant(s.montant_paye);
+    setPayMode("especes"); setPayCheque({ numero: "", banque: "", echeance: "" });
   }
+  // Mode de l'argent reçu (caisse du jour, échéancier des chèques — BIBLE §8.41)
+  const [payMode, setPayMode] = useState<"especes" | "cheque" | "virement">("especes");
+  const [payCheque, setPayCheque] = useState({ numero: "", banque: "", echeance: "" });
   async function savePayEdit() {
     if (!payEdit) return;
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Modification impossible hors-ligne."); return; }
     const montant = payStatut === "paye" ? payEdit.total : payMontant;
     await supabase.from("sales").update({ statut: payStatut, montant_paye: montant }).eq("id", payEdit.id);
+    // L'argent reçu maintenant (différence avec ce qui était déjà payé) → caisse du jour / échéancier
+    const recu = Math.round((montant - payEdit.montant_paye) * 100) / 100;
+    if (recu !== 0) await noterPaiement(supabase, {
+      sale_id: payEdit.id, client_id: payEdit.client_id, date: new Date().toISOString().slice(0, 10), montant: recu, mode: payMode,
+      numero_cheque: payMode === "cheque" ? payCheque.numero || null : null, banque: payMode === "cheque" ? payCheque.banque || null : null,
+      date_echeance: payMode === "cheque" ? payCheque.echeance || null : null, note: recu < 0 ? "correction du montant payé" : null,
+    });
     // Parrainage (Bible §4.15) : cette vente (souvent créée depuis /commandes en 'en_attente')
     // devient la 1ère vente ENCAISSÉE du filleul → crédite le parrain maintenant.
     if (payStatut !== "en_attente") {
@@ -548,7 +567,7 @@ export default function VentesPage() {
       localId,
       client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
       lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
-      total: saleTotal, statut, montant_paye: montant, notes: saleNotes || null, createdAt: Date.now(),
+      total: saleTotal, statut, montant_paye: montant, notes: saleNotes || null, createdAt: Date.now(), mode_paiement: venteMode,
     });
 
     let savedOnline = false;
@@ -584,7 +603,7 @@ export default function VentesPage() {
       lines: validLines.map(l => ({ nom: l.nom, quantite: l.quantite, prix_unitaire: l.prix_unitaire })),
       total: saleTotal, statut, montant_paye: montant, offline: !savedOnline, parrainMsg, clientId,
     });
-    setShowForm(false); setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye");
+    setShowForm(false); setLines([]); setClientId(""); setNotes(""); setMontantPaye(0); setStatut("paye"); setVenteMode("especes");
     setOilDismissed(false); setUseAvoir(false);
     if (savedOnline) load();
   }
@@ -831,6 +850,17 @@ export default function VentesPage() {
                   <input type="number" className="input" value={montantPaye} onChange={e => setMontantPaye(+e.target.value)} />
                 </div>
               )}
+              {(statut === "paye" || montantPaye > 0) && (
+                <div className="col-span-2">
+                  <label className="text-xs text-slate-500 mb-1 block">Reçu en</label>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {MODES_PAIEMENT.map(m => (
+                      <button key={m.cle} type="button" onClick={() => setVenteMode(m.cle as "especes" | "cheque" | "virement")}
+                        className={`rounded-lg py-1.5 text-xs font-medium ${venteMode === m.cle ? "bg-amber-500 text-black" : "btn-secondary"}`}>{m.libelle}</button>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex gap-2 justify-end items-center flex-wrap">
@@ -953,6 +983,22 @@ export default function VentesPage() {
                   <option value="en_attente">{t("pending")}</option>
                   <option value="partiel">{t("partial")}</option>
                 </select>
+              </div>
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block">Reçu en</label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {MODES_PAIEMENT.map(m => (
+                    <button key={m.cle} type="button" onClick={() => setPayMode(m.cle as "especes" | "cheque" | "virement")}
+                      className={`rounded-lg py-1.5 text-xs font-medium ${payMode === m.cle ? "bg-amber-500 text-black" : "btn-secondary"}`}>{m.libelle}</button>
+                  ))}
+                </div>
+                {payMode === "cheque" && (
+                  <div className="grid grid-cols-2 gap-2 mt-2">
+                    <label className="text-xs text-slate-500">N° du chèque<input className="input mt-1" value={payCheque.numero} onChange={e => setPayCheque({ ...payCheque, numero: e.target.value })} /></label>
+                    <label className="text-xs text-slate-500">Banque<input className="input mt-1" value={payCheque.banque} onChange={e => setPayCheque({ ...payCheque, banque: e.target.value })} /></label>
+                    <label className="text-xs text-slate-500 col-span-2">À encaisser le<input type="date" className="input mt-1" value={payCheque.echeance} onChange={e => setPayCheque({ ...payCheque, echeance: e.target.value })} /></label>
+                  </div>
+                )}
               </div>
               {payStatut !== "paye" && (
                 <div>

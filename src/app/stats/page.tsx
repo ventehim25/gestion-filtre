@@ -10,7 +10,7 @@ import { sendWhatsApp } from "@/lib/whatsapp";
 type MonthlyStat = { mois: string; total: number; count: number };
 type CityStat = { ville: string; total: number };
 type ProductStat = { nom: string; qty: number };
-type PnlRow = { key: string; ca: number; cost: number; benef: number };
+type PnlRow = { key: string; ca: number; cost: number; benef: number; dep: number }; // dep = dépenses (caisse, BIBLE §8.41)
 type SupplierRow = { id: string; nom: string; type: string; ventes: number; cost: number; benef: number };
 type CapPoint = { mois: string; capital: number };
 
@@ -83,13 +83,26 @@ export default function StatsPage() {
         byProduct[ref] = (byProduct[ref] ?? 0) + it.quantite;
       }
       setTopProducts(Object.entries(byProduct).sort(([, a], [, b]) => b - a).slice(0, 8).map(([nom, qty]) => ({ nom, qty })));
+      // Dépenses (essence, loyer…) de la page Caisse → bénéfice net = bénéfice − dépenses (BIBLE §8.41)
+      const deps: { date: string; montant: number }[] = [];
+      for (let i = 0; i < 50; i++) {
+        const { data, error } = await supabase.from("depenses").select("id, date, montant").order("id").range(i * 1000, i * 1000 + 999);
+        if (error || !data || data.length === 0) break;
+        deps.push(...(data as { date: string; montant: number }[]));
+        if (data.length < 1000) break;
+      }
       const agg = (keyFn: (d: string) => string): Record<string, PnlRow> => {
         const m: Record<string, PnlRow> = {};
+        for (const d of deps) {
+          const k = keyFn(d.date);
+          if (!m[k]) m[k] = { key: k, ca: 0, cost: 0, benef: 0, dep: 0 };
+          m[k].dep += Number(d.montant);
+        }
         for (const s of withItems) {
           if (!s.date) continue;
           const k = keyFn(s.date);
           const cost = (s.items ?? []).reduce((a, it) => a + it.quantite * (it.cout_unitaire ?? it.product?.prix_achat ?? 0), 0);
-          if (!m[k]) m[k] = { key: k, ca: 0, cost: 0, benef: 0 };
+          if (!m[k]) m[k] = { key: k, ca: 0, cost: 0, benef: 0, dep: 0 };
           m[k].ca += s.total; m[k].cost += cost; m[k].benef += s.total - cost;
         }
         return m;
@@ -252,6 +265,8 @@ export default function StatsPage() {
                   <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Ventes</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Coût</th>
                   <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Bénéfice</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Dépenses</th>
+                  <th className="text-right px-3 py-2 text-xs font-semibold text-slate-500 uppercase">Net</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -261,6 +276,8 @@ export default function StatsPage() {
                     <td className="px-3 py-2 text-right font-medium text-sky-400">{r.ca.toFixed(0)}</td>
                     <td className="px-3 py-2 text-right text-orange-400">{r.cost.toFixed(0)}</td>
                     <td className="px-3 py-2 text-right font-semibold text-emerald-400">+{r.benef.toFixed(0)}</td>
+                    <td className="px-3 py-2 text-right text-rose-400">{r.dep ? "−" + r.dep.toFixed(0) : "—"}</td>
+                    <td className={`px-3 py-2 text-right font-bold ${r.benef - r.dep >= 0 ? "text-amber-300" : "text-rose-400"}`}>{(r.benef - r.dep).toFixed(0)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -270,10 +287,12 @@ export default function StatsPage() {
                   <td className="px-3 py-2 text-right text-sky-400">{pnlRows.reduce((a, r) => a + r.ca, 0).toFixed(0)}</td>
                   <td className="px-3 py-2 text-right text-orange-400">{pnlRows.reduce((a, r) => a + r.cost, 0).toFixed(0)}</td>
                   <td className="px-3 py-2 text-right text-emerald-400">+{pnlRows.reduce((a, r) => a + r.benef, 0).toFixed(0)}</td>
+                  <td className="px-3 py-2 text-right text-rose-400">−{pnlRows.reduce((a, r) => a + r.dep, 0).toFixed(0)}</td>
+                  <td className="px-3 py-2 text-right text-amber-300">{pnlRows.reduce((a, r) => a + r.benef - r.dep, 0).toFixed(0)}</td>
                 </tr>
               </tfoot>
             </table>
-            <p className="text-[11px] text-slate-500 mt-2">Montants en MAD. Coût = prix d&apos;achat des articles vendus · Bénéfice = ventes − coût.</p>
+            <p className="text-[11px] text-slate-500 mt-2">Montants en MAD. Coût = prix d&apos;achat des articles vendus · Bénéfice = ventes − coût · Dépenses = page Caisse (essence, loyer…) · Net = bénéfice − dépenses.</p>
           </div>
         )}
       </div>
