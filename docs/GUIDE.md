@@ -354,3 +354,12 @@ Statistiques → bloc **💹 Rentabilité**. Choisis la période (Ce mois, 3 moi
 
 **Savoir ce qui s'est passé sur une pièce** : même onglet (ou bouton 🕘 dans **Produits**) : toutes les entrées, ventes, retours et corrections, la plus récente en haut.
 
+## 27. Le stock de la voiture (depuis le 18/11/2026)
+
+Menu **Stock voiture**.
+1. **Avant la tournée** : **Charger la voiture** → tape chaque référence que tu prends et combien → **Charger**.
+2. **Pendant la tournée** : dans la vente, coche **🚗 Sorti de la voiture** (la case reste cochée jusqu'à ce que tu la décoches) : la voiture se vide toute seule.
+3. **Au retour** : **Décharger** → l'appli propose tout ce qui reste ; baisse si tu laisses des pièces dans la voiture → **Décharger**.
+
+Le stock total de l'appli ne change pas quand tu charges ou décharges : la page montre ce qui est dans la voiture et ce qui reste au magasin.
+
