@@ -1301,6 +1301,8 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 
 **2 bis. La caisse (§8.41)** : le matin, menu **Caisse** → tape le fond (l'argent dans le tiroir). Chaque sortie d'argent (essence, repas…) → **+ Dépense**. Le soir → compte l'argent → **J'ai compté** : l'appli te dit s'il manque ou s'il y a trop.
 
+**2 ter. Une seule fois (§8.41)** : **Factures → Mes informations** (ICE, RC, IF, adresse) ; **Banque → Autre / solde de départ** ; coller `supabase/equipe.sql` si tu donnes l'appli à un vendeur. Ensuite : Échéancier le matin (chèques), Inventaire une fois par mois.
+
 **3. Une fois le catalogue rempli** : envoie le lien `/tarif` aux garages (message darija prêt dans `docs/SESSION_RECAP.md`), puis on lance la campagne e-mail des prospects.
 
 *Relis le §7 chaque vendredi : cinq chiffres, dix ans.*
