@@ -339,3 +339,10 @@ Chaque matin, ton téléphone reçoit « 🗓️ Échéancier » s'il y a un ch�
 
 Statistiques → bloc **💹 Rentabilité**. Choisis la période (Ce mois, 3 mois, Cette année, Tout) puis **Par article**, **Par client**, **Par marque** ou **Par famille**. Pour chaque ligne : combien tu as vendu, ton **bénéfice** et ta **marge %**. En rouge : marge de moins de 10 % (à vendre plus cher ou à acheter moins cher). « Trier par » change l'ordre (bénéfice, ventes, marge). Si un message dit « lignes sans prix d'achat », mets le prix d'achat sur la fiche (Réception ou Produits) : sinon le bénéfice est trop beau.
 
+## 25. Les factures (depuis le 18/11/2026)
+
+1. **Une seule fois** : menu **Factures** → **Mes informations** → remplis raison sociale, adresse, **ICE, RC, IF** (ce que demande la loi au Maroc), téléphone → Enregistrer.
+2. Pour un garage qui a un ICE : **Clients** → modifier → case **ICE**.
+3. **Faire une facture** : **Ventes** → sur le bon, bouton **🧾**. Elle prend le numéro suivant (F2026-0001, F2026-0002…), calcule le HT et la TVA (tes prix sont TTC) et s'ouvre prête à **imprimer** ou **enregistrer en PDF** (pour l'envoyer sur WhatsApp). Toucher 🧾 à nouveau réimprime la même facture.
+4. **Annuler une facture** : menu **Factures** → **Avoir** sur la facture (A2026-0001). On ne supprime jamais une facture.
+
