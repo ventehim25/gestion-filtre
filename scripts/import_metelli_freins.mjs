@@ -79,8 +79,20 @@ async function lirePdf(fichier) {
     // Marque = gros titre (taille 15) SANS dates, à gauche ou à droite, en haut OU au milieu de la page (« ACURA » après
     // « ABARTH ») ; modèle = gros titre AVEC ses dates (« RDX 1/12-1/70 »). Avant (17/11) : seule la marque en haut à gauche
     // était lue → Acura, Aixam… restaient sous Abarth.
-    const titresMarque = its.filter((i) => i.h >= 13 && !RE_MODELE.test(i.s) && /[A-Z]/.test(i.s) && i.s === i.s.toUpperCase() && !/^\d+$/.test(i.s))
-      .map((i) => ({ y: i.y, type: "marque", nom: i.s }));
+    // Un titre peut être en deux morceaux sur la même ligne (« Transit » + « VI Bus (E_ _) 6/94-6/00 ») : on les recolle.
+    // Marque = police du titre en haut de page (gras) ; modèle = avec ses dates (ou une autre police).
+    const grandes = [];
+    for (const i of its.filter((i) => i.h >= 13).sort((a, b) => b.y - a.y || a.x - b.x)) {
+      const l = grandes.find((g) => Math.abs(g.y - i.y) < 2.5);
+      if (l) { l.s += " " + i.s; l.polices.add(i.f); } else grandes.push({ y: i.y, s: i.s, polices: new Set([i.f]) });
+    }
+    const policeMarque = new Set(its.filter((i) => i.h >= 13 && i.y > 770).map((i) => i.f));
+    const titresMarque = grandes.map((g) => {
+      const m = g.s.match(RE_MODELE);
+      if (m) return { y: g.y, type: "modele", nom: m[1].trim() };
+      const estMarque = policeMarque.size ? [...g.polices].every((f) => policeMarque.has(f)) : g.s === g.s.toUpperCase();
+      return { y: g.y, type: estMarque ? "marque" : "modele", nom: g.s.trim() };
+    }).filter((t) => !/^\d+$/.test(t.nom));
     const corps = its.filter((i) => i.y < 730 && i.y > 30).sort((a, b) => b.y - a.y || a.x - b.x);
     const gauche = corps.filter((i) => i.x < 35);
     for (const i of gauche) i.vu = false;
@@ -88,7 +100,7 @@ async function lirePdf(fichier) {
     const evts = [];
     for (let k = 0; k < gauche.length; k++) {
       const i = gauche[k];
-      if (i.h >= 13) { const m = i.s.match(RE_MODELE); if (m) evts.push({ y: i.y, type: "modele", nom: m[1].trim() }); continue; }
+      if (i.h >= 13) continue; // titres (marque / modèle) : lus plus haut, morceaux recollés
       if (/kW\)/.test(i.s) || /\(\s*\d+\s*kW/.test(i.s)) {
         let txt = i.s, m = txt.match(RE_MOTEUR), j = k;
         while (!m && j + 1 < gauche.length && gauche[j + 1].h < 13 && !/kW/.test(gauche[j + 1].s) && i.y - gauche[j + 1].y < 12) { j++; txt += " " + gauche[j].s; m = txt.match(RE_MOTEUR); }

@@ -39,7 +39,7 @@ async function lire(fichier, reRef) {
   for (let p = 1; p <= doc.numPages; p++) {
     const page = await doc.getPage(p);
     const its = (await page.getTextContent()).items.filter((i) => i.str?.trim())
-      .map((i) => ({ x: i.transform[4], y: i.transform[5], h: i.transform[0], s: i.str.trim() }));
+      .map((i) => ({ x: i.transform[4], y: i.transform[5], h: i.transform[0], f: i.fontName, s: i.str.trim() }));
     page.cleanup();
     if (its.some((i) => i.s === "Adaptable to")) {
       const yh = Math.min(...its.filter((i) => i.s === "Adaptable to").map((i) => i.y));
@@ -61,12 +61,22 @@ async function lire(fichier, reRef) {
     // Marque = gros titre SANS dates (en haut OU au milieu de la page : 113 marques commencent en milieu de page) ;
     // modèle = gros titre AVEC ses dates. Avant (17/11) : un titre de marque en milieu de page était pris pour un modèle
     // → les Dacia qui suivaient restaient sous « CUPRA ».
-    const corps = its.filter((i) => i.y > 30 && !(i.y > 760 && i.h < 14)).sort((a, b) => b.y - a.y || a.x - b.x);
-    for (const i of corps) {
-      if (i.h >= 14) {
+    // Un titre peut être en plusieurs morceaux sur la même ligne : on les recolle. Marque = police du titre en haut de page.
+    const corps = its.filter((i) => i.y > 30 && i.y < 765 && i.h < 14).sort((a, b) => b.y - a.y || a.x - b.x);
+    const grandes = [];
+    for (const i of its.filter((i) => i.h >= 14 && i.y > 30).sort((a, b) => b.y - a.y || a.x - b.x)) {
+      const l = grandes.find((g) => Math.abs(g.y - i.y) < 2.5);
+      if (l) { l.s += " " + i.s; l.polices.add(i.f); } else grandes.push({ y: i.y, x: i.x, s: i.s, polices: new Set([i.f]), titre: true });
+    }
+    const policeMarque = new Set(its.filter((i) => i.h >= 14 && i.y > 785).map((i) => i.f));
+    const flux = [...grandes, ...corps].sort((a, b) => b.y - a.y || a.x - b.x);
+    for (const i of flux) {
+      if (i.titre) {
         const m = i.s.match(RE_MODELE);
+        const estMarque = !m && (policeMarque.size ? [...i.polices].every((f) => policeMarque.has(f)) : i.s === i.s.toUpperCase());
         if (m) { modele = m[1].trim(); mDe = m[2]; mA = m[3]; moteur = null; }
-        else if (/[A-Z]/.test(i.s) && i.s === i.s.toUpperCase()) { if (i.s !== marque) { marque = i.s; modele = null; moteur = null; } }
+        else if (estMarque) { if (i.s !== marque) { marque = i.s; modele = null; moteur = null; } }
+        else { modele = i.s.trim(); mDe = null; mA = null; moteur = null; }
         continue;
       }
       if (i.x < 40 && /kW\)/.test(i.s)) {

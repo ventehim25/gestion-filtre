@@ -30,6 +30,9 @@ type Vehicule = {
   cylindree: string | null;
 };
 
+/** Nombre de voitures distinctes (marque + modèle + moteur + code moteur) */
+const nbVoitures = (apps: Application[]) => new Set(apps.map(a => [a.marque, a.modele, a.moteur ?? "", a.code_moteur ?? ""].join("|"))).size;
+
 type RefResult = Product & {
   equivalences: Equivalence[];
   compatibilites: { vehicules: Vehicule | null }[];
@@ -186,6 +189,33 @@ export default function RecherchePage() {
   }, []);
   const [openDetails, setOpenDetails] = useState<Set<string>>(new Set());
   function toggleDetails(id: string) { setOpenDetails(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+  // « Parcourir les références » (comme Gates) : toutes les équivalences d'une pièce, + les autres marques qui vont sur
+  // les mêmes voitures (calculé, à vérifier : ce n'est pas une équivalence déclarée par le fabricant)
+  const [codesOuverts, setCodesOuverts] = useState<Set<string>>(new Set());
+  type MemeVoiture = { id: string; reference: string; marque: string; stock: number; prix_vente: number; communes: number };
+  const [parVoiture, setParVoiture] = useState<Record<string, MemeVoiture[] | "chargement">>({});
+  async function chercherParVoiture(p: RefResult) {
+    setParVoiture((x) => ({ ...x, [p.id]: "chargement" }));
+    try {
+      const apps = (p.applications ?? []) as Application[];
+      const cle = (a: { marque: string; modele: string; moteur: string | null; code_moteur: string | null }) => [a.marque, a.modele, a.moteur ?? "", a.code_moteur ?? ""].join("|");
+      const toutes = new Set(apps.map(cle));
+      const modeles = [...new Set(apps.map((a) => a.modele))].slice(0, 40);
+      const { data } = await supabase.from("applications")
+        .select("marque, modele, moteur, code_moteur, product_id, products!inner(id, reference, marque, categorie, stock, prix_vente, vehicule)")
+        .in("modele", modeles).eq("products.categorie", p.categorie).eq("products.vehicule", lireTypeVehicule()).neq("product_id", p.id).limit(3000);
+      const parProduit = new Map<string, MemeVoiture & { vus: Set<string> }>();
+      for (const a of (data ?? []) as unknown as (Application & { products: Product })[]) {
+        if (!toutes.has(cle(a))) continue;
+        let m = parProduit.get(a.product_id);
+        if (!m) { m = { id: a.products.id, reference: a.products.reference, marque: a.products.marque ?? "", stock: a.products.stock, prix_vente: a.products.prix_vente, communes: 0, vus: new Set() }; parProduit.set(a.product_id, m); }
+        if (!m.vus.has(cle(a))) { m.vus.add(cle(a)); m.communes++; }
+      }
+      const liste = [...parProduit.values()].sort((a, b) => b.communes - a.communes).slice(0, 10)
+        .map((m) => ({ id: m.id, reference: m.reference, marque: m.marque, stock: m.stock, prix_vente: m.prix_vente, communes: m.communes }));
+      setParVoiture((x) => ({ ...x, [p.id]: liste }));
+    } catch { setParVoiture((x) => ({ ...x, [p.id]: [] })); }
+  }
 
   // ---------- Ajout rapide d'une référence (depuis cette page) ----------
   // Marques : celles du métier de la pièce (filtres ou distribution, BIBLE §8.30) + celles ajoutées par l'utilisateur
@@ -418,16 +448,29 @@ export default function RecherchePage() {
               const apps = p.applications ?? [];
               const appPreview = distinctByMarque(apps, 2);
               const vehPreview = distinctByMarque(vehs, 2);
-              // Références que TU as enregistrées (avec un prix), pas les OE auto
-              const regEquivs = (p.equivalences ?? []).filter(e => (e.prix ?? null) !== null);
+              // Équivalences : d'abord les autres MARQUES (TRW, Bosch, Mann, Graf…, avec prix / stock s'il y en a),
+              // puis les numéros d'origine et le WVA (dépliables). Avant (17/11) : seules celles avec un prix s'affichaient
+              // → les milliers d'équivalences importées (TRW, Bosch, OE) restaient invisibles.
+              const marquesConnues = new Set(toutesMarques.map(m => m.toLowerCase()));
+              const regEquivs = (p.equivalences ?? []).filter(e => marquesConnues.has(e.marque.trim().toLowerCase()) || (e.prix ?? null) !== null);
+              const codesOe = (p.equivalences ?? []).filter(e => !regEquivs.includes(e));
+              const tape = refQuery.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+              const correspond = (r: string) => tape.length >= 3 && r.toUpperCase().replace(/[^A-Z0-9]/g, "").includes(tape);
+              const viaEquiv = !correspond(p.reference) ? (p.equivalences ?? []).find(e => correspond(e.reference)) : undefined;
+              const pv = parVoiture[p.id];
               return (
                 <div key={p.id} className="card p-4 flex gap-4">
                   <FilterImage reference={p.reference} categorie={p.categorie} imageUrl={p.image_url} wid={200} className="h-20 w-20 rounded-lg object-contain bg-white shrink-0 self-start border border-slate-700/60 p-1" />
                   <div className="flex-1 min-w-0">
+                  {viaEquiv && (
+                    <div className="mb-2 text-sm text-amber-300">
+                      <span className="font-mono font-semibold">{viaEquiv.reference}</span> ({viaEquiv.marque}) = <span className="font-mono font-semibold">{p.marque ?? "Filtron"} {p.reference}</span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-3 flex-wrap">
                     <div>
                       <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-0.5 rounded ${catColor(p.categorie)}`}><CategoryIcon categorie={p.categorie} size={14} /> {categoryLabel(p.categorie)}</span>
-                      <div className="text-xl font-bold font-mono text-slate-800 mt-1">{p.reference}</div>
+                      <div className="text-xl font-bold font-mono text-slate-800 mt-1">{p.reference} <span className="text-xs font-sans font-medium text-slate-400">{p.marque ?? "Filtron"}</span></div>
                     </div>
                     {avecDents(p.categorie) && p.dimensions && <div className="self-center text-xs font-semibold text-amber-500">🦷 {p.dimensions}</div>}
                     <div className="text-right">
@@ -487,10 +530,11 @@ export default function RecherchePage() {
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-2"><Repeat size={13} /> {t("equivalents")}</div>
                       <div className="space-y-1.5">
                         {regEquivs.map(e => (
-                          <div key={e.id} className="flex items-center justify-between gap-3 bg-[var(--surface-2)] rounded-lg px-3 py-2">
+                          <div key={e.id} className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 ${correspond(e.reference) ? "bg-amber-500/15 ring-1 ring-amber-500/40" : "bg-[var(--surface-2)]"}`}>
                             <div className="min-w-0">
                               <span className="font-mono text-xl font-bold text-slate-100">{e.reference}</span>
                               <span className="ms-2 text-xs text-indigo-300">{e.marque}</span>
+                              {correspond(e.reference) && <span className="ms-2 text-[11px] text-amber-300">← ta recherche</span>}
                             </div>
                             <div className="text-right shrink-0">
                               {e.prix ? <div className="text-sm font-bold text-blue-400">{e.prix} MAD</div> : null}
@@ -499,6 +543,49 @@ export default function RecherchePage() {
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {codesOe.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      <button type="button" onClick={() => setCodesOuverts(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-300">
+                        <Tag size={13} /> Numéros d&apos;origine et WVA ({codesOe.length}) {codesOuverts.has(p.id) ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </button>
+                      {(codesOuverts.has(p.id) || codesOe.some(e => correspond(e.reference))) && (
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {(codesOuverts.has(p.id) ? codesOe : codesOe.filter(e => correspond(e.reference))).map(e => (
+                            <span key={e.id} className={`text-xs font-mono px-2 py-0.5 rounded ${correspond(e.reference) ? "bg-amber-500/20 text-amber-200" : "bg-slate-100 text-slate-700"}`}>
+                              <span className="font-sans text-[10px] text-slate-400 me-1">{e.marque}</span>{e.reference}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {apps.length > 0 && !estFiltre(p.categorie) && (
+                    <div className="mt-3 pt-3 border-t border-slate-100">
+                      {pv === undefined && (
+                        <button type="button" onClick={() => chercherParVoiture(p)} className="btn-secondary text-xs">🔁 Mêmes voitures, autre marque</button>
+                      )}
+                      {pv === "chargement" && <p className="text-xs text-slate-400">Recherche des pièces qui vont sur les mêmes voitures…</p>}
+                      {Array.isArray(pv) && (pv.length === 0
+                        ? <p className="text-xs text-slate-400">Aucune autre marque enregistrée pour ces voitures.</p>
+                        : (
+                          <div>
+                            <div className="text-xs font-semibold text-slate-500 mb-1.5">Mêmes voitures, autre marque <span className="font-normal text-slate-400">(calculé d&apos;après les voitures : à vérifier avant de vendre)</span></div>
+                            <div className="space-y-1">
+                              {pv.map(m => (
+                                <button key={m.id} type="button" onClick={() => { setRefQuery(m.reference); searchRef(m.reference); }}
+                                  className="w-full flex items-center justify-between gap-3 bg-[var(--surface-2)] rounded-lg px-3 py-1.5 text-start hover:ring-1 hover:ring-amber-500/40">
+                                  <span><span className="font-mono font-bold text-slate-100">{m.reference}</span> <span className="text-xs text-indigo-300">{m.marque}</span></span>
+                                  <span className="text-xs text-slate-400">{m.communes} / {nbVoitures(apps)} voitures communes{m.stock > 0 ? ` · stock ${m.stock}` : ""}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                     </div>
                   )}
                   </div>
