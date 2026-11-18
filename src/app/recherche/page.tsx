@@ -1,7 +1,7 @@
 "use client";
 export const dynamic = "force-dynamic";
 import { useEffect, useRef, useState } from "react";
-import { equivalentsFiltron, type EquivTrouve } from "@/lib/equivalenceFiltron";
+import { autresMarques, equivalencesToutes, type Croisee, type EquivTrouve } from "@/lib/equivalenceFiltron";
 import Header from "@/components/Header";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
@@ -160,6 +160,8 @@ export default function RecherchePage() {
   const [searched, setSearched] = useState(false);
   // Catalogue officiel Filtron (toutes marques, BIBLE §8.42) : équivalents de la réf. tapée, même absents de la base
   const [filtronEq, setFiltronEq] = useState<EquivTrouve[]>([]);
+  const [autres, setAutres] = useState<Map<string, Croisee[]>>(new Map()); // autres marques de chaque fiche affichée
+  const [autresOuverts, setAutresOuverts] = useState<Set<string>>(new Set());
   const seqRef = useRef(0);
   const minuterieRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Une recherche 250 ms après la dernière touche (avant : une par touche, et une réponse lente pouvait écraser la bonne)
@@ -303,7 +305,7 @@ export default function RecherchePage() {
     setRefLoading(true);
     setSearched(true);
     const normQ = q.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    const filtronP = normQ.length >= 4 ? equivalentsFiltron(q, 30).catch(() => [] as EquivTrouve[]) : Promise.resolve([] as EquivTrouve[]);
+    const filtronP = normQ.length >= 3 ? equivalencesToutes(q, 30).catch(() => [] as EquivTrouve[]) : Promise.resolve([] as EquivTrouve[]);
     // On enlève les espaces et on cherche le numéro N'IMPORTE OÙ dans la référence,
     // en tolérant les espaces dans la réf stockée (wl 7510 ↔ wl7510).
     // -> permet aussi de taper juste "540" pour trouver OP540, AP540, etc.
@@ -341,6 +343,7 @@ export default function RecherchePage() {
     setFiltronEq(eqF);
     setRefResults(all);
     setRefLoading(false);
+    autresMarques(all.slice(0, 40).map(p => p.id)).then(m => { if (seq === seqRef.current) setAutres(m); }).catch(() => {});
   }
 
   // ---------- Recherche par véhicule ----------
@@ -606,6 +609,32 @@ export default function RecherchePage() {
                       </div>
                     </div>
                   )}
+
+                  {(() => {
+                    // Autres marques du catalogue Filtron (Mann, Mahle, Purflux, UFI…) — BIBLE §8.42
+                    const dejaVues = new Set((p.equivalences ?? []).map(e => e.reference.toUpperCase().replace(/[^A-Z0-9]/g, "")));
+                    const liste = (autres.get(p.id) ?? []).filter(c => !dejaVues.has(c.reference.toUpperCase().replace(/[^A-Z0-9]/g, "")));
+                    if (!liste.length) return null;
+                    const ouvert = autresOuverts.has(p.id);
+                    const visibles = ouvert ? liste : liste.filter(c => correspond(c.reference)).concat(liste.filter(c => !correspond(c.reference)).slice(0, 8));
+                    return (
+                      <div className="mt-3 pt-3 border-t border-slate-100">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 mb-2"><Repeat size={13} /> Autres marques ({liste.length}) <span className="font-normal text-slate-600">· catalogue Filtron</span></div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {visibles.map((c, i) => (
+                            <span key={i} className={`text-xs font-mono px-2 py-0.5 rounded ${correspond(c.reference) ? "bg-amber-500/20 text-amber-200 ring-1 ring-amber-500/40" : "bg-slate-100 text-slate-700"}`}>
+                              <span className="font-sans text-[10px] text-indigo-300 me-1">{c.marque}</span>{c.reference}
+                            </span>
+                          ))}
+                        </div>
+                        {liste.length > visibles.length || ouvert ? (
+                          <button type="button" className="text-xs text-blue-400 mt-1.5" onClick={() => setAutresOuverts(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })}>
+                            {ouvert ? "Voir moins" : `Voir les ${liste.length}`}
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })()}
 
                   {codesOe.length > 0 && (
                     <div className="mt-3 pt-3 border-t border-slate-100">

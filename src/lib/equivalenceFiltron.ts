@@ -45,6 +45,48 @@ export function chercherChezFiltron(texte: string): Promise<EquivFiltron[]> {
   return p;
 }
 
+export type Croisee = { product_id: string | null; marque: string; reference: string; filtron: string };
+
+/** Copie du catalogue Filtron dans la base (table references_croisees, BIBLE §8.42) : réf. qui COMMENCE par la saisie,
+ *  espaces ignorés. Marche même si le site Filtron est lent ou en panne. Table absente = []. */
+export async function croiseesLocales(texte: string, limite = 40): Promise<EquivTrouve[]> {
+  const k = norm(texte);
+  if (k.length < 3) return [];
+  const { data, error } = await supabase.from("references_croisees").select("product_id, marque, reference, filtron").like("ref_norm", k + "%").order("ref_norm").limit(limite);
+  if (error || !data?.length) return [];
+  const lignes = data as Croisee[];
+  const ids = [...new Set(lignes.map((l) => l.product_id).filter(Boolean) as string[])];
+  const { data: fiches } = ids.length ? await supabase.from("products").select("*").in("id", ids) : { data: [] };
+  const parId = new Map(((fiches ?? []) as Product[]).map((p) => [p.id, p]));
+  return lignes.map((l) => ({ numero: l.reference, marque: l.marque, filtron: l.filtron, produit: l.product_id ? parId.get(l.product_id) ?? null : null, marqueApp: marqueApp(l.marque) }));
+}
+
+/** Toutes les autres marques des fiches affichées (Mann, Mahle, Purflux…), par fiche. */
+export async function autresMarques(productIds: string[]): Promise<Map<string, Croisee[]>> {
+  const m = new Map<string, Croisee[]>();
+  if (!productIds.length) return m;
+  for (let i = 0; i < productIds.length; i += 50) {
+    const { data, error } = await supabase.from("references_croisees").select("product_id, marque, reference, filtron").in("product_id", productIds.slice(i, i + 50)).order("marque").order("ref_norm").limit(5000);
+    if (error) break;
+    for (const c of (data ?? []) as Croisee[]) (m.get(c.product_id!) ?? m.set(c.product_id!, []).get(c.product_id!)!).push(c);
+  }
+  return m;
+}
+
+/** Copie locale + catalogue en direct, sans doublon (même réf. sans espaces, même Filtron), réf. exacte en premier. */
+export async function equivalencesToutes(texte: string, limite = 30): Promise<EquivTrouve[]> {
+  const [loc, dir] = await Promise.all([croiseesLocales(texte, limite).catch(() => []), equivalentsFiltron(texte, limite).catch(() => [])]);
+  const k = norm(texte);
+  const vus = new Set<string>();
+  const out: EquivTrouve[] = [];
+  for (const e of [...loc, ...dir]) {
+    const c = norm(e.numero) + "|" + e.filtron.toUpperCase();
+    if (vus.has(c)) continue;
+    vus.add(c); out.push(e);
+  }
+  return out.sort((a, b) => Number(norm(b.numero) === k) - Number(norm(a.numero) === k) || Number(norm(b.numero).startsWith(k)) - Number(norm(a.numero).startsWith(k))).slice(0, limite);
+}
+
 /** Équivalents avec la fiche Filtron de l'appli (null si Filtron l'a mais pas encore l'appli). Référence exacte en premier. */
 export async function equivalentsFiltron(texte: string, limite = 20): Promise<EquivTrouve[]> {
   const items = await chercherChezFiltron(texte);

@@ -56,6 +56,8 @@ export type Database = {
       regularisations: Table<Regularisation, "id" | "created_at" | "date" | "motif">;
       commerciaux: Table<Commercial, "id" | "created_at" | "commission_pct" | "actif">;
       banque_mouvements: Table<BanqueMouvement, "id" | "created_at" | "date" | "type">;
+      // Catalogue Filtron toutes marques (supabase/references_croisees.sql, BIBLE §8.42) — recherche seulement
+      references_croisees: Table<ReferenceCroisee, "id" | "product_id" | "ref_norm" | "ajoute_le">;
       // Décomptes de stock déjà faits par ligne de vente (supabase/protection.sql) : jamais deux fois
       stock_decomptes: Table<{ sale_id: string; ligne: number; cree_le: string }, "cree_le">;
       // Catégories permises (products.categorie → clé étrangère) — supabase/categories_produits.sql, BIBLE §8.31
@@ -283,6 +285,8 @@ export type Regularisation = {
 };
 export type Commercial = { id: string; nom: string; telephone: string | null; commission_pct: number; actif: boolean; created_at: string };
 export type BanqueMouvement = { id: string; date: string; montant: number; type: "depot" | "retrait" | "virement_recu" | "virement_emis" | "cheque" | "frais" | "autre"; note: string | null; lien: string | null; created_at: string };
+
+export type ReferenceCroisee = { id: number; product_id: string | null; filtron: string; marque: string; reference: string; ref_norm: string; ajoute_le: string };
 
 export type Application = {
   id: string;

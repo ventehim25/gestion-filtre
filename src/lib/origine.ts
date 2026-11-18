@@ -4,7 +4,7 @@
 // de quel filtre Filtron il s'agit. Cherche dans TOUTES les fiches (voitures et camions).
 import { supabase } from "./supabase";
 import type { Product } from "@/types/database";
-import { equivalentsFiltron } from "./equivalenceFiltron";
+import { equivalencesToutes } from "./equivalenceFiltron";
 
 // source « filtron » = trouvé dans le catalogue officiel Filtron (pas encore dans la base), BIBLE §8.42
 export type ParOrigine = { code: string; marqueCode: string; produit: Product; source?: "base" | "filtron"; marqueApp?: string | null };
@@ -24,7 +24,7 @@ export function chercherParOrigine(texte: string, limite = 8, opts: { filtron?: 
     const motif = "%" + s.split("").join("%") + "%";
     const [{ data, error }, filtron] = await Promise.all([
       s.length >= 5 ? supabase.from("equivalences").select("marque, reference, products!inner(*)").ilike("reference", motif).limit(60) : Promise.resolve({ data: [], error: null }),
-      avecFiltron ? equivalentsFiltron(texte, 20).catch(() => []) : Promise.resolve([]),
+      avecFiltron ? equivalencesToutes(texte, 20).catch(() => []) : Promise.resolve([]),
     ]);
     const out: ParOrigine[] = [];
     if (!error) for (const e of (data ?? []) as unknown as { marque: string; reference: string; products: Product }[]) {
