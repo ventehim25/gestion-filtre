@@ -15,7 +15,7 @@ const LocationPicker = nextDynamic(() => import("@/components/LocationPicker"), 
   loading: () => <div className="w-full h-56 rounded-lg bg-[var(--surface-2)] flex items-center justify-center text-xs text-slate-500">Chargement de la carte…</div>,
 });
 
-const empty = { nom: "", telephone: "", ville: "", quartier: "", adresse: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0, parrain_id: "", latitude: null as number | null, longitude: null as number | null };
+const empty = { nom: "", telephone: "", ville: "", quartier: "", adresse: "", ice: "", notes: "", solde_du: 0, type: "comptoir" as ClientType, remise_pct: 0, limite_credit: 0, parrain_id: "", latitude: null as number | null, longitude: null as number | null };
 
 // Le type choisit aussi le catalogue de prix (src/lib/prixCatalogues.ts) : garage = prix de base,
 // particulier +30 %, location +15 %, magasin −5 % (réglables dans Paramètres). Comptoir = prix garage, gros = prix magasin.
@@ -168,7 +168,8 @@ export default function ClientsPage() {
 
   async function save() {
     // parrain_id "" → null ; si la colonne n'existe pas encore (SQL Bible §4.15 pas collé), on réessaie sans
-    const payload: Record<string, unknown> = { ...form, parrain_id: form.parrain_id || null, quartier: form.quartier.trim() || null };
+    const payload: Record<string, unknown> = { ...form, parrain_id: form.parrain_id || null, quartier: form.quartier.trim() || null, ice: form.ice.replace(/s+/g, "") || null };
+    if (!payload.ice && !editing?.ice) delete payload.ice; // ICE (factures, BIBLE §8.41) : rien à écrire si vide
     const attempt = (p: Record<string, unknown>) =>
       editing ? supabase.from("clients").update(p as Partial<Client>).eq("id", editing.id) : supabase.from("clients").insert(p as Omit<Client, "id" | "created_at">);
     let { error } = await attempt(payload);
@@ -176,6 +177,7 @@ export default function ClientsPage() {
       delete payload.parrain_id;
       ({ error } = await attempt(payload));
     }
+    if (error && /ice/i.test(error.message)) { delete payload.ice; ({ error } = await attempt(payload)); }
     if (error && /quartier/i.test(error.message)) {
       alert("Quartier non enregistré : colle supabase/clients_quartier.sql dans Supabase. Le reste de la fiche est enregistré.");
       delete payload.quartier;
@@ -234,7 +236,7 @@ export default function ClientsPage() {
 
   function startEdit(c: Client) {
     setEditing(c);
-    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, quartier: c.quartier ?? "", adresse: c.adresse ?? "", notes: c.notes ?? "", solde_du: c.solde_du, type: c.type ?? "comptoir", remise_pct: c.remise_pct ?? 0, limite_credit: c.limite_credit ?? 0, parrain_id: c.parrain_id ?? "", latitude: c.latitude ?? null, longitude: c.longitude ?? null });
+    setForm({ nom: c.nom, telephone: c.telephone ?? "", ville: c.ville, quartier: c.quartier ?? "", adresse: c.adresse ?? "", ice: c.ice ?? "", notes: c.notes ?? "", solde_du: c.solde_du, type: c.type ?? "comptoir", remise_pct: c.remise_pct ?? 0, limite_credit: c.limite_credit ?? 0, parrain_id: c.parrain_id ?? "", latitude: c.latitude ?? null, longitude: c.longitude ?? null });
     setLienMaps(""); setGeoMsg(""); setShowMap(false);
     setShowForm(true);
   }
@@ -308,6 +310,7 @@ export default function ClientsPage() {
                 <datalist id="quartiers-ville">{quartiersDe(form.ville).map(v => <option key={v} value={v} />)}</datalist>
               </div>
               <div><label className="text-xs text-slate-500 mb-1 block">Adresse</label><input className="input" value={form.adresse} placeholder="Rue, n°, repère…" onChange={e => setForm({ ...form, adresse: e.target.value })} /></div>
+              <div><label className="text-xs text-slate-500 mb-1 block">ICE (pour ses factures, facultatif)</label><input className="input" inputMode="numeric" value={form.ice} placeholder="15 chiffres" onChange={e => setForm({ ...form, ice: e.target.value })} /></div>
 
               {/* Localisation exacte du local */}
               <div className="rounded-lg border border-slate-700 p-3 space-y-2">

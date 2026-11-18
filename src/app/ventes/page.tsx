@@ -6,12 +6,14 @@ import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
 import { loadAll } from "@/lib/pagedFetch";
 import { Sale, Client, Product, SaleItem, SaleStatus, Fournisseur } from "@/types/database";
-import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck, Undo2 } from "lucide-react";
+import { Plus, Trash2, Printer, ScanLine, Check, Link2, X, MessageCircle, CloudOff, RefreshCw, Pencil, Wallet, Eye, Truck, Undo2, Receipt } from "lucide-react";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import ChoixVehicule from "@/components/ChoixVehicule";
 import { MODES_PAIEMENT, noterPaiement } from "@/lib/caisse";
 import { retoursParVente } from "@/lib/retours";
 import RetourClientModal from "@/components/RetourClientModal";
+import { chargerSociete, factureDeVente } from "@/lib/factures";
+import { ecrireFacture, ouvrirFenetre } from "@/lib/imprimerFacture";
 import FiltronDe from "@/components/FiltronDe";
 import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
 import { chargerMarques } from "@/lib/brands";
@@ -74,6 +76,20 @@ export default function VentesPage() {
   // Retours de pièces (BIBLE §8.41, nouveauté n° 2)
   const [retourSale, setRetourSale] = useState<(Sale & { client: Client }) | null>(null);
   const [retours, setRetours] = useState<Map<string, number>>(new Map());
+  // Factures déjà faites (numéro sous le total) — BIBLE §8.41, nouveauté n° 5
+  const [facturees, setFacturees] = useState<Map<string, string>>(new Map());
+  async function factureBon(s: Sale & { client: Client }) {
+    const w = ouvrirFenetre(); // ouverte tout de suite (sinon le téléphone bloque la fenêtre)
+    try {
+      const [f, soc] = await Promise.all([factureDeVente(s.id), chargerSociete()]);
+      if (w) ecrireFacture(w, f, soc);
+      setFacturees(prev => new Map(prev).set(s.id, f.numero));
+      flash(`Facture ${f.numero} ✓`);
+    } catch (e) {
+      w?.close();
+      alert("Facture impossible : " + String((e as Error)?.message ?? e));
+    }
+  }
   const [payStatut, setPayStatut] = useState<SaleStatus>("paye");
   const [payMontant, setPayMontant] = useState(0);
   // Pack vidange (Bible §4.11) : rangée « + l'huile ? » refermée par l'utilisateur
@@ -124,6 +140,8 @@ export default function VentesPage() {
     ]);
     lirePortefeuille().then(p => setEnPortefeuille(new Set(p.map(b => b.sale_id)))).catch(() => {});
     retoursParVente().then(setRetours).catch(() => {});
+    supabase.from("factures").select("sale_id, numero").eq("type", "facture").not("sale_id", "is", null).order("id").range(0, 9999)
+      .then(({ data }) => setFacturees(new Map(((data ?? []) as { sale_id: string; numero: string }[]).map(f => [f.sale_id, f.numero]))), () => {});
     setSales(s);
     setClients(c.data ?? []);
     setFournisseurs((fr.data as Fournisseur[]) ?? []);
@@ -914,6 +932,7 @@ export default function VentesPage() {
                 <td className="px-4 py-3 text-slate-500">{s.client?.ville}</td>
                 <td className="px-4 py-3 font-semibold">{s.total.toFixed(2)} MAD
                   {retours.has(s.id) && <span className="block text-[11px] font-medium text-amber-400" title="Pièces rendues par le client">↩ −{(retours.get(s.id) ?? 0).toFixed(0)} rendu</span>}
+                  {facturees.has(s.id) && <span className="block text-[11px] font-medium text-sky-400">🧾 {facturees.get(s.id)}</span>}
                 </td>
                 <td className="px-4 py-3"><span className={badgeClass(s.statut)}>{t(s.statut === "paye" ? "paid" : s.statut === "partiel" ? "partial" : "pending")}</span></td>
                 <td className="px-4 py-3">
@@ -942,6 +961,7 @@ export default function VentesPage() {
                   )}
                   <button onClick={() => openPayEdit(s)} className="text-amber-500 hover:text-amber-400" title="Modifier le paiement"><Wallet size={16} /></button>
                   <button onClick={() => openEditSale(s)} className="text-blue-400 hover:text-blue-300" title="Modifier la vente"><Pencil size={15} /></button>
+                  {hasItems && <button onClick={() => factureBon(s)} className="text-sky-400 hover:text-sky-300" title={facturees.has(s.id) ? `Réimprimer la facture ${facturees.get(s.id)}` : "Faire la facture (numérotée)"}><Receipt size={15} /></button>}
                   {hasItems && <button onClick={() => setRetourSale(s)} className="text-amber-300 hover:text-amber-200" title="Retour de pièces (le client rend)"><Undo2 size={15} /></button>}
                   <button onClick={() => whatsForSale(s)} className="text-green-500 hover:text-green-400" title="Envoyer la fiche sur WhatsApp"><MessageCircle size={16} /></button>
                   <button onClick={() => printReceipt(s)} className="text-slate-400 hover:text-blue-600" title={t("printReceipt")}><Printer size={15} /></button>
