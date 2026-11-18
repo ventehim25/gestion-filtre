@@ -303,3 +303,7 @@ Les équivalences TRW / Bosch sont celles que **Metelli** déclare (« adaptable
 ## 19. Voitures ou camions (depuis le 17/11/2026)
 
 En haut de chaque page, deux petits boutons **🚗 | 🚛** (et deux gros boutons en Vente et en Réception) : **Voitures** (choix normal) ou **Camions**. Toute l'appli suit ton choix : Vente, Réception, Produits, Stock, Recherche, VIN, Par marque… ne montrent que les pièces de ce type, et chargent plus vite. Les pièces camion ne sont pas supprimées : elles attendent le jour où tu vends pour les camions. Une nouvelle pièce est « voiture » ; après un import de catalogue, Claude relance le classement (`node scripts/classer_vehicules.mjs --ecrire`).
+
+## 20. Trouver l'équivalent d'une référence (depuis le 18/11/2026)
+
+Recherche → **Par référence** → tape **n'importe quelle référence** : la tienne, une TRW (GDB…), une Bosch (0 986…), une Gates, une Graf, un numéro d'origine ou un WVA. L'appli montre la pièce (« GDB2018 (TRW) = Metelli 22-0975-1 »), puis **toutes ses équivalences** (la référence tapée est surlignée), et « Numéros d'origine et WVA » à déplier. Pour un kit ou une pièce sans équivalence déclarée, touche **« Mêmes voitures, autre marque »** : l'appli cherche les pièces des autres marques qui vont sur les mêmes voitures (ex. kit Gates → kit Graf), avec le nombre de voitures communes — à vérifier avant de vendre.

@@ -5,7 +5,9 @@
 
 ---
 
-## ▶ REPRENDRE ICI (mis à jour le 17/11/2026)
+## ▶ REPRENDRE ICI (mis à jour le 18/11/2026)
+
+**Vérification complète (17-18/11) : FAIT** (BIBLE §8.38, GUIDE §20) — lectures par pages triées par `id` partout (245 fiches en double/manquantes avant), recherche VIN complète, « Parcourir les références » (toutes les équivalences + « Mêmes voitures, autre marque »), PDF Metelli relus (marque = police du titre, titres recollés) et réimportés (freins 104 314 liens 77 %, kits 11 927 liens 98 %), Produits par tranches de 100. **Idée** : faire tester à l'utilisateur sur son téléphone (Chrome piloté non connecté). Gates : réimport `--remplacer` facultatif pour profiter de la tolérance de puissance (code précis 8 %).
 
 **Mode 🚗/🚛 (17/11) : FAIT** (BIBLE §8.37, GUIDE §19) — `products.vehicule` (SQL collé), `node scripts/classer_vehicules.mjs --ecrire` (965 camions) **à relancer après chaque import** ; `src/lib/typeVehicule.ts` (choix commun) + `Header` + `ChoixVehicule`. Camions = projet de l'utilisateur à court terme, pas vendu aujourd'hui. Fenêtres coupées en haut corrigées (13).
 
