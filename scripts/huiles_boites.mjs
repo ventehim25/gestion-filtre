@@ -99,8 +99,11 @@ async function collecte() {
   console.log(`Collecte : ${lus} lues maintenant · ${Object.keys(brut).length} / ${total} au total`);
 }
 
+// Viscosité relue dans le nom de l'huile : « 75W-80 », mais aussi « 75W » tout court (Top Tec MTF 5100 75W)
+const viscDe = (produits) => [...new Set(produits.map((p) => p.match(/\b(\d{2})W(?:-?(\d{2,3})(W?))?\b/)).filter(Boolean).map((x) => x[2] ? `${x[1]}W-${x[2]}${x[3]}` : `${x[1]}W`))];
 function lignes() {
   const brut = lire("boites_brut.json", {});
+  for (const b of Object.values(brut)) for (const x of b.boites ?? []) x.viscosites = viscDe(x.produits ?? []);
   const parCle = new Map();
   for (const t of versions()) {
     const b = brut[cleLecture(t)]; if (!b || (!b.boites.length && !(b.fluides ?? []).length)) continue;

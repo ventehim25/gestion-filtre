@@ -291,7 +291,8 @@ export function nomFluide(nom: string): string {
 export function nomBoite(nom: string): string {
   if (/transfert/i.test(nom)) return "Boîte de transfert";
   if (/diff[ée]rentiel|pont arri|essieu/i.test(nom)) return /avant/i.test(nom) ? "Pont avant" : "Pont arrière";
-  if (/automatique|CVT|DSG|double embrayage/i.test(nom)) return "Boîte automatique";
+  if (/semi-automatique|robotis|double embrayage|DSG/i.test(nom)) return "Boîte robotisée (DSG)";
+  if (/automatique|CVT/i.test(nom)) return "Boîte automatique";
   if (/manuelle/i.test(nom)) return "Boîte manuelle";
   return nom;
 }
