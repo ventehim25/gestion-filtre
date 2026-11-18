@@ -307,3 +307,13 @@ En haut de chaque page, deux petits boutons **🚗 | 🚛** (et deux gros bouton
 ## 20. Trouver l'équivalent d'une référence (depuis le 18/11/2026)
 
 Recherche → **Par référence** → tape **n'importe quelle référence** : la tienne, une TRW (GDB…), une Bosch (0 986…), une Gates, une Graf, un numéro d'origine ou un WVA. L'appli montre la pièce (« GDB2018 (TRW) = Metelli 22-0975-1 »), puis **toutes ses équivalences** (la référence tapée est surlignée), et « Numéros d'origine et WVA » à déplier. Pour un kit ou une pièce sans équivalence déclarée, touche **« Mêmes voitures, autre marque »** : l'appli cherche les pièces des autres marques qui vont sur les mêmes voitures (ex. kit Gates → kit Graf), avec le nombre de voitures communes — à vérifier avant de vendre.
+
+## 21. La caisse et les dépenses (depuis le 18/11/2026)
+
+Menu **Caisse** (icône portefeuille).
+1. **Le matin** : tape le **fond** = l'argent qu'il y a dans le tiroir en commençant (le lendemain, l'appli propose l'argent compté la veille).
+2. **Pendant la journée** : chaque vente encaissée demande **« Reçu en »** : 💵 Espèces, 🧾 Chèque (n°, banque, date d'encaissement) ou 🏦 Virement. Seules les espèces vont dans la caisse ; chèques et virements sont listés à part.
+3. **Chaque sortie d'argent** (essence, repas, téléphone, loyer, salaire…) → **+ Dépense** : montant, catégorie, payé en espèces / banque / chèque. L'argent donné à un fournisseur (Fournisseurs → avance) est compté tout seul.
+4. **Le soir** : l'appli affiche **« Tu dois avoir en caisse »**. Compte l'argent → **J'ai compté** → elle dit s'il **manque** ou s'il y a **trop** (l'écart est gardé).
+5. **Statistiques → Coûts & Bénéfices** : la colonne **Net** = bénéfice − dépenses (ce qui te reste vraiment).
+

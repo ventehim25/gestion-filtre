@@ -7,7 +7,11 @@
 
 ## ▶ REPRENDRE ICI (mis à jour le 18/11/2026)
 
-**Numéros d'origine + VIN Par véhicule (18/11) : FAIT** (BIBLE §8.39). **En attente de l'utilisateur** : (a) accord pour transformer la fiche « Flag 5801317097 » (stock 3) en variante Flag de Filtron AP085/1 ; (b) lien ou capture de « Databays » (huile moteur + huile de boîte) — piste : huile de boîte du guide Liqui Moly.
+**Les 8 nouveautés du logiciel GMP de dinoun (18/11) : EN COURS** (BIBLE §8.41). SQL `supabase/gestion_magasin.sql` collé (12 tables vérifiées). ✅ **N° 1 Caisse + dépenses** (page `/caisse`, `src/lib/caisse.ts`, « Reçu en » à la vente / encaissement / modification → `paiements_clients`, Net dans Statistiques, GUIDE §21). **Ensuite, dans l'ordre** : 2 Retours (client : stock rendu + avoir / remboursé / déduit → `retours_clients` ; fournisseur : `receptions.type = 'retour'`, montant et quantités négatifs) · 3 Échéancier (chèques clients `paiements_clients` non encaissés, chèques fournisseurs `avances`, crédits en retard, notification du matin) · 4 Rentabilité par article / client / marque · 5 Factures numérotées + avoirs (`prochain_numero`, infos société dans `reglages`, ICE client, impression) · 6 Inventaire + régularisation (motif) + historique d'un article · 7 Stock voiture (`stock_depots` + `transferts`) · 8 Rôles (`mon_role`, vendeur sans prix d'achat) + commerciaux + banque. **Expliquer chaque étape simplement à l'utilisateur** (demande).
+
+**Huile de boîte + liquides (18/11) : EN COURS** (BIBLE §8.40) — rubrique « Boîte et liquides » en ligne ; relevé élargi (liquides) qui tourne : quand `backups/huiles/boites_brut.json` est complet → `node scripts/huiles_boites.mjs lignes` puis `envoi`, vérifier sur une Logan.
+
+**Numéros d'origine + VIN Par véhicule (18/11) : FAIT** (BIBLE §8.39). Fiche « Flag 5801317097 » fusionnée dans Filtron AP085/1 (accord donné) ; Databays = webdatabays.com (HaynesPro, payant) → inspiration de présentation seulement.
 
 **Vérification complète (17-18/11) : FAIT** (BIBLE §8.38, GUIDE §20) — lectures par pages triées par `id` partout (245 fiches en double/manquantes avant), recherche VIN complète, « Parcourir les références » (toutes les équivalences + « Mêmes voitures, autre marque »), PDF Metelli relus (marque = police du titre, titres recollés) et réimportés (freins 104 314 liens 77 %, kits 11 927 liens 98 %), Produits par tranches de 100. **Idée** : faire tester à l'utilisateur sur son téléphone (Chrome piloté non connecté). Gates : réimport `--remplacer` facultatif pour profiter de la tolérance de puissance (code précis 8 %).
 

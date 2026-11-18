@@ -1234,10 +1234,28 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Cause (2)** : le sélecteur d'articles ne cherchait que dans les fiches et les variantes de MARQUE du mode courant ; « 5801317097 » est en base comme numéro d'origine **« IVECO 5801 317097 »** (avec espace) de **Filtron AP085/1** (filtre à air, **camion**, donc caché en mode 🚗). **Corrigé** : `src/lib/origine.ts` (`chercherParOrigine` : motif souple sans espaces + contrôle exact, toutes fiches voitures et camions, cache) ; `ProductPicker` propose « Numéro d'origine : 5801 317097 IVECO = Filtron AP085/1 · 🚛 » (+ « Ce n'est pas ça : nouvelle pièce ») ; en Réception le choix prend la fiche Filtron et crée la **variante de la marque de la boîte** (Flag par défaut) avec la réf. tapée (`choisirParOrigine`) ; en Vente la fiche (même camion) est ajoutée à la liste. Composant `FiltronDe` : « 5801317097 = Filtron AP085/1 » sous la ligne dans l'historique de la Réception et sur les lignes de vente (filtres non Filtron dont la réf. est un numéro d'origine connu).
 - **Existant à régler (demande d'accord à l'utilisateur)** : la fiche « Flag 5801317097 » (filtration_autre, stock 3, réception du 17/11 « 5801317097 (Flag)×3 ») devrait devenir la variante Flag de Filtron AP085/1 (stock et réception déplacés).
 - **(3) Databays** : introuvable en recherche web (ni monde ni Maroc) → demander le lien ou une capture à l'utilisateur. Piste : l'huile de boîte (manuelle / automatique) par voiture existe dans le guide Liqui Moly déjà utilisé pour l'huile moteur (§8.19).
+- **Réglé le 18/11** : avec l'accord de l'utilisateur, la fiche « Flag 5801317097 » est devenue la **variante Flag de Filtron AP085/1** (stock et réception déplacés, ancienne fiche retirée). Databays = **webdatabays.com (HaynesPro)** : photo envoyée par l'utilisateur ; base payante sous licence → on s'inspire seulement de la présentation (§8.40), aucune donnée copiée.
+
+## 8.40 Huile de boîte et liquides par voiture (18/11/2026)
+- **Demande** : « Databays est très bon au niveau huile et huile de transmission, s'en inspirer ». Données prises dans le **guide public Liqui Moly** (le même que l'huile moteur, §8.19) — rien de HaynesPro.
+- **Où** : fiche voiture (`VoitureCarte`, Recherche → VIN / Par marque / Par véhicule) → rubrique **« Boîte et liquides »** : code de boîte, type (manuelle / automatique / **« Boîte robotisée (DSG) »** pour les semi-automatiques), huile conseillée + norme + litres, et les liquides (**frein, refroidissement, direction assistée**) ; ce qu'on a en stock est signalé.
+- **Technique** : table `huiles_boites` (`supabase/huiles_boites.sql`, colonnes `boites` + `fluides` jsonb, SQL collé « sql ok ») ; clés au même format que l'huile moteur (`~MARQUE|MODELE|cyl|E/D|kW` + désignation) ; `boitesDeLaVoiture()`, `nomBoite`, `nomFluide` dans `src/lib/huiles.ts` ; script `scripts/huiles_boites.mjs` (`collecte` reprenable → `lignes` → `envoi`, jamais de ligne remplacée par une vide ; viscosités « 75W », « 70W-75W » bien lues). Relevé élargi aux liquides **en cours** (≈ 10 000 lectures, cache `backups/huiles/boites_brut.json`) ; à la fin : `node scripts/huiles_boites.mjs envoi`.
+
+## 8.41 Les 8 nouveautés inspirées du logiciel « GMP » de dinoun (18/11/2026)
+- **Demande** : l'utilisateur a envoyé 6 captures des menus du logiciel de gestion de dinoun → « ce qu'on peut rajouter dans la nôtre » ; « on fait les 8, explique-moi toutes les étapes », « commence par le plus utilisé ».
+- **Ordre retenu** (du plus utile au moins utile au quotidien) : 1 Caisse + dépenses · 2 Retours (client / fournisseur) · 3 Échéancier (chèques, crédits en retard) · 4 Rentabilité par article / client / marque · 5 Factures numérotées + avoirs · 6 Inventaire + régularisation · 7 Stock voiture (dépôts + transferts) · 8 Rôles (vendeur sans prix d'achat) + commerciaux + banque.
+- **SQL commun** : `supabase/gestion_magasin.sql` (collé « sql ok », 12 tables vérifiées) : depenses, paiements_clients, caisse_journees, retours_clients, compteurs, factures, stock_depots, transferts, inventaires, regularisations, commerciaux, banque_mouvements + colonnes receptions.type (« reception » / « retour »), clients.ice, sales.commercial_id, utilisateurs_autorises.role / nom / commercial_id + fonctions `prochain_numero(type)` (F2026-0001, A2026-0001) et `mon_role()`. RLS `equipe` sur tout (le public ne voit rien).
+- **✅ N° 1 — Caisse du jour + dépenses (18/11)** :
+  - **Page `/caisse`** (menu « Caisse ») : choix du jour (◀ ▶), **« Tu dois avoir en caisse »** = fond de départ + espèces reçues des clients − dépenses payées en espèces − argent donné aux fournisseurs en espèces (`calculerCaisse`, `src/lib/caisse.ts`). Chèques et virements affichés à part (pas dans le tiroir).
+  - **« + Dépense »** : montant, catégorie (essence, repas, téléphone, transport, réparation voiture, loyer, salaire, fournitures, impôts, autre), payée en espèces / banque / chèque, note ; suppression possible. Résumé des dépenses du mois par catégorie.
+  - **Clôture du soir** : « J'ai compté … » → écart affiché (+ ou −), gardé dans `caisse_journees` ; le lendemain, le fond de départ proposé = l'argent compté la veille.
+  - **Argent reçu noté avec son mode** dans `paiements_clients` : à la vente (« Reçu en » espèces / chèque / virement, voyage avec la vente hors-ligne, clé « vente » = jamais en double), à l'encaissement d'un bon (+ n° du chèque, banque, date d'encaissement → servira à l'échéancier n° 3) et à la modification d'une vente (l'écart). Ne bloque jamais une vente.
+  - **Statistiques → Coûts & Bénéfices** : colonnes **Dépenses** et **Net** (= bénéfice − dépenses) par jour / semaine / mois.
+  - **Limite** : l'argent reçu avant le 18/11/2026 n'a pas de mode (non compté dans la caisse) ; la caisse est juste à partir du premier jour où le fond est saisi.
 
 ---
 
-# PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 16/11/2026)*
+# PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*
 
 *(Faits : protection de la base le 12/11, les 9 familles de pièces le 16/11 — plus jamais de SQL pour ajouter une catégorie.)*
 
@@ -1248,6 +1266,8 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 **1 bis. Catalogues Gates** : télécharge le PDF Gates d'une marque (navigates.gates.com, « Applications véhicules particuliers ») sur le Bureau → dis-le à Claude → les kits de cette marque apparaissent sur les fiches voiture (§8.34). Priorité : **Dacia**, Citroën, Fiat, Hyundai, Kia, Ford, Opel, Mercedes, Nissan.
 
 **2. Vends normalement** : accueil → **Vente**. La source (dinoun / filtropro) se met toute seule par ligne. Bon payé → camion **👛 Mettre de côté** (l'argent va dans le portefeuille dinoun, la dette ne bouge pas) ; quand tu donnes l'argent à dinoun → Fournisseurs → **Donner à dinoun** (c'est là que la dette baisse).
+
+**2 bis. La caisse (§8.41)** : le matin, menu **Caisse** → tape le fond (l'argent dans le tiroir). Chaque sortie d'argent (essence, repas…) → **+ Dépense**. Le soir → compte l'argent → **J'ai compté** : l'appli te dit s'il manque ou s'il y a trop.
 
 **3. Une fois le catalogue rempli** : envoie le lien `/tarif` aux garages (message darija prêt dans `docs/SESSION_RECAP.md`), puis on lance la campagne e-mail des prospects.
 
