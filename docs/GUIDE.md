@@ -317,3 +317,12 @@ Menu **Caisse** (icône portefeuille).
 4. **Le soir** : l'appli affiche **« Tu dois avoir en caisse »**. Compte l'argent → **J'ai compté** → elle dit s'il **manque** ou s'il y a **trop** (l'écart est gardé).
 5. **Statistiques → Coûts & Bénéfices** : la colonne **Net** = bénéfice − dépenses (ce qui te reste vraiment).
 
+## 22. Les retours de pièces (depuis le 18/11/2026)
+
+**Un garage te rend des pièces** : Ventes → sur le bon, touche **↩**.
+1. Avec **+ / −**, mets combien de pièces il rend (« tout » = toute la ligne).
+2. Choisis pour l'argent : **🎁 Avoir** (il l'utilisera à sa prochaine vente, bouton « Déduire »), **💵 Je lui rends l'argent** (sort de la caisse du jour) ou **➖ Déduire de ce qu'il doit** (s'il n'a pas tout payé).
+3. **Valider** : les pièces reviennent dans le stock toutes seules ; le bon garde « ↩ −X rendu ».
+
+**Tu rends des pièces à dinoun / filtropro** : Fournisseurs → sur le fournisseur, **Rendre des pièces** → choisis les pièces (+ / −), vérifie le prix d'achat → **Valider**. Le stock baisse et la dette baisse (ou ton capital remonte). Erreur ? Historique → **✕** sur la ligne « ↩ » pour annuler.
+

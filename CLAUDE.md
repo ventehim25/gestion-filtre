@@ -82,7 +82,8 @@ Colonnes ajoutées (migrations dans `supabase/`) :
 - `/recherche` (par référence) : clic sur la réf = déplie les **références enregistrées** (avec prix), pas les OE auto. Chaque voiture (VIN, Par marque) : **kit** (« Vendre ce kit » → `/ventes?kit=id,id*2`, WhatsApp) + **huile moteur** (`src/lib/huiles.ts`).
 - **4 catalogues de prix** (`src/lib/prixCatalogues.ts`) : garage (prix saisi), particulier +30 %, location +15 %, magasin −5 % ; `/tarif?k=<clé>` (clés dans `CATALOGUES`), Paramètres → « Mes 4 catalogues » ; en vente le prix suit `clients.type`.
 - `/caisse` : caisse du jour (fond + espèces reçues − dépenses espèces − avances fournisseurs espèces), dépenses par catégorie, clôture du soir avec écart (`src/lib/caisse.ts`, tables depenses / paiements_clients / caisse_journees, BIBLE §8.41). Tout argent reçu d'un client passe par `noterPaiement()` (mode espèces/chèque/virement ; clé « vente » à la création = jamais en double).
-- `/stats` : coûts/bénéfices jour/semaine/mois + dépenses + net, par fournisseur, capital vs crédit, évolution du capital. Bénéfices basés sur `cout_unitaire` (fallback `products.prix_achat`).
+- **Retours** (`src/lib/retours.ts`, BIBLE §8.41) : client = bouton ↩ sur un bon (`retours_clients`, stock remis, avoir / rendu (paiement négatif) / déduit (montant_paye)) ; fournisseur = « Rendre des pièces » → `receptions` type « retour », montant et quantités négatifs (l'annulation ✕ marche telle quelle). Le bon d'origine n'est jamais modifié.
+- `/stats` : coûts/bénéfices jour/semaine/mois + dépenses + net (retours clients enlevés le jour du retour), par fournisseur, capital vs crédit, évolution du capital. Bénéfices basés sur `cout_unitaire` (fallback `products.prix_achat`).
 - PWA installable (bannière), `manifest.json` orientation `any`.
 
 ## Scripts (dossier scripts/, reprenables)
