@@ -363,3 +363,13 @@ Menu **Stock voiture**.
 
 Le stock total de l'appli ne change pas quand tu charges ou décharges : la page montre ce qui est dans la voiture et ce qui reste au magasin.
 
+## 28. Équipe, vendeurs, commerciaux, banque (depuis le 18/11/2026)
+
+**Une seule fois** : colle `supabase/equipe.sql` dans l'éditeur SQL de Supabase (comme les autres fois).
+
+**Donner l'appli à un vendeur** : menu **Équipe** → **Ajouter** → son e-mail, son nom, **Vendeur** → Enregistrer. Puis dans Supabase → **Authentication → Users → Add user** : le même e-mail + un mot de passe (coche « Auto confirm »). Le vendeur vend, encaisse, cherche, fait les factures et la tournée, mais ne voit ni tes prix d'achat, ni tes bénéfices, ni la caisse, ni les fournisseurs, ni la banque.
+
+**Commerciaux** : Équipe → **+ Commercial** (nom, téléphone, commission en %). Dans la vente, choisis le **Commercial du bon** ; Équipe montre ses ventes du mois et sa commission.
+
+**Banque** : menu **Banque**. D'abord **Autre / solde de départ** (le solde de ton relevé). Ensuite l'appli ajoute toute seule les chèques encaissés, les chèques donnés débités, les virements des clients et les dépenses payées par banque. Toi, tu ajoutes les **dépôts d'espèces** (ils sortent de la caisse du jour), les **retraits** et les **frais**.
+
