@@ -109,6 +109,10 @@ const designation = (cm: string, texte: string | null, modele?: string) => {
 };
 type VoitureHuile = { marque: string; modele: string; moteur: string | null; code_moteur: string | null; annee_debut: string | null; puissance: string | null };
 /** Clés possibles de la voiture (puissance exacte d'abord, puis ± 1 et ± 2 kW : Filtron donne des ch arrondis). */
+const ALIAS_MODELE: Record<string, string> = {
+  "CITROEN|DISPATCH": "JUMPY", "CITROEN|RELAY": "JUMPER", "CITROEN|SYNERGIE": "EVASION",
+  "PEUGEOT|EXPERT TEPEE": "EXPERT", "FIAT|GRANDE PUNTO": "PUNTO", "RENAULT|GRAND SCENIC": "SCENIC",
+};
 export function clesVoiture(v: VoitureHuile): string[] {
   const ch = Number((String(v.puissance ?? "").match(/\d+(?:[.,]\d+)?/) ?? [""])[0].replace(",", "."));
   if (!ch) return [];
@@ -117,9 +121,13 @@ export function clesVoiture(v: VoitureHuile): string[] {
   const cm = cleMarque(v.marque);
   const cyl = (v.moteur ?? "").match(/(\d)[.,](\d)/);
   const des = designation(cm, v.moteur, v.modele);
+  // Même voiture, autre nom chez Filtron et dans le guide : « Dispatch » = « Jumpy », « Relay » = « Jumper »,
+  // « Synergie » = « Evasion » (Citroën) — BIBLE §8.49
+  const fam = familleModele(v.modele);
+  const familles = [fam, ...(ALIAS_MODELE[`${cm}|${fam}`] ? [ALIAS_MODELE[`${cm}|${fam}`]] : [])];
   const bases = [
     ...(des ? [`~${cm}|=${des}|${carb}|`] : []),
-    ...(cyl ? [`~${cm}|${familleModele(v.modele)}|${cyl[1]}.${cyl[2]}|${carb}|`] : []),
+    ...(cyl ? familles.map((f) => `~${cm}|${f}|${cyl[1]}.${cyl[2]}|${carb}|`) : []),
   ];
   return bases.flatMap((b) => [0, -1, 1, -2, 2].map((d) => b + (kw + d)));
 }

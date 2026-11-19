@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { cameraPlaceholder, logoPlaceholder } from "@/lib/filterPhotos";
+import { cameraPlaceholder, illustrationPiece, logoPlaceholder } from "@/lib/filterPhotos";
 import { getImgIdx, setImgIdx } from "@/lib/imgMemo";
 import { s7Name, photoCopieUrl } from "@/lib/photoCopie";
 import { photoMann } from "@/lib/categories";
@@ -30,7 +30,8 @@ export default function FilterImage({
       photoCopieUrl(reference),
     ] : []),
     // Pas de vraie photo → logo (catalogues, côté client) ou appareil photo (gestion, ma vue)
-    placeholder === "logo" ? logoPlaceholder() : cameraPlaceholder(),
+    // (sauf pièce dont on a un dessin : kit, courroie, galet, chaîne, pompe, frein… BIBLE §8.48)
+    illustrationPiece(categorie) ?? (placeholder === "logo" ? logoPlaceholder() : cameraPlaceholder()),
   ];
   // Clé mémo : dépend de la réf, de la présence d'une vraie photo et du nb de candidats.
   const memoKey = `${reference.toUpperCase()}|${imageUrl ? 1 : 0}|${candidates.length}`;

@@ -45,6 +45,7 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
   const [boites, setBoites] = useState<HuileBoiteLigne[]>([]);
   // Freinage : la référence TRW (celle que les garages connaissent) à la place de la réf. Metelli — demande du 18/11
   const [trw, setTrw] = useState<Map<string, string[]>>(new Map());
+  const [typesOuverts, setTypesOuverts] = useState<Set<string>>(new Set()); // types de pièces dépliés (« + N autres »)
   const idsFreins = voiture.filtres.filter((f) => familleDe(f.categorie) === "freinage").map((f) => f.id).sort().join(",");
   useEffect(() => {
     if (!idsFreins) { setTrw(new Map()); return; }
@@ -159,7 +160,25 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
               {t.cats.includes("chaine_distribution") && !pieces.some((f) => ["courroie_distribution", "kit_distribution", "galet_distribution"].includes(f.categorie)) && (
                 <p className="text-[11px] text-slate-400 mt-0.5">Moteur à chaîne : pas de courroie ni de galet de distribution. Le kit chaîne contient la chaîne, le tendeur et les patins.</p>
               )}
-              <div className="grid sm:grid-cols-2 gap-2 mt-1">{pieces.filter((f) => t.cats.includes(f.categorie)).map(piece)}</div>
+              {(() => {
+                // 2 pièces par type (en stock, puis avec un prix, d'abord), le reste derrière « + N autres » : une fiche
+                // Evasion avait 21 pièces de distribution et les freins passaient inaperçus (BIBLE §8.49)
+                const liste = pieces.filter((f) => t.cats.includes(f.categorie))
+                  .sort((a, b) => Number(b.stock > 0) - Number(a.stock > 0) || Number(b.prix_vente > 0) - Number(a.prix_vente > 0));
+                const ouvert = typesOuverts.has(`${fa.k}|${t.titre}`);
+                const vues = ouvert ? liste : liste.slice(0, 2);
+                return (
+                  <>
+                    <div className="grid sm:grid-cols-2 gap-2 mt-1">{vues.map(piece)}</div>
+                    {liste.length > 2 && (
+                      <button type="button" className="text-xs text-blue-400 mt-1"
+                        onClick={() => setTypesOuverts((prev) => { const n = new Set(prev); const k = `${fa.k}|${t.titre}`; if (n.has(k)) n.delete(k); else n.add(k); return n; })}>
+                        {ouvert ? "Voir moins" : `+ ${liste.length - 2} autre${liste.length - 2 > 1 ? "s" : ""}`}
+                      </button>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           ))}
         </div>

@@ -43,3 +43,55 @@ const LOGO_SVG =
 export function logoPlaceholder(): string {
   return "data:image/svg+xml," + encodeURIComponent(LOGO_SVG);
 }
+
+// Dessin propre par type de pièce (19/11/2026, choix de l'utilisateur « 2 ») : pour les pièces sans photo dans les
+// catalogues officiels (Gates : kits, courroies, galets, chaînes…) — au lieu de l'appareil photo. Une vraie photo
+// (prise par l'utilisateur ou tirée d'un catalogue) passe toujours avant. BIBLE §8.48.
+const FOND = "<rect width='120' height='120' fill='#f4efe4'/>";
+const SOMBRE = "#3f3a33", OR = "#b8963e", GRIS = "#d9d2c3", EAU = "#3b82c4", FRICTION = "#8d8676";
+const svg = (corps: string) => "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'>" + FOND + corps + "</svg>";
+const poulie = (cx: number, cy: number, r: number) =>
+  `<circle cx='${cx}' cy='${cy}' r='${r}' fill='${GRIS}' stroke='${SOMBRE}' stroke-width='3'/>` +
+  `<circle cx='${cx}' cy='${cy}' r='${Math.round(r * 0.55)}' fill='none' stroke='${SOMBRE}' stroke-width='2'/>` +
+  `<circle cx='${cx}' cy='${cy}' r='${Math.max(3, Math.round(r * 0.22))}' fill='${OR}'/>`;
+const goutte = (x: number, y: number) =>
+  `<path d='M${x} ${y - 11} C ${x + 8} ${y - 1}, ${x + 8} ${y + 7}, ${x} ${y + 7} C ${x - 8} ${y + 7}, ${x - 8} ${y - 1}, ${x} ${y - 11} Z' fill='${EAU}'/>`;
+const deg = (a: number) => (a * Math.PI) / 180;
+const ILLUSTRATIONS: Record<string, string> = {
+  courroie_distribution: svg(
+    `<rect x='22' y='40' width='76' height='40' rx='20' fill='none' stroke='${SOMBRE}' stroke-width='7'/>` +
+    `<rect x='17' y='35' width='86' height='50' rx='25' fill='none' stroke='${SOMBRE}' stroke-width='4' stroke-dasharray='3 3.5'/>`),
+  courroie_accessoire: svg(
+    `<rect x='18' y='38' width='84' height='44' rx='22' fill='none' stroke='${SOMBRE}' stroke-width='11'/>` +
+    `<rect x='18' y='38' width='84' height='44' rx='22' fill='none' stroke='${GRIS}' stroke-width='1.5'/>`),
+  kit_courroie_accessoire: svg(
+    `<rect x='14' y='30' width='92' height='50' rx='25' fill='none' stroke='${SOMBRE}' stroke-width='8'/>` + poulie(36, 55, 15) + poulie(84, 55, 11) + poulie(60, 96, 9)),
+  galet_distribution: svg(
+    poulie(56, 56, 34) + `<path d='M56 56 L98 94' stroke='${SOMBRE}' stroke-width='6' stroke-linecap='round'/><circle cx='98' cy='94' r='6' fill='${SOMBRE}'/><circle cx='56' cy='56' r='7' fill='${OR}'/>`),
+  poulie: svg(poulie(60, 60, 38) + `<circle cx='60' cy='60' r='30' fill='none' stroke='${SOMBRE}' stroke-width='1.5' stroke-dasharray='2 2'/>`),
+  kit_distribution: svg(
+    `<path d='M30 38 A 20 20 0 1 0 30 78 L 86 70 A 14 14 0 1 0 86 42 Z' fill='none' stroke='${SOMBRE}' stroke-width='7' stroke-linejoin='round'/>` +
+    poulie(30, 58, 15) + poulie(86, 56, 10) + poulie(60, 98, 9)),
+  kit_distribution_pompe: svg(
+    `<path d='M28 34 A 20 20 0 1 0 28 74 L 82 66 A 14 14 0 1 0 82 38 Z' fill='none' stroke='${SOMBRE}' stroke-width='7' stroke-linejoin='round'/>` +
+    poulie(28, 54, 15) + poulie(82, 52, 10) + goutte(100, 100) +
+    `<circle cx='70' cy='96' r='12' fill='${GRIS}' stroke='${SOMBRE}' stroke-width='3'/><path d='M70 86 v20 M60 96 h20 M63 89 l14 14 M77 89 l-14 14' stroke='${SOMBRE}' stroke-width='1.8'/>`),
+  chaine_distribution: svg(
+    [0, 1, 2, 3].map((i) => `<rect x='${12 + i * 25}' y='${i % 2 ? 50 : 46}' width='34' height='${i % 2 ? 20 : 28}' rx='${i % 2 ? 10 : 14}' fill='none' stroke='${SOMBRE}' stroke-width='5'/>`).join("") +
+    [0, 1, 2, 3].map((i) => `<circle cx='${22 + i * 25}' cy='60' r='3.5' fill='${OR}'/>`).join("")),
+  pompe_eau: svg(
+    `<path d='M30 40 L72 30 L96 52 L88 88 L48 96 L24 74 Z' fill='${GRIS}' stroke='${SOMBRE}' stroke-width='3' stroke-linejoin='round'/>` + poulie(60, 62, 18) + goutte(98, 30)),
+  plaquette_frein: svg(
+    `<path d='M16 50 Q60 24 104 50 L100 86 Q60 70 20 86 Z' fill='${GRIS}' stroke='${SOMBRE}' stroke-width='3' stroke-linejoin='round'/>` +
+    `<path d='M24 58 Q60 38 96 58 L93 80 Q60 66 27 80 Z' fill='${FRICTION}'/><path d='M60 46 v28' stroke='${GRIS}' stroke-width='2.5'/>`),
+  disque_frein: svg(
+    `<circle cx='60' cy='60' r='44' fill='${GRIS}' stroke='${SOMBRE}' stroke-width='3'/>` +
+    `<circle cx='60' cy='60' r='18' fill='#f4efe4' stroke='${SOMBRE}' stroke-width='3'/><circle cx='60' cy='60' r='6' fill='${SOMBRE}'/>` +
+    [0, 72, 144, 216, 288].map((a) => `<circle cx='${(60 + 12 * Math.cos(deg(a))).toFixed(1)}' cy='${(60 + 12 * Math.sin(deg(a))).toFixed(1)}' r='2.2' fill='${SOMBRE}'/>`).join("") +
+    [20, 65, 110, 155, 200, 245, 290, 335].map((a) => `<path d='M${(60 + 26 * Math.cos(deg(a))).toFixed(1)} ${(60 + 26 * Math.sin(deg(a))).toFixed(1)} L${(60 + 40 * Math.cos(deg(a))).toFixed(1)} ${(60 + 40 * Math.sin(deg(a))).toFixed(1)}' stroke='${FRICTION}' stroke-width='2.2'/>`).join("")),
+};
+/** Dessin du type de pièce (data URI), ou null si on n'en a pas (les filtres ont leurs photos MANN). */
+export function illustrationPiece(categorie?: string | null): string | null {
+  const s = categorie ? ILLUSTRATIONS[categorie] : undefined;
+  return s ? "data:image/svg+xml," + encodeURIComponent(s) : null;
+}
