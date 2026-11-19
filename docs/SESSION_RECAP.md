@@ -5,7 +5,9 @@
 
 ---
 
-## ▶ REPRENDRE ICI (mis à jour le 18/11/2026)
+## ▶ REPRENDRE ICI (mis à jour le 19/11/2026)
+
+**19/11** : pompes et kits Airtex importés (868 fiches, BIBLE §8.45), huile de boîte complète (7 741 lignes), catalogue Filtron toutes marques complet (81 269). **En attente** : PDF Gates « Système d'entraînement auxiliaire » + « Système de refroidissement » (courroies d'accessoires Micro-V, pompes Gates) → lire les noms de groupes puis compléter TYPES dans `import_gates_pdf.mjs`.
 
 **Courroie d'accessoires + pompe à eau (19/11, demande après un test VIN)** : manquent parce que les 37 PDF Gates du Bureau (« gates distribuon marque ») ne contiennent QUE la distribution PowerGrip (Dacia : 0 ligne écartée, types kit / courroie / galet / chaîne / kit + pompe). **En attente de l'utilisateur** : télécharger sur navigates.gates.com les mêmes PDF « Applications véhicules particuliers » avec les gammes **Micro-V (courroies et kits d'accessoires)** et **Pompes à eau**, marques prioritaires d'abord, dans un dossier du Bureau → alors ajouter leurs groupes au tableau TYPES de `scripts/import_gates_pdf.mjs` (catégories courroie_accessoire / kit_courroie_accessoire / pompe_eau existent) après avoir lu les noms de groupes du PDF. **Airtex** : aucun catalogue PDF public trouvé (recherche web) → demander le catalogue au fournisseur Airtex, ou captures → `scripts/ajouter_equivalences.mjs` ; une boîte Airtex reçue = « + Autre marque » en Réception.
 
