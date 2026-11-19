@@ -16,6 +16,22 @@ import type { HuileMoteur, HuileBoiteLigne } from "@/types/database";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { Package, Send, Droplet, Cog, Disc } from "lucide-react";
 
+// Rubriques Distribution / Freinage rangées par type, avec un titre chacun (demande du 19/11 : « la poulie tendeur et la
+// courroie seule doivent s'afficher » — elles y étaient, noyées parmi 8 à 10 pièces sans titre). BIBLE §8.46.
+const SOUS_TYPES: { titre: string; cats: string[] }[] = [
+  { titre: "Kit de distribution", cats: ["kit_distribution"] },
+  { titre: "Kit de distribution + pompe à eau", cats: ["kit_distribution_pompe"] },
+  { titre: "Courroie de distribution seule", cats: ["courroie_distribution"] },
+  { titre: "Poulie tendeur / galet enrouleur", cats: ["galet_distribution"] },
+  { titre: "Pompe à eau", cats: ["pompe_eau"] },
+  { titre: "Chaîne de distribution", cats: ["chaine_distribution"] },
+  { titre: "Kit courroie d'accessoires", cats: ["kit_courroie_accessoire"] },
+  { titre: "Courroie d'accessoires", cats: ["courroie_accessoire"] },
+  { titre: "Poulie (vilebrequin, alternateur)", cats: ["poulie"] },
+  { titre: "Plaquettes de frein", cats: ["plaquette_frein"] },
+  { titre: "Disques de frein", cats: ["disque_frein"] },
+];
+
 export default function VoitureCarte({ v: voiture, action }: { v: Voiture; action?: React.ReactNode }) {
   const router = useRouter();
   // Mode de l'appli (🚗 voitures / 🚛 camions, BIBLE §8.37) : seulement les pièces de ce mode
@@ -77,7 +93,7 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
             </>
           ) : (
             <>
-              <div className="text-xs text-slate-400">{libelle(f.categorie)}{f.marque && familleDe(f.categorie) !== "filtres_huile" ? ` · ${f.marque}` : ""}</div>
+              <div className="text-xs text-slate-400">{f.categorie === "galet_distribution" && f.nom_fr ? f.nom_fr.replace(f.marque ? " " + f.marque : "", "").trim() : libelle(f.categorie)}{f.marque && familleDe(f.categorie) !== "filtres_huile" ? ` · ${f.marque}` : ""}</div>
               <div className="font-mono font-semibold truncate">{f.reference}</div>
             </>
           )}
@@ -137,7 +153,12 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
             {fa.k === "freinage" ? <Disc size={14} className="text-amber-300" /> : <Cog size={14} className="text-amber-300" />} {fa.court}
             <span className="text-xs text-slate-500 font-normal">(catalogue officiel {[...new Set(pieces.map((f) => f.marque).filter(Boolean))].join(", ") || "fabricant"}{fa.k === "freinage" && pieces.some((f) => trw.has(f.id)) ? " · réf. TRW" : ""})</span>
           </div>
-          <div className="grid sm:grid-cols-2 gap-2 mt-1.5">{pieces.map(piece)}</div>
+          {SOUS_TYPES.filter((t) => pieces.some((f) => t.cats.includes(f.categorie))).concat(pieces.some((f) => !SOUS_TYPES.some((t) => t.cats.includes(f.categorie))) ? [{ titre: "Autres", cats: [...new Set(pieces.filter((f) => !SOUS_TYPES.some((t) => t.cats.includes(f.categorie))).map((f) => f.categorie))] }] : []).map((t) => (
+            <div key={t.titre} className="mt-2">
+              <div className="text-[11px] uppercase tracking-wide text-amber-300/80 font-semibold">{t.titre} <span className="text-slate-500 normal-case font-normal">({pieces.filter((f) => t.cats.includes(f.categorie)).length})</span></div>
+              <div className="grid sm:grid-cols-2 gap-2 mt-1">{pieces.filter((f) => t.cats.includes(f.categorie)).map(piece)}</div>
+            </div>
+          ))}
         </div>
       ))}
 

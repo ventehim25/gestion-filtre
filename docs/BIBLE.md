@@ -1313,6 +1313,12 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Courroie d'accessoires** : absente car les PDF Gates téléchargés = distribution seulement. Sur navigates.gates.com, cocher **« Système d'entraînement auxiliaire »** (Micro-V : courroies, kits, galets d'accessoires) et **« Système de refroidissement »** (pompes à eau). **Continental** : pas de PDF courroies (catalogue en ligne TecAlliance seulement, données sous licence, non recopiées) → rappel du cron arrêté (`reglages.catalogue_continental_importe`).
 - **Huile de boîte terminée** : relevé complet (8 679 versions) → **7 741 lignes** (7 530 avec une huile) ; contrôle sur 10 modèles courants : **80 %** des versions (Clio 17/20, Golf 17/20, Yaris 16/20, 208 19/20, Fiesta 19/20, Picanto 17/20, Accent 16/20, Classe C 14/20, Logan 13/20, Punto 12/20).
 
+## 8.46 Fiche voiture : distribution et freinage rangés par type (19/11/2026)
+- **Demande** : « rajoute la poulie tendeur comme les filtres, kits, huile et frein dans la recherche VIN — elle est dans les catalogues Gates des kits, et aussi la courroie seule ».
+- **Constat** : les données étaient là (Logan 1.5 dCi K9K 796 : kit Gates K025578XS, **courroie seule 5578XS**, **galet tendeur T43014**, kits + pompe Gates/Airtex, pompe Airtex WPA-1746, kit Graf TP074) et la recherche VIN les chargeait, mais la rubrique « Distribution » les montrait en une seule liste sans titre (8 à 10 pièces depuis l'import Airtex).
+- **Fait** (`VoitureCarte`, `SOUS_TYPES`) : un titre par type avec le nombre — **Kit de distribution · Kit de distribution + pompe à eau · Courroie de distribution seule · Poulie tendeur / galet enrouleur · Pompe à eau · Chaîne · Kit courroie d'accessoires · Courroie d'accessoires · Poulie** ; freinage : **Plaquettes · Disques**. Un galet affiche son vrai nom (« Galet tendeur de distribution », « Galet enrouleur… », « Amortisseur de vibrations… ») : `nom_fr` ajouté à `COLS` / `ProdLite` (`src/lib/voitures.ts`).
+- La poulie tendeur de la **courroie d'accessoires** viendra avec les PDF Gates « Système d'entraînement auxiliaire ».
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*
