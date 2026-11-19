@@ -1319,6 +1319,12 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Fait** (`VoitureCarte`, `SOUS_TYPES`) : un titre par type avec le nombre — **Kit de distribution · Kit de distribution + pompe à eau · Courroie de distribution seule · Poulie tendeur / galet enrouleur · Pompe à eau · Chaîne · Kit courroie d'accessoires · Courroie d'accessoires · Poulie** ; freinage : **Plaquettes · Disques**. Un galet affiche son vrai nom (« Galet tendeur de distribution », « Galet enrouleur… », « Amortisseur de vibrations… ») : `nom_fr` ajouté à `COLS` / `ProdLite` (`src/lib/voitures.ts`).
 - La poulie tendeur de la **courroie d'accessoires** viendra avec les PDF Gates « Système d'entraînement auxiliaire ».
 
+## 8.47 Pub réseaux hebdomadaire — routine cloud (19/11/2026)
+- Kit publicitaire créé pour **OP540/1** (filtre à huile Filtron, Renault Clio 1.5 dCi) — 6ᵉ produit traité après oe667-3, oe688-3, ap071-7, golf-7-4-filtres, oe688-1. Référence et prix (30 MAD) sourcés dans `supabase/data_only.sql` / `supabase/filtron_inserts.sql`, équivalences dans `supabase/equivalences.sql` — aucune invention.
+- **Point de vigilance corrigé en relecture** : le brouillon du sous-agent affirmait à tort qu'OP540/1 est « 1 seul filtre pour 6 voitures » (Clio/Megane/Logan/Sandero/Duster/Kangoo). En réalité OP540/1 à OP540/5 sont **5 références Filtron distinctes**, une par groupe de modèles (confirmé par des équivalences Mann/Mahle/Purflux différentes entre OP540/1 et OP540/3 dans `supabase/equivalents_mann_wix.sql` / `equivalents_mahle_purflux.sql`). Kit et affiche réécrits pour rester exacts : OP540/1 = Clio, mention de la gamme complète (OP540/2 à /5) sans jamais dire qu'une seule réf irait sur les 6 voitures.
+- Fichiers : `docs/pub/op540-1.md` + `docs/pub/op540-1-affiche.html` (affiche 9:16 autonome, charte FiltroPro).
+- Reste à faire côté utilisateur : filmer les plans, monter dans CapCut, exporter l'affiche en image, publier jeudi/vendredi/samedi.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*
