@@ -1,4 +1,4 @@
-// Photos des pièces tirées des catalogues PDF OFFICIELS (BIBLE §8.47) : pompes / kits Airtex, kits Graf et Metelli,
+// Photos des pièces tirées des catalogues PDF OFFICIELS (BIBLE §8.48) : pompes / kits Airtex, kits Graf et Metelli,
 // plaquettes Metelli. Demande de l'utilisateur (19/11/2026) : « pour les photos des chaînes, pompes et freinage on doit
 // retravailler » (la fiche voiture montrait un appareil photo). Les catalogues Gates n'ont pas de photos de pièces.
 //
@@ -117,8 +117,14 @@ for (const [cle, fichier] of photos) {
   if (!f) { sansFiche++; continue; }
   if (f.image_url) { dejaPhoto++; continue; }
   const chemin = `catalogue/${MARQUE.toLowerCase()}/${cle}.jpg`;
-  const { error } = await sb.storage.from("produits").upload(chemin, readFileSync(fichier), { contentType: "image/jpeg", upsert: true });
-  if (error) throw new Error(`stockage ${chemin} : ${error.message}`);
+  // 3 essais (coupure réseau passagère pendant un long envoi)
+  let error = null;
+  for (let essai = 1; essai <= 3; essai++) {
+    ({ error } = await sb.storage.from("produits").upload(chemin, readFileSync(fichier), { contentType: "image/jpeg", upsert: true }));
+    if (!error) break;
+    await new Promise((r) => setTimeout(r, essai * 5000));
+  }
+  if (error) { console.log(`  ⚠ stockage ${chemin} : ${error.message} (passée)`); continue; }
   const url = sb.storage.from("produits").getPublicUrl(chemin).data.publicUrl;
   const { error: e2 } = await sb.from("products").update({ image_url: url }).eq("id", f.id).is("image_url", null);
   if (e2) throw e2;
