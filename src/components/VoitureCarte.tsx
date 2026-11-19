@@ -156,6 +156,9 @@ export default function VoitureCarte({ v: voiture, action }: { v: Voiture; actio
           {SOUS_TYPES.filter((t) => pieces.some((f) => t.cats.includes(f.categorie))).concat(pieces.some((f) => !SOUS_TYPES.some((t) => t.cats.includes(f.categorie))) ? [{ titre: "Autres", cats: [...new Set(pieces.filter((f) => !SOUS_TYPES.some((t) => t.cats.includes(f.categorie))).map((f) => f.categorie))] }] : []).map((t) => (
             <div key={t.titre} className="mt-2">
               <div className="text-[11px] uppercase tracking-wide text-amber-300/80 font-semibold">{t.titre} <span className="text-slate-500 normal-case font-normal">({pieces.filter((f) => t.cats.includes(f.categorie)).length})</span></div>
+              {t.cats.includes("chaine_distribution") && !pieces.some((f) => ["courroie_distribution", "kit_distribution", "galet_distribution"].includes(f.categorie)) && (
+                <p className="text-[11px] text-slate-400 mt-0.5">Moteur à chaîne : pas de courroie ni de galet de distribution. Le kit chaîne contient la chaîne, le tendeur et les patins.</p>
+              )}
               <div className="grid sm:grid-cols-2 gap-2 mt-1">{pieces.filter((f) => t.cats.includes(f.categorie)).map(piece)}</div>
             </div>
           ))}
