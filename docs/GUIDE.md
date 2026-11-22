@@ -379,3 +379,11 @@ Le stock total de l'appli ne change pas quand tu charges ou décharges : la page
 
 Menu **Mon stock** (ou la case **En stock** sur l'accueil) : le total de pièces, le nombre par famille et par type (filtres à huile, à air…), puis chaque référence avec sa quantité. Vert = en stock, orange = 2 ou moins, rouge = négatif (à recompter dans **Inventaire**). Tape une réf. pour la trouver, **Imprimer** pour une feuille de stock. Pour corriger un chiffre : **Inventaire**.
 
+## 30. La marchandise d'avant (notée dans le cahier) (depuis le 22/11/2026)
+
+1. Menu **Stock voiture** → **📒 Marchandise d'avant (cahier)**.
+2. **Compte les boîtes** et tape chaque référence avec son nombre (si tu ne peux pas tout compter, mets ce que tu as compté et reviens plus tard).
+3. **Elle est à qui ?** → **dinoun** (elle est déjà dans sa dette par le cahier). Coche « Elle est dans la voiture ».
+4. **Ajouter au stock** : le stock monte, **la dette ne bouge pas** (pas de double solde).
+5. À la vente, ces boîtes passent toutes seules en **« 📒 cahier · dinoun »** : le camion « mettre de côté » te dit ce que tu dois à dinoun. Quand il n'en reste plus, tout redevient normal.
+

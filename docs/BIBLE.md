@@ -1343,6 +1343,12 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Accueil** : la case « Produits » (nombre de fiches du catalogue, ≈ 9 000, inutile) devient **« En stock · N réf. — X pièces »** → `/mon-stock`.
 - **Chiffres du 22/11** : **622 pièces sur 43 références** (filtres à huile 447, à air 114, à carburant 47, habitacle 1, huile 8, kits 2, plaquettes 2, courroie d'accessoire 1) ; **2 références en stock négatif** à recompter.
 
+## 8.51 Marchandise d'avant (notée dans le cahier) : dans le stock sans double solde (22/11/2026)
+- **Demande** : « j'ai déjà de la marchandise dans la voiture, notée avant dans le cahier, je ne sais pas combien ; comment la faire entrer dans le stock et la vendre sans bouger le capital / la dette dinoun » puis « compte-la pour dinoun : je l'ai déjà notée dans le cahier, si je la renote ce sera un double solde ».
+- **Entrée** (Stock voiture → **📒 Marchandise d'avant (cahier)**, `ajouterStockAvant` dans `src/lib/voiture.ts`) : on compte les boîtes, on tape les quantités (on peut compléter plus tard), on choisit **à qui elle est** (dinoun par défaut ; ou un autre fournisseur ; ou « à moi ») et si elle est dans la voiture. Le stock monte par une correction motif **« 📒 Stock d'avant (cahier) »** (`corrigerStock`, motif ajouté à `MOTIFS`) — **aucune réception** → ni la dette dinoun ni le capital ne bougent (pas de double solde). Dépôt `avant:<fournisseur>` (`stock_depots`) = combien il en reste et à qui ; + dépôt « voiture » ; trace `transferts` cahier → voiture.
+- **Vente** (`/ventes`) : tant qu'il reste de la marchandise d'avant pour une pièce, la ligne prend **le fournisseur à qui elle est** (bouton « 📒 cahier · dinoun », auto) → le camion « mettre de côté » compte ce qu'on doit à dinoun ; la vente emporte `stock_avant` = le dépôt, et `envoyerVente` (étape 3 ter, drapeau `avantFait`) le fait baisser une seule fois. Quand il n'en reste plus, la source redevient normale (dernière réception). Un tap sur dinoun / filtropro force une autre source.
+- La page Stock voiture rappelle « il reste N pièce(s) de la marchandise d'avant ».
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*

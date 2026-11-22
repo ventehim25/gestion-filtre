@@ -2,10 +2,10 @@
 // synchronisée vers Supabase dès que le réseau revient.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { noterPaiement } from "./caisse";
-import { ajusterVoiture } from "./voiture";
+import { ajusterVoiture, ajusterDepot } from "./voiture";
 import type { SaleStatus } from "@/types/database";
 
-export type PendingLine = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string | null; equivalence_id?: string | null; cout_unitaire?: number | null };
+export type PendingLine = { product_id: string; quantite: number; prix_unitaire: number; nom: string; fournisseur_id?: string | null; equivalence_id?: string | null; cout_unitaire?: number | null; stock_avant?: string /* dépôt de la marchandise d'avant (cahier) à faire baisser, BIBLE §8.51 */ };
 export type PendingSale = {
   localId: string;
   client_id: string;
@@ -20,6 +20,7 @@ export type PendingSale = {
   commercial_id?: string | null; // commercial du bon (BIBLE §8.41 n° 8)
   depuis_voiture?: boolean; // pièces sorties de la voiture (tournée) : enlevées aussi du stock voiture (BIBLE §8.41)
   voitureFaite?: boolean;
+  avantFait?: boolean;
   notes: string | null;
   createdAt: number;
   // Avancement de l'envoi (reprise sans doublon si le réseau coupe au milieu)
@@ -145,6 +146,12 @@ async function envoyerUne(supabase: SupabaseClient<any>, localId: string): Promi
       if (s.depuis_voiture && !s.voitureFaite) {
         try { for (const l of s.lines) await ajusterVoiture(supabase, { product_id: l.product_id, equivalence_id: l.equivalence_id ?? null }, -l.quantite); } catch { /* stock voiture : indicatif */ }
         avancer(s.localId, { voitureFaite: true });
+      }
+
+      // 3 ter) Marchandise d'avant vendue : son compteur baisse (une seule fois ; ne bloque jamais la vente)
+      if (!s.avantFait && s.lines.some((l) => l.stock_avant)) {
+        try { for (const l of s.lines.filter((x) => x.stock_avant)) await ajusterDepot(supabase, { product_id: l.product_id, equivalence_id: l.equivalence_id ?? null }, -l.quantite, l.stock_avant!); } catch { /* compteur indicatif */ }
+        avancer(s.localId, { avantFait: true });
       }
 
       // 4) L'argent reçu à la vente (caisse du jour, BIBLE §8.41) — ne bloque jamais la vente

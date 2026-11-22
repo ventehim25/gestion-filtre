@@ -35,7 +35,21 @@ export async function stockVoiture(): Promise<ArticleVoiture[]> {
 
 /** Ajoute (delta > 0) ou enlève (delta < 0) des pièces dans la voiture, jamais en dessous de 0. */
 export async function ajusterVoiture(db: Db, l: { product_id: string; equivalence_id: string | null }, delta: number): Promise<void> {
-  let q = db.from("stock_depots").select("id, quantite").eq("product_id", l.product_id).eq("depot", DEPOT);
+  return ajusterDepot(db, l, delta, DEPOT);
+}
+
+// ───────────── Marchandise d'avant (notée dans le cahier, avant l'appli) — BIBLE §8.51 ─────────────
+// Elle entre dans le stock SANS réception (motif « Stock d'avant (cahier) ») → ni la dette dinoun ni le capital ne bougent.
+// Le dépôt « avant:<fournisseur> » compte combien il en reste par pièce ET à qui elle est (dinoun, déjà dans sa dette
+// via le cahier ; « avant » seul = à moi) : tant qu'il en reste, une vente de cette pièce prend CE fournisseur comme
+// source (le camion « mettre de côté » compte ce que je dois à dinoun) et le dépôt baisse ; ensuite la source redevient
+// normale (dernière réception). Demande du 22/11 : « compte-la pour dinoun, je l'ai déjà notée, sinon double solde ».
+export const DEPOT_AVANT = "avant";
+export const depotAvant = (fournisseurId: string | null) => (fournisseurId ? `${DEPOT_AVANT}:${fournisseurId}` : DEPOT_AVANT);
+
+/** Ajoute un dépôt (voiture, avant…) : jamais sous 0, une ligne par pièce et dépôt. */
+export async function ajusterDepot(db: Db, l: { product_id: string; equivalence_id: string | null }, delta: number, depot: string): Promise<void> {
+  let q = db.from("stock_depots").select("id, quantite").eq("product_id", l.product_id).eq("depot", depot);
   q = l.equivalence_id ? q.eq("equivalence_id", l.equivalence_id) : q.is("equivalence_id", null);
   const { data, error } = await q.maybeSingle();
   if (error) throw error;
@@ -44,7 +58,7 @@ export async function ajusterVoiture(db: Db, l: { product_id: string; equivalenc
     const { error: e } = await db.from("stock_depots").update({ quantite: Math.max(0, ligne.quantite + delta), maj_le: new Date().toISOString() }).eq("id", ligne.id);
     if (e) throw e;
   } else if (delta > 0) {
-    const { error: e } = await db.from("stock_depots").insert({ product_id: l.product_id, equivalence_id: l.equivalence_id, depot: DEPOT, quantite: delta });
+    const { error: e } = await db.from("stock_depots").insert({ product_id: l.product_id, equivalence_id: l.equivalence_id, depot, quantite: delta });
     if (e) throw e;
   }
 }
@@ -59,6 +73,36 @@ export async function transferer(sens: "charger" | "decharger", lignes: LigneVoi
   });
   if (error) throw error;
   for (const l of ok) await ajusterVoiture(supabase, l, sens === "charger" ? l.quantite : -l.quantite);
+}
+
+/** Entrée de la marchandise d'avant : stock + (motif « stock d'avant »), dépôt « avant » + et, si elle est dans la voiture,
+ *  dépôt « voiture » +. Une ligne « transferts » cahier → voiture garde la trace. Aucune réception, aucun fournisseur. */
+export async function ajouterStockAvant(lignes: LigneVoiture[], dansVoiture: boolean, fournisseurId: string | null): Promise<void> {
+  const ok = lignes.filter((l) => l.quantite > 0);
+  if (!ok.length) throw new Error("Aucune pièce comptée.");
+  const { corrigerStock } = await import("./inventaire");
+  for (const l of ok) {
+    await corrigerStock({ product_id: l.product_id, equivalence_id: l.equivalence_id, delta: l.quantite, motif: "stock_avant", note: dansVoiture ? "marchandise d'avant (cahier), dans la voiture" : "marchandise d'avant (cahier)" });
+    await ajusterDepot(supabase, l, l.quantite, depotAvant(fournisseurId));
+    if (dansVoiture) await ajusterDepot(supabase, l, l.quantite, DEPOT);
+  }
+  if (dansVoiture) await supabase.from("transferts").insert({ date: new Date().toISOString().slice(0, 10), depot_de: "cahier", depot_vers: DEPOT, lignes: ok, note: "marchandise d'avant (cahier)" });
+}
+
+export type ResteAvant = { quantite: number; fournisseur_id: string | null; depot: string };
+/** Ce qu'il reste de marchandise d'avant, par pièce (« product_id|equivalence_id » → quantité, à qui, dépôt). */
+export async function resteStockAvant(): Promise<Map<string, ResteAvant>> {
+  const m = new Map<string, ResteAvant>();
+  for (let i = 0; i < 20; i++) {
+    const { data, error } = await supabase.from("stock_depots").select("id, product_id, equivalence_id, quantite, depot").like("depot", `${DEPOT_AVANT}%`).gt("quantite", 0).order("id").range(i * 1000, i * 1000 + 999);
+    if (error || !data?.length) break;
+    for (const r of data as { product_id: string; equivalence_id: string | null; quantite: number; depot: string }[]) {
+      const k = `${r.product_id}|${r.equivalence_id ?? ""}`;
+      if (!m.has(k)) m.set(k, { quantite: r.quantite, fournisseur_id: r.depot.includes(":") ? r.depot.split(":")[1] : null, depot: r.depot });
+    }
+    if (data.length < 1000) break;
+  }
+  return m;
 }
 
 export async function derniersTransferts(): Promise<Transfert[]> {

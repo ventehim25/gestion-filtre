@@ -14,7 +14,7 @@ import { retoursParVente } from "@/lib/retours";
 import RetourClientModal from "@/components/RetourClientModal";
 import { chargerSociete, factureDeVente } from "@/lib/factures";
 import { ecrireFacture, ouvrirFenetre } from "@/lib/imprimerFacture";
-import { DEPOT, choisirVenteVoiture, lireVenteVoiture } from "@/lib/voiture";
+import { DEPOT, choisirVenteVoiture, lireVenteVoiture, resteStockAvant, type ResteAvant } from "@/lib/voiture";
 import { useRole } from "@/lib/role";
 import FiltronDe from "@/components/FiltronDe";
 import { lireTypeVehicule, useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
@@ -426,7 +426,14 @@ export default function VentesPage() {
   }, []);
   const sourceParDefaut = () => (fournisseurs.find(f => f.type === "credit") ?? fournisseurs[0])?.id ?? "";
   const sourceAuto = (l: LineItem) => sourceRecue.get(`${l.product_id}|${l.equivalence_id ?? ""}`) ?? sourceRecue.get(`${l.product_id}|*`) ?? null;
-  const srcOf = (l: LineItem) => l.fournisseur_id || sourceAuto(l) || sourceParDefaut() || null;
+  // Marchandise d'avant (cahier, BIBLE §8.51) : tant qu'il en reste pour cette pièce, la ligne n'a PAS de fournisseur
+  const [resteAvant, setResteAvant] = useState<Map<string, ResteAvant>>(new Map());
+  useEffect(() => { resteStockAvant().then(setResteAvant).catch(() => {}); }, []);
+  const AVANT = "__avant__";
+  const avantDe = (l: LineItem) => resteAvant.get(`${l.product_id}|${l.equivalence_id ?? ""}`);
+  const estAvant = (l: LineItem) => (l.fournisseur_id === AVANT && !!avantDe(l)) || (!l.fournisseur_id && (avantDe(l)?.quantite ?? 0) > 0);
+  // Marchandise d'avant : la source = le fournisseur à qui elle est (dinoun : déjà dans sa dette, pas de double solde)
+  const srcOf = (l: LineItem) => estAvant(l) ? (avantDe(l)?.fournisseur_id ?? null) : (l.fournisseur_id && l.fournisseur_id !== AVANT ? l.fournisseur_id : (sourceAuto(l) || sourceParDefaut() || null));
 
   function resetForm() {
     setShowForm(false); setEditingSale(null); setOldLines([]);
@@ -461,7 +468,7 @@ export default function VentesPage() {
     const validLines = lines.filter(l => l.product_id && l.quantite > 0);
     if (!clientId || validLines.length === 0) { flash("Client et au moins un article requis"); return; }
     if (typeof navigator !== "undefined" && !navigator.onLine) { alert("Modification impossible hors-ligne."); return; }
-    if (validLines.some(l => !srcOf(l)) && !confirm("⚠️ Ligne(s) sans source (dinoun / filtropro). Enregistrer quand même ?")) return;
+    if (validLines.some(l => !srcOf(l) && !estAvant(l)) && !confirm("⚠️ Ligne(s) sans source (dinoun / filtropro). Enregistrer quand même ?")) return;
     const saleTotal = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
     const montant = statut === "paye" ? saleTotal : montantPaye;
     try {
@@ -592,7 +599,7 @@ export default function VentesPage() {
     const validLines = lines.filter(l => l.product_id && l.quantite > 0);
     if (!clientId || validLines.length === 0) return;
     // Rappel : sans source (bon ni ligne), la marchandise n'est comptée sur aucun fournisseur
-    const sansSource = validLines.filter(l => !srcOf(l)).length;
+    const sansSource = validLines.filter(l => !srcOf(l) && !estAvant(l)).length;
     if (sansSource > 0 && !confirm(`⚠️ ${sansSource} ligne(s) sans source (dinoun / filtropro).\nCette marchandise ne sera comptée sur aucun fournisseur, et le camion « dinoun payé » ne la comptera pas.\n\nEnregistrer quand même ?`)) return;
     const client = clients.find(c => c.id === clientId);
     const brut = validLines.reduce((s, l) => s + l.quantite * l.prix_unitaire, 0);
@@ -610,7 +617,7 @@ export default function VentesPage() {
     addPending({
       localId,
       client_id: clientId, clientNom: client?.nom ?? "", clientTel: client?.telephone ?? null, date,
-      lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null })),
+      lines: validLines.map(l => ({ product_id: l.product_id, quantite: l.quantite, prix_unitaire: l.prix_unitaire, nom: l.nom, fournisseur_id: srcOf(l), equivalence_id: l.equivalence_id || null, cout_unitaire: l.cout_unitaire ?? null, stock_avant: estAvant(l) ? avantDe(l)!.depot : undefined })),
       total: saleTotal, statut, montant_paye: montant, notes: saleNotes || null, createdAt: Date.now(), mode_paiement: venteMode,
       depuis_voiture: depuisVoiture && piecesVoiture > 0,
       commercial_id: commercialId || null,
@@ -808,7 +815,7 @@ export default function VentesPage() {
                   {fournisseurs.length > 0 && l.product_id && (
                     <div className="flex items-center gap-1.5 mt-1">
                       {fournisseurs.map(f => {
-                        const actif = srcOf(l) === f.id;
+                        const actif = !estAvant(l) && srcOf(l) === f.id;
                         return (
                           <button key={f.id} type="button" onClick={() => updateLine(i, "fournisseur_id", f.id)}
                             className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${actif ? (f.type === "capital" ? "bg-emerald-600 text-white" : "bg-red-600 text-white") : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
@@ -816,8 +823,15 @@ export default function VentesPage() {
                           </button>
                         );
                       })}
+                      {avantDe(l) && (
+                        <button type="button" onClick={() => updateLine(i, "fournisseur_id", estAvant(l) && l.fournisseur_id === AVANT ? "" : AVANT)}
+                          title="Marchandise d'avant (cahier) : déjà comptée chez ce fournisseur, elle n'est pas comptée deux fois"
+                          className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium transition-colors ${estAvant(l) ? "bg-amber-500 text-black" : "bg-slate-800 text-slate-400 hover:text-slate-200"}`}>
+                          📒 cahier{avantDe(l)!.fournisseur_id ? ` · ${fournisseurs.find(f => f.id === avantDe(l)!.fournisseur_id)?.nom ?? ""}` : " · à moi"}
+                        </button>
+                      )}
                       {!l.fournisseur_id && (
-                        <span className="text-[10px] text-slate-500">{sourceAuto(l) ? "auto · dernière réception" : "par défaut"}</span>
+                        <span className="text-[10px] text-slate-500">{estAvant(l) ? `auto · reste ${avantDe(l)!.quantite} du cahier` : sourceAuto(l) ? "auto · dernière réception" : "par défaut"}</span>
                       )}
                     </div>
                   )}

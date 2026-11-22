@@ -18,6 +18,7 @@ export const MOTIFS = [
   { cle: "echantillon", libelle: "🎁 Échantillon / cadeau" },
   { cle: "retrouve", libelle: "🔎 Retrouvé" },
   { cle: "inventaire", libelle: "📋 Inventaire" },
+  { cle: "stock_avant", libelle: "📒 Stock d'avant (cahier)" },
   { cle: "correction", libelle: "Correction" },
 ] as const;
 export const libelleMotif = (m: string) => MOTIFS.find((x) => x.cle === m)?.libelle ?? m;

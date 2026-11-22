@@ -3,13 +3,14 @@
 // Charger (magasin → voiture), décharger (voiture → magasin) ; une vente « 🚗 sortie de la voiture » la vide d'autant.
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
+import { supabase } from "@/lib/supabase";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import { loadAll } from "@/lib/pagedFetch";
 import { chargerMarques } from "@/lib/brands";
 import { useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
-import { derniersTransferts, stockVoiture, transferer, type ArticleVoiture, type LigneVoiture } from "@/lib/voiture";
+import { ajouterStockAvant, derniersTransferts, resteStockAvant, stockVoiture, transferer, type ArticleVoiture, type LigneVoiture, type ResteAvant } from "@/lib/voiture";
 import type { Product, Transfert } from "@/types/database";
-import { CarFront, PackagePlus, PackageMinus, X, Trash2 } from "lucide-react";
+import { CarFront, PackagePlus, PackageMinus, X, Trash2, NotebookPen } from "lucide-react";
 
 const mad = (n: number) => `${Math.round(n).toLocaleString("fr-FR")} MAD`;
 
@@ -24,10 +25,22 @@ export default function VoiturePage() {
   const [decharge, setDecharge] = useState<Record<string, number> | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
+  // Marchandise d'avant (notée dans le cahier) : entre dans le stock sans réception — BIBLE §8.51
+  const [avant, setAvant] = useState<LigneVoiture[] | null>(null);
+  const [avantVoiture, setAvantVoiture] = useState(true);
+  const [resteAvant, setResteAvant] = useState(0);
+  const [fournisseurs, setFournisseurs] = useState<{ id: string; nom: string; type: string | null }[]>([]);
+  const [proprio, setProprio] = useState<string>(""); // fournisseur à qui est la marchandise d'avant ("" = à moi)
+  useEffect(() => {
+    supabase.from("fournisseurs").select("id, nom, type").order("nom").then(({ data }) => {
+      const l = (data ?? []) as { id: string; nom: string; type: string | null }[];
+      setFournisseurs(l); setProprio((l.find((f) => (f.type ?? "credit") === "credit") ?? l[0])?.id ?? "");
+    }, () => {});
+  }, []);
 
   async function charger() {
-    const [s, h] = await Promise.all([stockVoiture(), derniersTransferts()]);
-    setStock(s); setHist(h);
+    const [s, h, ra] = await Promise.all([stockVoiture(), derniersTransferts(), resteStockAvant().catch(() => new Map<string, ResteAvant>())]);
+    setStock(s); setHist(h); setResteAvant([...ra.values()].reduce((a, b) => a + b.quantite, 0));
   }
   async function chargerFiches(t: TypeVehicule = typeV) {
     setProducts(await loadAll<Product>("products", "*", { filter: (q) => q.eq("vehicule", t).order("reference") }));
@@ -61,6 +74,23 @@ export default function VoiturePage() {
     } catch (e) { setMsg("Erreur : " + String((e as Error)?.message ?? e)); }
     setEnvoi(false);
   }
+  function ajouterAvant(p: Product, v?: PickerVariant) {
+    const eq = v?.id ?? null;
+    const ref = v ? `${v.reference} (${v.marque})` : p.reference;
+    setAvant((prev) => { const l = prev ?? []; return l.some((x) => x.product_id === p.id && x.equivalence_id === eq) ? l : [...l, { product_id: p.id, equivalence_id: eq, ref, quantite: 1 }]; });
+  }
+  async function validerAvant() {
+    if (!avant) return;
+    setEnvoi(true);
+    try {
+      await ajouterStockAvant(avant, avantVoiture, proprio || null);
+      const n = avant.reduce((s, l) => s + l.quantite, 0);
+      const nomP = fournisseurs.find((f) => f.id === proprio)?.nom;
+      setMsg(`Marchandise d'avant ajoutée ✓ — ${n} pièce(s) dans le stock${avantVoiture ? " et dans la voiture" : ""}. La dette n'a pas bougé (pas de double solde) ; à la vente, elle sera comptée ${nomP ? `pour ${nomP}` : "pour toi"}.`);
+      setAvant(null); charger();
+    } catch (e) { setMsg("Erreur : " + String((e as Error)?.message ?? e)); }
+    setEnvoi(false);
+  }
   async function validerDecharge() {
     if (!decharge || !stock) return;
     setEnvoi(true);
@@ -87,8 +117,10 @@ export default function VoiturePage() {
         <div className="text-xs text-slate-500">{stock?.length ?? "…"} référence(s) · valeur {mad(valeur)} au prix de vente</div>
         <div className="flex flex-wrap gap-2 mt-4">
           <button onClick={() => setCharge([])} className="flex items-center gap-1.5 btn-primary"><PackagePlus size={15} /> Charger la voiture</button>
+          <button onClick={() => { setAvant([]); setAvantVoiture(true); }} className="flex items-center gap-1.5 btn-secondary"><NotebookPen size={15} /> Marchandise d&apos;avant (cahier)</button>
           {pieces > 0 && <button onClick={() => setDecharge(Object.fromEntries((stock ?? []).map((a) => [a.id, a.quantite])))} className="flex items-center gap-1.5 btn-secondary"><PackageMinus size={15} /> Décharger (retour magasin)</button>}
         </div>
+        {resteAvant > 0 && <p className="text-xs text-amber-300 mt-3">📒 Il reste {resteAvant} pièce(s) de la marchandise d&apos;avant (cahier) : à la vente, elles sont comptées sur aucun fournisseur.</p>}
         <p className="text-[11px] text-slate-500 mt-3">En tournée, coche <b>🚗 Sorti de la voiture</b> dans le formulaire de vente : la voiture se vide toute seule. Le stock total de l&apos;appli ne change pas quand tu charges ou décharges (magasin = total − voiture).</p>
       </div>
 
@@ -137,6 +169,41 @@ export default function VoiturePage() {
             <div className="flex justify-end gap-2">
               <button onClick={() => setCharge(null)} className="btn-secondary">Annuler</button>
               <button onClick={validerCharge} disabled={envoi || !charge.some((l) => l.quantite > 0)} className="btn-primary disabled:opacity-50">Charger</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {avant && (
+        <div className="fixed inset-0 overflow-y-auto bg-black/60 flex items-start justify-center z-[60] p-4">
+          <div className="card p-5 w-full max-w-lg my-auto">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="font-semibold text-slate-100 flex items-center gap-2"><NotebookPen size={18} className="text-amber-400" /> Marchandise d&apos;avant (cahier)</h3>
+              <button onClick={() => setAvant(null)} className="text-slate-400 hover:text-white"><X size={20} /></button>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">La marchandise que tu avais déjà (notée dans le cahier). <b>Compte les boîtes</b> et tape le nombre de chaque référence. Elle entre dans le stock <b>sans réception</b> : la dette ne bouge pas (elle y est déjà par le cahier, pas de double solde). À la vente, elle est comptée pour le fournisseur choisi ci-dessous (« 📒 cahier »). Si tu ne peux pas tout compter maintenant, ajoute ce que tu as compté et complète plus tard.</p>
+            <ProductPicker products={products} variants={variants} value="" onSelect={(p, v) => ajouterAvant(p, v)} placeholder="Tape la référence de la boîte" />
+            <div className="space-y-2 my-3 max-h-[45vh] overflow-y-auto">
+              {avant.map((l, i) => (
+                <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center rounded-lg bg-slate-800/50 px-3 py-2">
+                  <span className="font-mono text-xs text-slate-200 truncate">{l.ref}</span>
+                  <input type="number" inputMode="numeric" min={0} className="input w-20 py-1 text-center" value={l.quantite}
+                    onChange={(e) => setAvant(avant.map((x, j) => j === i ? { ...x, quantite: Math.max(0, Math.round(Number(e.target.value) || 0)) } : x))} />
+                  <button onClick={() => setAvant(avant.filter((_, j) => j !== i))} className="text-slate-500 hover:text-red-400"><Trash2 size={14} /></button>
+                </div>
+              ))}
+              {avant.length === 0 && <p className="text-xs text-slate-500">Tape chaque référence que tu trouves dans la voiture.</p>}
+            </div>
+            <label className="text-xs text-slate-500 block mb-2">Elle est à qui ? (déjà comptée dans sa dette par le cahier)
+              <select className="input mt-1" value={proprio} onChange={(e) => setProprio(e.target.value)}>
+                {fournisseurs.map((f) => <option key={f.id} value={f.id}>{f.nom}{(f.type ?? "credit") === "credit" ? " (crédit)" : " (capital)"}</option>)}
+                <option value="">À moi (sans fournisseur)</option>
+              </select>
+            </label>
+            <label className="flex items-center gap-2 text-sm text-slate-300 mb-4"><input type="checkbox" checked={avantVoiture} onChange={(e) => setAvantVoiture(e.target.checked)} /> Elle est dans la voiture</label>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setAvant(null)} className="btn-secondary">Annuler</button>
+              <button onClick={validerAvant} disabled={envoi || !avant.some((l) => l.quantite > 0)} className="btn-primary disabled:opacity-50">Ajouter au stock</button>
             </div>
           </div>
         </div>
