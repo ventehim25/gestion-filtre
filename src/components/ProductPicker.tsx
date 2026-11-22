@@ -4,7 +4,7 @@ import { Product } from "@/types/database";
 import { avecDents } from "@/lib/categories";
 import { chercherParOrigine, type ParOrigine } from "@/lib/origine";
 
-export type PickerVariant = { id: string; product_id: string; marque: string; reference: string };
+export type PickerVariant = { id: string; product_id: string; marque: string; reference: string; stock?: number | null };
 
 // Sélecteur de produit par saisie de référence (autocomplétion) — plus rapide
 // qu'un menu déroulant de milliers de produits.
@@ -14,10 +14,13 @@ export type PickerVariant = { id: string; product_id: string; marque: string; re
 // Numéro d'origine (IVECO 5801 317097…) : cherché dans la base, espaces ignorés, voitures ET camions → onSelect reçoit
 // alors { code, marqueCode } en 3e argument (BIBLE §8.39).
 export default function ProductPicker({
-  products, value, onSelect, variants, placeholder, onCreate,
+  products, value, onSelect, variants, placeholder, onCreate, preferStock,
 }: {
   products: Product[]; value: string; onSelect: (p: Product, v?: PickerVariant, origine?: { code: string; marqueCode: string; tape: string; marqueApp?: string | null }) => void; variants?: PickerVariant[];
   placeholder?: string; onCreate?: (reference: string) => void;
+  // Vente (BIBLE §8.57) : ce qui est EN STOCK d'abord, quantité affichée ; une réf. à 0 touchée alors qu'UNE SEULE
+  // réf. de la liste est en stock → « Tu voulais … ? » (le 22/11, AP149/10 vendu au lieu de fa943 Flag = AP149/1)
+  preferStock?: boolean;
 }) {
   const [externe, setExterne] = useState<Product | null>(null); // fiche choisie par numéro d'origine (peut être hors liste)
   const selected = products.find((p) => p.id === value) || (externe?.id === value ? externe : null);
@@ -56,15 +59,26 @@ export default function ProductPicker({
       ? variants.filter((v) => norm(v.reference).includes(s) && byId.has(v.product_id))
           .slice(0, 30).map((v) => ({ p: byId.get(v.product_id)!, v }))
       : [];
-    // Référence exacte en premier (Filtron ou marque), puis le reste
+    // Référence exacte en premier (Filtron ou marque), puis le reste — en vente : ce qui est en stock avant tout
     const all = [...prods, ...vars];
-    return all.sort((a, b) => Number(norm((b.v ?? b.p).reference) === s) - Number(norm((a.v ?? a.p).reference) === s)).slice(0, 30);
-  }, [q, products, variants, byId]);
+    const enStock = (m: { p: Product; v?: PickerVariant }) => Number((m.v ? m.v.stock ?? 0 : m.p.stock) > 0);
+    return all.sort((a, b) => (preferStock ? enStock(b) - enStock(a) : 0)
+      || Number(norm((b.v ?? b.p).reference) === s) - Number(norm((a.v ?? a.p).reference) === s)).slice(0, 30);
+  }, [q, products, variants, byId, preferStock]);
+  const stockDe = (m: { p: Product; v?: PickerVariant }) => (m.v ? m.v.stock ?? null : m.p.stock);
 
   const originesAffichees = origines.filter((o) => !matches.some((m) => m.p.id === o.produit.id && !m.v));
   const label = selected ? selected.reference : "";
 
   function pick(m: { p: Product; v?: PickerVariant }) {
+    if (preferStock && (stockDe(m) ?? 0) <= 0) {
+      const dispo = matches.filter((x) => (stockDe(x) ?? 0) > 0);
+      if (dispo.length === 1) {
+        const d = dispo[0];
+        const nom = d.v ? `${d.v.reference} (${d.v.marque}) = Filtron ${d.p.reference}` : d.p.reference;
+        if (confirm(`« ${(m.v ?? m.p).reference} » n'est pas en stock.\n\nTu voulais ${nom} (${stockDe(d)} en stock) ?\n\nOK = prendre ${nom} · Annuler = garder « ${(m.v ?? m.p).reference} »`)) m = d;
+      }
+    }
     onSelect(m.p, m.v);
     setQ("");
     setOpen(false);
@@ -95,6 +109,9 @@ export default function ProductPicker({
               onClick={() => pick(m)}
               className={`w-full text-left px-2 py-1.5 rounded-md flex items-center gap-2 ${idx === hi ? "bg-slate-700/50" : "hover:bg-slate-800/60"}`}
             >
+              {preferStock && (stockDe(m) != null) && (
+                <span className={`order-last ms-auto shrink-0 text-[10px] rounded-full px-1.5 py-0.5 ${(stockDe(m) ?? 0) > 0 ? "bg-emerald-500/15 text-emerald-300" : "bg-slate-700/60 text-slate-400"}`}>{(stockDe(m) ?? 0) > 0 ? `stock ${stockDe(m)}` : "stock 0"}</span>
+              )}
               {m.v ? (
                 <>
                   <span className="font-mono text-xs text-slate-100 shrink-0">{m.v.reference}</span>

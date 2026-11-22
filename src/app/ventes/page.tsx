@@ -140,7 +140,7 @@ export default function VentesPage() {
     const all = await loadAll<Product>("products", "*", { filter: q => q.eq("vehicule", type).order("reference") });
     setProducts(all);
     chargerMarques() // marques de départ + celles ajoutées par l'utilisateur
-      .then(marques => loadAll<PickerVariant>("equivalences", "id, product_id, marque, reference, products!inner(vehicule)",
+      .then(marques => loadAll<PickerVariant>("equivalences", "id, product_id, marque, reference, stock, products!inner(vehicule)",
         { filter: q => q.in("marque", marques).eq("products.vehicule", type).order("id"), countSelect: "id, products!inner(vehicule)" }))
       .then(setBrandVariants).catch(() => {});
     return all;
@@ -792,7 +792,7 @@ export default function VentesPage() {
                 <div key={i} className="mb-2">
                   <div className="grid grid-cols-12 gap-2">
                     <div className="col-span-5">
-                      <ProductPicker products={products} variants={brandVariants} value={l.product_id} onSelect={(p, v, o) => { if (o) setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p]); if (v) setLineProductVariant(i, p, v.marque); else setLineProduct(i, p); }} />
+                      <ProductPicker preferStock products={products} variants={brandVariants} value={l.product_id} onSelect={(p, v, o) => { if (o) setProducts(prev => prev.some(x => x.id === p.id) ? prev : [...prev, p]); if (v) setLineProductVariant(i, p, v.marque); else setLineProduct(i, p); }} />
                       <FiltronDe produit={productById(l.product_id)} className="block mt-0.5" />
                     </div>
                     <input type="number" className="input col-span-2" value={l.quantite} onChange={e => updateLine(i, "quantite", +e.target.value)} min={1} />

@@ -1378,6 +1378,10 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Réf. Filtron toujours montrée** (demande du 22/11 : « le fournisseur se base sur Filtron ») : dans À reprendre et Mon stock / Stock voiture, une autre marque s'affiche « Fa182 Flag = Filtron AP133/5 » sur la même ligne ; le message WhatsApp à Reda met la **réf. Filtron d'abord** : « • AP133/5 (Filtron) = Flag Fa182 × 37 ».
 - **Chiffres du 22/11 (14 j)** : 27 réf. vendues, **14 à reprendre** (Fa182 Flag 37, OP643/3 24, FANFARO 10W40 20, PEMKO 10W40 16, fa028 Flag 16, OE674/5 12, Castrol 5W30 8, Fanfaro 15W40 8…).
 
+## 8.57 Vente : la référence en stock d'abord (22/11/2026)
+- **Constat** (stock exact demandé par l'utilisateur) : **AP149/10 à −10** — vente du 22/11 18 h 36 à Habibati « 10 × AP149/10 à 32 MAD », jamais reçue, alors que **fa943 (Flag) = Filtron AP149/1** avait 10 boîtes jamais vendues. L'utilisateur confirme : « je voulais Flag ». **Ligne de vente corrigée** (produit AP149/1, variante fa943, coût 22 MAD), stock AP149/10 −10 → **0**, fa943 10 → **0**.
+- **Règle demandée** : « s'il n'existe qu'une référence dans le stock, il sélectionne la référence existante ; s'il y a d'autres marques, je sélectionne ». **Fait** (`ProductPicker` option `preferStock`, utilisée en Vente ; variantes chargées avec leur `stock`) : dans la liste, **ce qui est en stock passe en premier** avec un badge « stock N » (vert) / « stock 0 » ; si on touche une réf. **à 0** alors qu'**une seule** réf. de la liste est en stock → « « AP149/10 » n'est pas en stock. Tu voulais fa943 (Flag) = Filtron AP149/1 (10 en stock) ? » (OK = la prendre) ; plusieurs marques en stock → l'utilisateur choisit. La Réception n'est pas touchée (recevoir une réf. à 0 est normal).
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*
