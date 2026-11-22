@@ -12,6 +12,7 @@ const navItems = [
   { href: "/", icon: LayoutDashboard, key: "dashboard" as const },
   { href: "/recherche", icon: Car, key: "vehicleSearch" as const },
   { href: "/produits", icon: Package, key: "products" as const },
+  { href: "/mon-stock", icon: Boxes, key: "myStock" as const },
   { href: "/stock", icon: Boxes, key: "stockEntry" as const },
   { href: "/reappro", icon: ClipboardList, key: "reorder" as const },
   { href: "/fournisseurs", icon: Truck, key: "suppliers" as const },

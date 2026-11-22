@@ -375,3 +375,7 @@ Le stock total de l'appli ne change pas quand tu charges ou décharges : la page
 
 **Depuis le 18/11 au soir** : tape **n'importe quelle référence** (Mann HU7018Z, Bosch 0451103300, Purflux L330, UFI, Fram, numéro d'origine…), avec ou sans espaces. Une liste « Catalogue Filtron » s'affiche pendant que tu tapes, avec l'équivalent Filtron de chaque référence et ton stock. Touche une ligne pour voir la fiche. En Vente et en Réception, c'est pareil : la case de référence propose l'équivalent Filtron.
 
+## 29. Combien il me reste (depuis le 22/11/2026)
+
+Menu **Mon stock** (ou la case **En stock** sur l'accueil) : le total de pièces, le nombre par famille et par type (filtres à huile, à air…), puis chaque référence avec sa quantité. Vert = en stock, orange = 2 ou moins, rouge = négatif (à recompter dans **Inventaire**). Tape une réf. pour la trouver, **Imprimer** pour une feuille de stock. Pour corriger un chiffre : **Inventaire**.
+

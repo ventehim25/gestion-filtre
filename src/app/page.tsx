@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useLang } from "@/context/LangContext";
 import { supabase } from "@/lib/supabase";
-import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, CloudOff, Banknote, MessageCircle, PackagePlus, BarChart2, ClipboardList } from "lucide-react";
+import { TrendingUp, Users, Package, AlertTriangle, Wallet, Search, Car, Tag, ShieldCheck, Truck, ArrowUp, Star, Eye, ChevronDown, ChevronUp, ShoppingCart, CloudOff, Banknote, MessageCircle, PackagePlus, BarChart2, ClipboardList, Boxes } from "lucide-react";
 // Truck déjà importé pour la tuile Fournisseurs
 import BrandLogo from "@/components/BrandLogo";
 import Logo from "@/components/Logo";
@@ -64,6 +64,26 @@ export default function Dashboard() {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [idx, setIdx] = useState(0);
+  // Pièces en stock (fiches + variantes de marque), BIBLE §8.50 — remplace le nombre de fiches du catalogue (≈ 9 000)
+  const [enStock, setEnStock] = useState<{ pieces: number; refs: number } | null>(null);
+  useEffect(() => {
+    (async () => {
+      let pieces = 0, refs = 0;
+      for (let i = 0; i < 20; i++) {
+        const { data, error } = await supabase.from("products").select("id, stock").gt("stock", 0).order("id").range(i * 1000, i * 1000 + 999);
+        if (error || !data?.length) break;
+        for (const r of data) { pieces += r.stock; refs++; }
+        if (data.length < 1000) break;
+      }
+      for (let i = 0; i < 20; i++) {
+        const { data, error } = await supabase.from("equivalences").select("id, stock").gt("stock", 0).order("id").range(i * 1000, i * 1000 + 999);
+        if (error || !data?.length) break;
+        for (const r of data) { pieces += r.stock ?? 0; refs++; }
+        if (data.length < 1000) break;
+      }
+      setEnStock({ pieces, refs });
+    })().catch(() => {});
+  }, []);
   const [stats, setStats] = useState<Stats>({ totalVentes: 0, totalClients: 0, totalProduits: 0, stockFaible: 0, benefice: 0, coutMarchandise: 0, toRecommend: 0, unpaid: 0, encaisseJour: 0, encaisseSemaine: 0 });
   const [dbError, setDbError] = useState("");
   const [pendingOffline, setPendingOffline] = useState(0);
@@ -359,7 +379,7 @@ export default function Dashboard() {
   const cards = [
     { label: t("totalSales"), value: `${stats.totalVentes.toFixed(0)} ${t("moroccanDirham")}`, icon: TrendingUp, color: "bg-sky-500/15 text-sky-400", href: "/ventes" },
     { label: t("totalClients"), value: stats.totalClients, icon: Users, color: "bg-violet-500/15 text-violet-400", href: "/clients" },
-    { label: t("totalProducts"), value: stats.totalProduits, icon: Package, color: "bg-teal-500/15 text-teal-400", href: "/produits" },
+    { label: enStock ? `En stock · ${enStock.refs} réf.` : "En stock", value: enStock ? `${enStock.pieces.toLocaleString("fr-FR")} pièces` : "…", icon: Boxes, color: "bg-teal-500/15 text-teal-400", href: "/mon-stock" },
     { label: t("lowStock"), value: stats.stockFaible, icon: AlertTriangle, color: "bg-amber-500/15 text-amber-400", href: "/reappro" },
   ];
 
