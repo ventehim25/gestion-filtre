@@ -1349,6 +1349,12 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Vente** (`/ventes`) : tant qu'il reste de la marchandise d'avant pour une pièce, la ligne prend **le fournisseur à qui elle est** (bouton « 📒 cahier · dinoun », auto) → le camion « mettre de côté » compte ce qu'on doit à dinoun ; la vente emporte `stock_avant` = le dépôt, et `envoyerVente` (étape 3 ter, drapeau `avantFait`) le fait baisser une seule fois. Quand il n'en reste plus, la source redevient normale (dernière réception). Un tap sur dinoun / filtropro force une autre source.
 - La page Stock voiture rappelle « il reste N pièce(s) de la marchandise d'avant ».
 
+## 8.52 OE640/2 introuvable dans « Mon stock » + menu simplifié (22/11/2026)
+- **Signalé** : réception du 07/11 « OE640/2×38, Wl7009 (Wix)×22 » mais « Mon stock » ne montrait que le Wix (19).
+- **Cause** : la réception a été saisie le **07/11 à 20 h 49**, juste avant la remise à zéro du démarrage (§8.7), qui a remis à 0 les **fiches** (products.stock) mais pas les **variantes** (equivalences.stock) → le Filtron est passé de 38 à 0 sans trace (déjà 0 dans la plus ancienne sauvegarde, 14/11) ; le Wix est juste (22 − 3 vendus).
+- **Contrôle complet** (stock attendu = réceptions − ventes ± corrections ± retours, comparé au stock réel, 51 articles) : **2 écarts seulement** — OE640/2 (attendu 38, réel 0) et Flag DO1801 (attendu 0, réel −1, aucun mouvement ne l'explique). **Corrigés par correction tracée** (motif « correction », note avec la raison, visibles dans l'historique) : **OE640/2 → 38**, **DO1801 → 0**. Reste FANFARO 10W40 5L à −3 : 3 vendus sans aucune réception → à saisir (Réception, ou Marchandise d'avant si c'était le stock du cahier).
+- **Menu simplifié** (`src/components/Sidebar.tsx`) : **« Saisie stock » retirée** (page gardée à l'adresse /stock ; le stock bouge par Réception / Vente / Retour et se corrige dans Inventaire avec un motif). En haut, le quotidien : Accueil, Recherche, Ventes, Fournisseurs, Mon stock, Clients, Caisse, Stock voiture, Tournées ; le reste sous **« Plus… »** (replié, ouvert tout seul sur une de ces pages, choix gardé sur l'appareil) : Produits, Réappro, Étiquettes, Catalogues, Commandes, Rappels, Échéancier, Factures, Inventaire, Banque, Équipe, Statistiques, Prospects. Rien n'est supprimé.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*
