@@ -3,6 +3,7 @@
 // Charger (magasin → voiture), décharger (voiture → magasin) ; une vente « 🚗 sortie de la voiture » la vide d'autant.
 import { useEffect, useState } from "react";
 import Header from "@/components/Header";
+import StockDetaille from "@/components/StockDetaille";
 import { supabase } from "@/lib/supabase";
 import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import { loadAll } from "@/lib/pagedFetch";
@@ -30,6 +31,7 @@ export default function VoiturePage() {
   const [avantVoiture, setAvantVoiture] = useState(true);
   const [resteAvant, setResteAvant] = useState(0);
   const [unique, setUnique] = useState(true); // un seul stock = la voiture (BIBLE §8.54)
+  const [version, setVersion] = useState(0); // recharge le stock détaillé après un ajout
   const [fournisseurs, setFournisseurs] = useState<{ id: string; nom: string; type: string | null }[]>([]);
   const [proprio, setProprio] = useState<string>(""); // fournisseur à qui est la marchandise d'avant ("" = à moi)
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function VoiturePage() {
 
   async function charger() {
     const [s, h, ra, u] = await Promise.all([stockVoiture(), derniersTransferts(), resteStockAvant().catch(() => new Map<string, ResteAvant>()), lireStockUnique().catch(() => true)]);
-    setUnique(u);
+    setUnique(u); setVersion((v) => v + 1);
     setStock(s); setHist(h); setResteAvant([...ra.values()].reduce((a, b) => a + b.quantite, 0));
   }
   async function chargerFiches(t: TypeVehicule = typeV) {
@@ -116,8 +118,8 @@ export default function VoiturePage() {
 
       <div className="card p-5 mb-4">
         <div className="flex items-center gap-2 text-slate-400 text-sm"><CarFront size={16} className="text-amber-400" /> {unique ? "Dans la voiture (tout ton stock)" : "Dans la voiture"}</div>
-        <div className="text-3xl font-bold text-amber-300 mt-1">{pieces} pièce(s)</div>
-        <div className="text-xs text-slate-500">{stock?.length ?? "…"} référence(s) · valeur {mad(valeur)} au prix de vente</div>
+        {!unique && <div className="text-3xl font-bold text-amber-300 mt-1">{pieces} pièce(s)</div>}
+        {!unique && <div className="text-xs text-slate-500">{stock?.length ?? "…"} référence(s) · valeur {mad(valeur)} au prix de vente</div>}
         <div className="flex flex-wrap gap-2 mt-4">
           {!unique && <button onClick={() => setCharge([])} className="flex items-center gap-1.5 btn-primary"><PackagePlus size={15} /> Charger la voiture</button>}
           <button onClick={() => { setAvant([]); setAvantVoiture(true); }} className={`flex items-center gap-1.5 ${unique ? "btn-primary" : "btn-secondary"}`}><NotebookPen size={15} /> Marchandise d&apos;avant (cahier)</button>
@@ -131,7 +133,9 @@ export default function VoiturePage() {
         )}
       </div>
 
-      {!stock ? <p className="text-sm text-slate-400">Chargement…</p> : stock.length > 0 && (
+      {/* Un seul stock : même présentation que « Mon stock » (familles, cases par type, recherche, tri, imprimer) — §8.55 */}
+      {unique && <StockDetaille key={version} titre="Dans la voiture" />}
+      {!unique && (!stock ? <p className="text-sm text-slate-400">Chargement…</p> : stock.length > 0 && (
         <div className="card divide-y divide-slate-800 mb-4">
           {stock.map((a) => (
             <div key={a.id} className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 items-center">
@@ -141,7 +145,7 @@ export default function VoiturePage() {
             </div>
           ))}
         </div>
-      )}
+      ))}
 
       {hist.length > 0 && (
         <div className="card p-4">

@@ -1366,6 +1366,10 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Fait** : réglage `reglages.stock_unique` = **vrai** (`lireStockUnique` / `choisirStockUnique` dans `src/lib/voiture.ts`). En mode « un seul stock », **Stock voiture = tout le stock** (fiches + variantes de marque, quantité > 0 : tout ce qui a été reçu et pas vendu), sans « Charger » ni « Décharger », sans colonne magasin ; bouton principal **📒 Marchandise d'avant (cahier)** (boîtes du cahier, à dinoun, sans double solde, sans dépôt voiture) ; réception ajoute, vente enlève, tout seul. Lien « J'ai aussi un magasin » pour revenir au mode magasin + voiture (dépôts), et « Un seul stock » pour revenir.
 - **Prochaine étape de l'utilisateur** : compter la voiture → boîtes du cahier en Marchandise d'avant ; pour vérifier les autres : Inventaire au scanner.
 
+## 8.55 Stock voiture : même présentation que « Mon stock » (22/11/2026)
+- **Demande** (capture de Mon stock : familles, cases Filtre huile 460 / Filtre air 87…) : « fais-moi ça pareil dans Stock voiture, ça me facilite les recherches ».
+- **Fait** : le contenu de « Mon stock » devient le composant partagé **`src/components/StockDetaille.tsx`** (titre au choix) ; `/mon-stock` = en-tête + composant ; **Stock voiture** (mode un seul stock) = boutons (📒 Marchandise d'avant) + le même composant titré « Dans la voiture » (rechargé après un ajout) → familles, cases par type, recherche, tri, Imprimer, historique par ligne, stock négatif signalé. Mode magasin + voiture : l'ancienne liste reste.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*
