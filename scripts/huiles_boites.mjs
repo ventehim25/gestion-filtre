@@ -24,7 +24,8 @@ const UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKi
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function json(p) {
   for (let e = 0; e < 4; e++) {
-    try { const r = await fetch(BASE + p, { headers: UA }); if (r.ok) return await r.json(); if (r.status === 404) return null; throw new Error("HTTP " + r.status); }
+    // 30 s au plus par demande : le 19/11 une demande sans réponse a bloqué le relevé 3 jours
+    try { const r = await fetch(BASE + p, { headers: UA, signal: AbortSignal.timeout(30000) }); if (r.ok) return await r.json(); if (r.status === 404) return null; throw new Error("HTTP " + r.status); }
     catch (err) { await sleep(3000 * (e + 1)); if (e === 3) throw err; }
   }
 }
@@ -87,7 +88,10 @@ async function collecte() {
   const vs = versions(); const vus = new Set(); let lus = 0, total = 0;
   for (const t of vs) { const k = cleLecture(t); if (!vus.has(k)) { vus.add(k); total++; } }
   vus.clear();
+  // --filtre=Evasion : seulement les versions dont le modèle ou le nom contient ce texte (lecture rapide d'un modèle)
+  const filtre = (process.argv.find((x) => x.startsWith("--filtre=")) ?? "").slice(9);
   for (const t of vs) {
+    if (filtre && !new RegExp(filtre, "i").test(`${t.modele} ${t.nom}`)) continue;
     const k = cleLecture(t);
     if (vus.has(k)) continue; vus.add(k);
     if (brut[k] && brut[k].fluides) continue; // déjà lue (boîtes + liquides)

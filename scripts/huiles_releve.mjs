@@ -33,7 +33,7 @@ const UA = { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKi
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function json(p) {
   for (let e = 0; e < 4; e++) {
-    try { const r = await fetch(BASE + p, { headers: UA }); if (r.ok) return await r.json(); if (r.status === 404) return null; throw new Error("HTTP " + r.status); }
+    try { const r = await fetch(BASE + p, { headers: UA, signal: AbortSignal.timeout(30000) }); if (r.ok) return await r.json(); if (r.status === 404) return null; throw new Error("HTTP " + r.status); } // 30 s au plus (blocage du 19/11)
     catch (err) { await sleep(3000 * (e + 1)); if (e === 3) throw err; }
   }
 }
