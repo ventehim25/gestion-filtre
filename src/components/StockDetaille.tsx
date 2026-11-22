@@ -145,9 +145,9 @@ export default function StockDetaille({ titre = "Il te reste en stock" }: { titr
             {visibles.slice(0, 400).map((l) => (
               <div key={l.cle} className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 items-center">
                 <span className="min-w-0">
-                  <span className="block font-mono text-sm text-slate-100 truncate">{l.ref} <span className="font-sans text-xs text-indigo-300">{l.marque}</span>{l.vehicule === "camion" ? " 🚛" : ""}</span>
+                  <span className="block font-mono text-sm text-slate-100 truncate">{l.ref} <span className="font-sans text-xs text-indigo-300">{l.marque}</span>{l.filtron && <span className="font-sans text-xs text-amber-300"> = {l.filtron}</span>}{l.vehicule === "camion" ? " 🚛" : ""}</span>
                   <span className="block text-[11px] text-slate-500 truncate">
-                    {libelleCategorie(l.categorie)}{l.filtron ? ` · = ${l.filtron}` : ""}{l.voiture ? ` · ${l.voiture} dans la voiture` : ""}
+                    {libelleCategorie(l.categorie)}{l.voiture ? ` · ${l.voiture} dans la voiture` : ""}
                     <Link href={`/inventaire?article=${l.product_id}`} className="ms-2 inline-flex items-center gap-0.5 text-slate-500 hover:text-amber-300"><History size={11} /> historique</Link>
                   </span>
                 </span>

@@ -53,7 +53,8 @@ export default function AReprendrePage() {
     const c = choisies(liste);
     if (!c.length) { alert("Coche au moins une référence avec une quantité."); return; }
     const texte = ["Salam Reda 👋", "🧾 *Commande FiltroPro*", `📅 ${new Date().toLocaleDateString("fr-FR")}`, "————————————",
-      ...c.map((l) => `• ${l.ref}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""} × ${qte[l.cle]}`),
+      // Réf. Filtron d'abord (Reda travaille avec les réf. Filtron, demande du 22/11), puis la marque de la boîte
+      ...c.map((l) => l.filtron ? `• ${l.filtron.replace(/^Filtron /, "")} (Filtron) = ${l.marque} ${l.ref} × ${qte[l.cle]}` : `• ${l.ref}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""} × ${qte[l.cle]}`),
       "————————————", `${c.reduce((s, l) => s + (qte[l.cle] ?? 0), 0)} pièce(s), ${c.length} référence(s). Merci 🙏`].join("\n");
     sendWhatsApp(dinoun?.telephone ?? null, texte);
   }
@@ -114,8 +115,8 @@ export default function AReprendrePage() {
                 <div key={l.cle} className="grid grid-cols-[auto_1fr_auto] gap-3 py-2 items-center">
                   <input type="checkbox" checked={!!coche[l.cle]} onChange={(e) => setCoche({ ...coche, [l.cle]: e.target.checked })} />
                   <span className="min-w-0">
-                    <span className="block font-mono text-sm text-slate-100 truncate">{l.ref} <span className="font-sans text-xs text-indigo-300">{l.marque}</span></span>
-                    <span className="block text-[11px] text-slate-500 truncate">vendu <b className="text-slate-300">{l.vendu}</b> · reste <b className={l.stock <= 0 ? "text-red-400" : "text-slate-300"}>{l.stock}</b>{l.filtron ? ` · = ${l.filtron}` : ""} · dernière vente {l.derniere.slice(8, 10)}/{l.derniere.slice(5, 7)}</span>
+                    <span className="block font-mono text-sm text-slate-100 truncate">{l.ref} <span className="font-sans text-xs text-indigo-300">{l.marque}</span>{l.filtron && <span className="font-sans text-xs text-amber-300"> = {l.filtron}</span>}</span>
+                    <span className="block text-[11px] text-slate-500 truncate">vendu <b className="text-slate-300">{l.vendu}</b> · reste <b className={l.stock <= 0 ? "text-red-400" : "text-slate-300"}>{l.stock}</b> · dernière vente {l.derniere.slice(8, 10)}/{l.derniere.slice(5, 7)}</span>
                   </span>
                   <input type="number" inputMode="numeric" min={0} className="input !w-20 py-1 text-center" value={qte[l.cle] ?? 0}
                     onChange={(e) => setQte({ ...qte, [l.cle]: Math.max(0, Math.round(Number(e.target.value) || 0)) })} />
