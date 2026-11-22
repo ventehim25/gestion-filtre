@@ -46,14 +46,19 @@ export default function AReprendrePage() {
   const nomF = (id: string) => fournisseurs.find((f) => f.id === id)?.nom ?? "Sans fournisseur";
   const choisies = (liste: ARepr[]) => liste.filter((l) => coche[l.cle] && (qte[l.cle] ?? 0) > 0);
 
-  function commande(fid: string, liste: ARepr[]) {
+  // Commande WhatsApp : TOUJOURS à Reda (dinoun) — demande du 22/11 (BIBLE §8.56) : numéro de la fiche du fournisseur à
+  // crédit (dinoun auto), quelle que soit la source de la dernière réception
+  const dinoun = fournisseurs.find((f) => (f.type ?? "credit") === "credit") ?? null;
+  function commande(_fid: string, liste: ARepr[]) {
     const c = choisies(liste);
     if (!c.length) { alert("Coche au moins une référence avec une quantité."); return; }
-    const texte = ["🧾 *Commande FiltroPro*", `📅 ${new Date().toLocaleDateString("fr-FR")}`, "————————————",
+    const texte = ["Salam Reda 👋", "🧾 *Commande FiltroPro*", `📅 ${new Date().toLocaleDateString("fr-FR")}`, "————————————",
       ...c.map((l) => `• ${l.ref}${l.marque && l.marque !== "Filtron" ? ` (${l.marque})` : ""} × ${qte[l.cle]}`),
       "————————————", `${c.reduce((s, l) => s + (qte[l.cle] ?? 0), 0)} pièce(s), ${c.length} référence(s). Merci 🙏`].join("\n");
-    sendWhatsApp(fournisseurs.find((f) => f.id === fid)?.telephone ?? null, texte);
+    sendWhatsApp(dinoun?.telephone ?? null, texte);
   }
+  // Tout ce qui est coché, tous fournisseurs confondus, en un seul message à Reda
+  const toutCoche = () => visibles;
   function jaiRecu(fid: string, liste: ARepr[]) {
     const c = choisies(liste);
     if (!c.length) { alert("Coche les références reçues."); return; }
@@ -82,6 +87,11 @@ export default function AReprendrePage() {
           <label className="text-xs text-slate-400 flex items-center gap-2"><input type="checkbox" checked={toutes} onChange={(e) => setToutes(e.target.checked)} /> Voir aussi celles qui ont encore du stock</label>
         </div>
         {lignes && <p className="text-xs text-slate-500 mt-2">{total} référence(s) à reprendre · {lignes.length} vendue(s) sur la période</p>}
+        {lignes && total > 0 && (
+          <button onClick={() => commande("tout", toutCoche())} className="mt-3 flex items-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white px-4 py-2 text-sm font-medium">
+            <MessageCircle size={16} /> Tout commander à Reda (dinoun){dinoun?.telephone ? ` · ${dinoun.telephone}` : ""}
+          </button>
+        )}
       </div>
 
       {!lignes ? <p className="text-sm text-slate-400">Calcul…</p> : groupes.length === 0 ? (
@@ -94,7 +104,7 @@ export default function AReprendrePage() {
             <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <h3 className="font-semibold text-slate-100">Chez {nomF(fid)} <span className="text-xs text-slate-500 font-normal">· {c.length} réf. · {c.reduce((s, l) => s + (qte[l.cle] ?? 0), 0)} pièces{montant > 0 ? ` · ≈ ${Math.round(montant)} MAD` : ""}</span></h3>
               <div className="flex gap-2">
-                <button onClick={() => commande(fid, liste)} className="flex items-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 text-xs font-medium"><MessageCircle size={14} /> Commande WhatsApp</button>
+                <button onClick={() => commande(fid, liste)} className="flex items-center gap-1.5 rounded-lg bg-green-600 hover:bg-green-500 text-white px-3 py-1.5 text-xs font-medium"><MessageCircle size={14} /> Commande à Reda</button>
                 {fid !== "aucun" && <button onClick={() => jaiRecu(fid, liste)} className="flex items-center gap-1.5 btn-primary text-xs"><PackagePlus size={14} /> J&apos;ai reçu → Réception</button>}
               </div>
             </div>
