@@ -393,3 +393,9 @@ Menu **Mon stock** (ou la case **En stock** sur l'accueil) : le total de pièces
 
 Menu **Stock voiture** = **tout ton stock** (tout ce que tu as reçu et pas encore vendu). Rien à charger ni décharger : une réception ajoute, une vente enlève. Les boîtes qui ne sont que dans le cahier → **📒 Marchandise d'avant (cahier)**, à dinoun. Pour vérifier les chiffres → **Inventaire** (scanner).
 
+## 32. Ce qu'il faut reprendre (depuis le 22/11/2026)
+
+Menu **À reprendre** : ce que tu as **vendu** et qu'il faut **racheter**, rangé par fournisseur. Choisis la période (14 jours par exemple). La quantité proposée = ce que tu as vendu − ce qui te reste ; change-la si besoin, décoche ce que tu ne veux pas.
+1. **Commande WhatsApp** : la liste part chez dinoun (ou filtropro), prête à envoyer.
+2. Quand la marchandise arrive : **J'ai reçu → Réception** : la réception s'ouvre déjà remplie ; vérifie les quantités et les prix, puis **Enregistrer**. Le stock remonte tout seul.
+

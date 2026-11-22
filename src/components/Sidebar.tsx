@@ -18,6 +18,7 @@ const navItems = [
   { href: "/ventes", icon: ShoppingCart, key: "sales" as const },
   { href: "/fournisseurs", icon: Truck, key: "suppliers" as const },
   { href: "/mon-stock", icon: Boxes, key: "myStock" as const },
+  { href: "/a-reprendre", icon: ClipboardList, key: "toRestock" as const },
   { href: "/clients", icon: Users, key: "clients" as const },
   { href: "/caisse", icon: Wallet, key: "cash" as const },
   { href: "/voiture", icon: CarFront, key: "vanStock" as const },

@@ -1371,6 +1371,11 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Demande** (capture de Mon stock : familles, cases Filtre huile 460 / Filtre air 87…) : « fais-moi ça pareil dans Stock voiture, ça me facilite les recherches ».
 - **Fait** : le contenu de « Mon stock » devient le composant partagé **`src/components/StockDetaille.tsx`** (titre au choix) ; `/mon-stock` = en-tête + composant ; **Stock voiture** (mode un seul stock) = boutons (📒 Marchandise d'avant) + le même composant titré « Dans la voiture » (rechargé après un ajout) → familles, cases par type, recherche, tri, Imprimer, historique par ligne, stock négatif signalé. Mode magasin + voiture : l'ancienne liste reste.
 
+## 8.56 « À reprendre » : racheter ce qui a été vendu (22/11/2026)
+- **Demande** : « les références que j'ai vendues, je dois les reprendre à nouveau : comment gérer plus facilement ». La page Réappro partait du catalogue entier (milliers de fiches à 0).
+- **Page `/a-reprendre`** (menu du quotidien « À reprendre », `src/lib/aReprendre.ts`) : chaque article **vendu** sur la période (7 j, 14 j, 30 j, depuis le début) — fiche Filtron… ou variante Flag, Wix… — avec vendu, ce qui reste, dernière vente, et une **quantité proposée = vendu − reste** (modifiable, case à cocher) ; rangé **par fournisseur** (celui de la dernière réception de l'article, sinon le fournisseur à crédit) avec le total en pièces et en MAD (prix d'achat) ; « Voir aussi celles qui ont encore du stock ». Boutons par fournisseur : **Commande WhatsApp** (liste « • Fa182 (Flag) × 37 », au numéro du fournisseur) et **J'ai reçu → Réception** : les lignes cochées sont gardées sur le téléphone (`fp_reception_prefill`) et la Réception s'ouvre **déjà remplie** (fournisseur, références, marques, quantités, prix) → vérifier, Enregistrer.
+- **Chiffres du 22/11 (14 j)** : 27 réf. vendues, **14 à reprendre** (Fa182 Flag 37, OP643/3 24, FANFARO 10W40 20, PEMKO 10W40 16, fa028 Flag 16, OE674/5 12, Castrol 5W30 8, Fanfaro 15W40 8…).
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*

@@ -21,6 +21,7 @@ import {
   ChevronDown, ChevronUp, Wallet, TrendingUp, Eye, EyeOff, PiggyBank, ScanLine, ExternalLink, CloudOff, RefreshCw, Undo2,
 } from "lucide-react";
 import RetourFournisseurModal from "@/components/RetourFournisseurModal";
+import { CLE_PREREMPLI, type Prerempli } from "@/lib/aReprendre";
 import { noterBanque, enleverBanque } from "@/lib/banque";
 
 type RecLine = {
@@ -287,10 +288,28 @@ export default function FournisseursPage() {
   const autoReception = useRef(false);
   useEffect(() => {
     if (autoReception.current || !fournisseurs.length) return;
-    if (!new URLSearchParams(window.location.search).has("reception")) return;
+    const param = new URLSearchParams(window.location.search).get("reception");
+    if (param == null) return;
     autoReception.current = true;
-    openReception(fournisseurs.find(x => (x.type ?? "credit") === "credit") ?? fournisseurs[0]);
     window.history.replaceState(null, "", "/fournisseurs");
+    // « À reprendre → J'ai reçu » (BIBLE §8.56) : la réception s'ouvre déjà remplie (fournisseur + lignes cochées)
+    if (param === "prefill") {
+      let p: Prerempli | null = null;
+      try { p = JSON.parse(localStorage.getItem(CLE_PREREMPLI) ?? "null"); localStorage.removeItem(CLE_PREREMPLI); } catch { /* rien */ }
+      const f = p ? fournisseurs.find(x => x.id === p!.fournisseur_id) : null;
+      if (p && f && p.lignes.length) {
+        const pre = p;
+        openReception(f);
+        setRecLines(pre.lignes.map(l => ({ ...emptyRecLine(), product_id: l.product_id, equivalence_id: l.equivalence_id, marque: l.marque, quantite: l.quantite, prix_achat: l.prix_achat, prix_vente: l.prix_vente, reference: l.reference })));
+        // fiches absentes de la liste (autre mode 🚗/🚛) : ajoutées pour que les lignes s'affichent
+        const manquants = pre.lignes.map(l => l.product_id).filter(id => !products.some(x => x.id === id));
+        if (manquants.length) supabase.from("products").select("*").in("id", manquants).then(({ data }) => {
+          if (data?.length) setProducts(prev => [...prev, ...(data as Product[]).filter(d => !prev.some(x => x.id === d.id))]);
+        });
+        return;
+      }
+    }
+    openReception(fournisseurs.find(x => (x.type ?? "credit") === "credit") ?? fournisseurs[0]);
   }, [fournisseurs]); // eslint-disable-line react-hooks/exhaustive-deps
   function setRecProduct(i: number, p: Product) {
     setRecLines(prev => prev.map((l, j) => j === i ? { ...l, product_id: p.id, equivalence_id: null, marque: "Filtron", prix_achat: p.prix_achat, prix_vente: p.prix_vente, reference: p.reference, code_barre: l.code_barre || p.code_barre || "", nouvelleMarque: null, nouvelleRef: "", nouvellePiece: null } : l));
