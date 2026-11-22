@@ -459,7 +459,7 @@ export default function ReapproPage() {
                 <td className="px-3 py-2.5"><StockBadge stock={p.stock} stockMin={p.stock_min} /></td>
                 <td className="px-3 py-2.5 text-slate-400">{p.stock_min}</td>
                 <td className="px-3 py-2.5">
-                  <input type="number" min={1} className="input w-20 text-center font-mono py-1"
+                  <input type="number" min={1} className="input !w-20 text-center font-mono py-1"
                     value={qty[p.id] ?? 1} onChange={e => setQty({ ...qty, [p.id]: Math.max(1, +e.target.value) })} />
                 </td>
               </tr>

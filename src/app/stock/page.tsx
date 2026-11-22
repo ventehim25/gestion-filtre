@@ -366,7 +366,7 @@ export default function StockPage() {
                       <input
                         ref={el => { inputRefs.current[idx] = el; }}
                         type="number" min={0}
-                        className="input w-16 text-center font-mono py-1"
+                        className="input !w-16 text-center font-mono py-1"
                         value={effStock(p)}
                         onFocus={e => e.target.select()}
                         onChange={e => setEdit(p, "stock", +e.target.value)}
@@ -377,7 +377,7 @@ export default function StockPage() {
                   </td>
                   <td className="px-4 py-2.5">
                     <input type="number" min={0}
-                      className="input w-16 text-center font-mono py-1"
+                      className="input !w-16 text-center font-mono py-1"
                       value={effMin(p)}
                       onFocus={e => e.target.select()}
                       onChange={e => setEdit(p, "stock_min", +e.target.value)} />

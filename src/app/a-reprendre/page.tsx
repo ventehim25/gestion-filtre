@@ -98,6 +98,7 @@ export default function AReprendrePage() {
                 {fid !== "aucun" && <button onClick={() => jaiRecu(fid, liste)} className="flex items-center gap-1.5 btn-primary text-xs"><PackagePlus size={14} /> J&apos;ai reçu → Réception</button>}
               </div>
             </div>
+            <div className="grid grid-cols-[auto_1fr_auto] gap-3 pb-1 text-[11px] uppercase text-slate-500"><span className="w-4" /><span>Référence · vendu · reste</span><span className="w-20 text-center">À reprendre</span></div>
             <div className="divide-y divide-slate-800">
               {liste.map((l) => (
                 <div key={l.cle} className="grid grid-cols-[auto_1fr_auto] gap-3 py-2 items-center">
@@ -106,7 +107,7 @@ export default function AReprendrePage() {
                     <span className="block font-mono text-sm text-slate-100 truncate">{l.ref} <span className="font-sans text-xs text-indigo-300">{l.marque}</span></span>
                     <span className="block text-[11px] text-slate-500 truncate">vendu <b className="text-slate-300">{l.vendu}</b> · reste <b className={l.stock <= 0 ? "text-red-400" : "text-slate-300"}>{l.stock}</b>{l.filtron ? ` · = ${l.filtron}` : ""} · dernière vente {l.derniere.slice(8, 10)}/{l.derniere.slice(5, 7)}</span>
                   </span>
-                  <input type="number" inputMode="numeric" min={0} className="input w-20 py-1 text-center" value={qte[l.cle] ?? 0}
+                  <input type="number" inputMode="numeric" min={0} className="input !w-20 py-1 text-center" value={qte[l.cle] ?? 0}
                     onChange={(e) => setQte({ ...qte, [l.cle]: Math.max(0, Math.round(Number(e.target.value) || 0)) })} />
                 </div>
               ))}

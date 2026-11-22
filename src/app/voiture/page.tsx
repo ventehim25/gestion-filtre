@@ -170,7 +170,7 @@ export default function VoiturePage() {
               {charge.map((l, i) => (
                 <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center rounded-lg bg-slate-800/50 px-3 py-2">
                   <span className="min-w-0"><span className="block font-mono text-xs text-slate-200 truncate">{l.ref}</span><span className="text-[11px] text-slate-500">au magasin : {l.dispo}</span></span>
-                  <input type="number" inputMode="numeric" min={0} max={l.dispo} className="input w-20 py-1 text-center" value={l.quantite}
+                  <input type="number" inputMode="numeric" min={0} max={l.dispo} className="input !w-20 py-1 text-center" value={l.quantite}
                     onChange={(e) => setCharge(charge.map((x, j) => j === i ? { ...x, quantite: Math.max(0, Math.min(x.dispo, Math.round(Number(e.target.value) || 0))) } : x))} />
                   <button onClick={() => setCharge(charge.filter((_, j) => j !== i))} className="text-slate-500 hover:text-red-400"><Trash2 size={14} /></button>
                 </div>
@@ -200,7 +200,7 @@ export default function VoiturePage() {
                 <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center rounded-lg bg-slate-800/50 px-3 py-2">
                   <span className="min-w-0"><span className="block font-mono text-xs text-slate-200 truncate">{l.ref}</span>
                     <span className={`block text-[11px] ${l.deja > 0 ? "text-amber-300" : "text-slate-500"}`}>{l.deja > 0 ? `déjà ${l.deja} dans l'appli (réceptions) : n'ajoute que les boîtes du cahier en plus` : "pas encore dans l'appli"}</span></span>
-                  <input type="number" inputMode="numeric" min={0} className="input w-20 py-1 text-center" value={l.quantite}
+                  <input type="number" inputMode="numeric" min={0} className="input !w-20 py-1 text-center" value={l.quantite}
                     onChange={(e) => setAvant(avant.map((x, j) => j === i ? { ...x, quantite: Math.max(0, Math.round(Number(e.target.value) || 0)) } : x))} />
                   <button onClick={() => setAvant(avant.filter((_, j) => j !== i))} className="text-slate-500 hover:text-red-400"><Trash2 size={14} /></button>
                 </div>
@@ -234,7 +234,7 @@ export default function VoiturePage() {
               {stock.map((a) => (
                 <div key={a.id} className="grid grid-cols-[1fr_auto] gap-2 items-center rounded-lg bg-slate-800/50 px-3 py-2">
                   <span className="min-w-0"><span className="block font-mono text-xs text-slate-200 truncate">{a.ref}</span><span className="text-[11px] text-slate-500">dans la voiture : {a.quantite}</span></span>
-                  <input type="number" inputMode="numeric" min={0} max={a.quantite} className="input w-20 py-1 text-center" value={decharge[a.id] ?? 0}
+                  <input type="number" inputMode="numeric" min={0} max={a.quantite} className="input !w-20 py-1 text-center" value={decharge[a.id] ?? 0}
                     onChange={(e) => setDecharge({ ...decharge, [a.id]: Math.max(0, Math.min(a.quantite, Math.round(Number(e.target.value) || 0))) })} />
                 </div>
               ))}
