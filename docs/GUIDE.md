@@ -348,7 +348,7 @@ Statistiques → bloc **💹 Rentabilité**. Choisis la période (Ce mois, 3 moi
 
 ## 26. Inventaire, corrections de stock, historique (depuis le 18/11/2026)
 
-**Faire l'inventaire** : menu **Inventaire** → **Commencer un inventaire**. La liste montre tout ce que l'appli croit avoir. Compte les boîtes et tape le nombre en face de chaque référence (vert ✓ = juste, rouge = il en manque, orange = il y en a plus). Une boîte qui n'est pas dans la liste : **➕ Boîte pas dans la liste**. Tu peux fermer et reprendre plus tard. À la fin : **✓ Valider l'inventaire** → le stock prend tes chiffres (ce que tu n'as pas compté ne change pas).
+**Faire l'inventaire** (menu **Plus… → Inventaire**) → **Commencer un inventaire**. **Le plus rapide : « Scanner avec la caméra »** (ou la douchette) : scanne chaque boîte une par une, chaque scan = +1. Une boîte inconnue → choisis sa référence une fois, l'appli retient son code. Sinon : La liste montre tout ce que l'appli croit avoir. Compte les boîtes et tape le nombre en face de chaque référence (vert ✓ = juste, rouge = il en manque, orange = il y en a plus). Une boîte qui n'est pas dans la liste : **➕ Boîte pas dans la liste**. Tu peux fermer et reprendre plus tard. À la fin : **✓ Valider l'inventaire** → le stock prend tes chiffres (ce que tu n'as pas compté ne change pas).
 
 **Une boîte cassée, perdue, volée, un cadeau** : Inventaire → **Historique d'un article** → tape la référence → **Corriger le stock** → choisis la boîte, Retirer ou Ajouter, combien, **pourquoi** → Enregistrer. Plus jamais un stock qui change sans raison.
 

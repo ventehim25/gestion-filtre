@@ -13,7 +13,9 @@ import {
   inventairesPasses, sauverComptage, validerInventaire, type Article, type Mouvement,
 } from "@/lib/inventaire";
 import type { Inventaire, Product } from "@/types/database";
-import { ClipboardCheck, History, X, Search } from "lucide-react";
+import { ClipboardCheck, History, X, Search, ScanLine } from "lucide-react";
+import BarcodeScanner from "@/components/BarcodeScanner";
+import { supabase } from "@/lib/supabase";
 
 const COUL: Record<Mouvement["type"], string> = {
   reception: "text-emerald-400", retour_fournisseur: "text-amber-300", vente: "text-sky-400", retour_client: "text-amber-300", correction: "text-fuchsia-300", transfert: "text-slate-400",
@@ -66,19 +68,69 @@ export default function InventairePage() {
   useChangementType(typeV, (t) => { chargerComptage(t).catch(() => {}); chargerFiches(t).catch(() => {}); });
 
   const parCle = useMemo(() => new Map((articles ?? []).map((a) => [cleArticle(a), a])), [articles]);
-  function taper(a: Article, v: string) {
-    const nv = { ...comptes, [cleArticle(a)]: v };
-    setComptes(nv);
+  // Code inconnu associé à une référence : le code est retenu (fiche ou variante de marque, seulement s'il n'y en a pas)
+  // puis la boîte est comptée — la suivante identique sera reconnue toute seule
+  async function associerCode(p: Product, v?: PickerVariant) {
+    const code = codeInconnu; if (!code) return;
+    setCodeInconnu(null);
+    if (v) await supabase.from("equivalences").update({ code_barre: code }).eq("id", v.id).is("code_barre", null);
+    else { await supabase.from("products").update({ code_barre: code }).eq("id", p.id).is("code_barre", null); setProducts((prev) => prev.map((x) => (x.id === p.id && !x.code_barre ? { ...x, code_barre: code } : x))); }
+    const k = `${p.id}|${v?.id ?? ""}`;
+    const { data: st } = v ? await supabase.from("equivalences").select("stock, prix_achat").eq("id", v.id).single() : { data: { stock: p.stock, prix_achat: p.prix_achat } };
+    compterArticle(parCle.get(k) ?? { product_id: p.id, equivalence_id: v?.id ?? null, ref: v ? `${v.reference} (${v.marque})` : p.reference, stock: Number((st as { stock: number | null } | null)?.stock ?? 0), prix_achat: Number((st as { prix_achat: number | null } | null)?.prix_achat ?? 0) });
+  }
+
+  // Réf. de chaque article (aussi ceux ajoutés par un scan à l'instant) pour le brouillon
+  const refsRef = useRef<Map<string, string>>(new Map());
+  useEffect(() => { for (const a of articles ?? []) refsRef.current.set(cleArticle(a), a.ref); }, [articles]);
+  function planifierSauvegarde(nv: Record<string, string>) {
     if (!inv) return;
     if (minuteur.current) clearTimeout(minuteur.current);
     minuteur.current = setTimeout(() => {
       const lignes = Object.entries(nv).filter(([, x]) => x.trim() !== "" && !isNaN(Number(x))).map(([k, x]) => {
-        const art = parCle.get(k); const [product_id, eq] = k.split("|");
-        return { product_id, equivalence_id: eq || null, compte: Math.max(0, Math.round(Number(x))), ref: art?.ref };
+        const [product_id, eq] = k.split("|");
+        return { product_id, equivalence_id: eq || null, compte: Math.max(0, Math.round(Number(x))), ref: refsRef.current.get(k) };
       });
       sauverComptage(inv.id, lignes).catch(() => {});
-      setInv({ ...inv, lignes });
+      setInv((prev) => (prev ? { ...prev, lignes } : prev));
     }, 700);
+  }
+  function taper(a: Article, v: string) {
+    setComptes((prev) => { const nv = { ...prev, [cleArticle(a)]: v }; planifierSauvegarde(nv); return nv; });
+  }
+
+  // ── Compter au scanner (19-22/11/2026, BIBLE §8.53) : chaque boîte scannée = +1, sans rien taper ──
+  const [camScan, setCamScan] = useState(false);
+  const [codeScan, setCodeScan] = useState("");
+  const [retourScan, setRetourScan] = useState<string>("");
+  const [codeInconnu, setCodeInconnu] = useState<string | null>(null); // boîte scannée sans code connu → « c'est quelle réf. ? »
+  async function compterScan(brut: string) {
+    const code = brut.trim();
+    if (!code) return;
+    let a: Article | null = null;
+    // 1) fiche (code-barres ou référence), 2) variante de marque (code-barres de la boîte Wix / Flag / Mann…)
+    const p = products.find((x) => (x.code_barre && x.code_barre === code) || x.reference.toUpperCase() === code.toUpperCase());
+    if (p) a = parCle.get(`${p.id}|`) ?? { product_id: p.id, equivalence_id: null, ref: p.reference, stock: p.stock, prix_achat: p.prix_achat };
+    else {
+      const { data } = await supabase.from("equivalences").select("id, product_id, marque, reference, stock, prix_achat").eq("code_barre", code).limit(1);
+      const e = (data?.[0] ?? null) as { id: string; product_id: string; marque: string; reference: string; stock: number | null; prix_achat: number | null } | null;
+      if (e) a = parCle.get(`${e.product_id}|${e.id}`) ?? { product_id: e.product_id, equivalence_id: e.id, ref: `${e.reference} (${e.marque})`, stock: e.stock ?? 0, prix_achat: Number(e.prix_achat ?? 0) };
+    }
+    if (!a) { setCamScan(false); setCodeInconnu(code); setRetourScan(`⚠ Code inconnu : ${code} — choisis sa référence`); return; }
+    compterArticle(a);
+  }
+  // +1 sur un article (et il entre dans la liste s'il n'y était pas)
+  function compterArticle(art: Article) {
+    const k = cleArticle(art);
+    refsRef.current.set(k, art.ref);
+    if (!parCle.has(k)) setArticles((prev) => [art, ...(prev ?? [])]);
+    setComptes((prev) => {
+      const n = (Number(prev[k]) || 0) + 1;
+      const nv = { ...prev, [k]: String(n) };
+      planifierSauvegarde(nv);
+      setRetourScan(`✓ ${art.ref} : ${n} compté${n > 1 ? "s" : ""}${art.stock ? ` (appli ${art.stock})` : ""}`);
+      return nv;
+    });
   }
   function ajouterHorsListe(p: Product, v?: PickerVariant) {
     const a: Article = { product_id: p.id, equivalence_id: v?.id ?? null, ref: v ? `${v.reference} (${v.marque})` : p.reference, stock: v ? 0 : p.stock, prix_achat: v ? 0 : p.prix_achat };
@@ -190,6 +242,30 @@ export default function InventairePage() {
                   <ProductPicker products={products} variants={variants} value="" onSelect={(p, v) => ajouterHorsListe(p, v)} placeholder="➕ Boîte pas dans la liste (réf.)" />
                 </div>
               </div>
+              <div className="card p-3 mb-3">
+                <p className="text-xs text-slate-400 mb-2"><b className="text-slate-200">Compter au scanner</b> : chaque boîte scannée = +1 (caméra du téléphone ou douchette). Une boîte inconnue se tape dans « ➕ Boîte pas dans la liste ».</p>
+                <div className="flex flex-wrap gap-2">
+                  <button onClick={() => setCamScan(true)} className="btn-primary flex items-center gap-1.5 text-sm"><ScanLine size={15} /> Scanner avec la caméra</button>
+                  <input className="input flex-1 min-w-[10rem]" placeholder="Douchette : scanne ici (ou tape un code + Entrée)" value={codeScan}
+                    onChange={(e) => setCodeScan(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { compterScan(codeScan); setCodeScan(""); } }} />
+                </div>
+                {retourScan && <p className={`text-sm mt-2 ${retourScan.startsWith("✓") ? "text-emerald-400" : "text-amber-300"}`}>{retourScan}</p>}
+              </div>
+              {camScan && <BarcodeScanner onScan={(c) => compterScan(c)} onClose={() => setCamScan(false)} hint="Scanne chaque boîte une par une." status={retourScan} />}
+              {codeInconnu && (
+                <div className="fixed inset-0 overflow-y-auto bg-black/60 flex items-start justify-center z-[60] p-4">
+                  <div className="card p-5 w-full max-w-md my-auto">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-slate-100">Boîte inconnue</h3>
+                      <button onClick={() => setCodeInconnu(null)} className="text-slate-400 hover:text-white"><X size={20} /></button>
+                    </div>
+                    <p className="text-sm text-slate-300 mb-1">Code scanné : <span className="font-mono">{codeInconnu}</span></p>
+                    <p className="text-xs text-slate-400 mb-3">Tape la référence écrite sur la boîte (Filtron, Flag, Wix…). La boîte est comptée et le code est retenu : la prochaine sera reconnue toute seule.</p>
+                    <ProductPicker products={products} variants={variants} value="" onSelect={(p, v) => associerCode(p, v)} placeholder="Référence de la boîte" />
+                    <div className="flex justify-end mt-4"><button onClick={() => setCodeInconnu(null)} className="btn-secondary">Passer</button></div>
+                  </div>
+                </div>
+              )}
               <label className="text-xs text-slate-400 flex items-center gap-2 mb-2"><input type="checkbox" checked={seulementEcarts} onChange={(e) => setSeulementEcarts(e.target.checked)} /> Seulement les écarts</label>
               {!articles ? <p className="text-sm text-slate-400">Chargement…</p> : (
                 <div className="card divide-y divide-slate-800">
