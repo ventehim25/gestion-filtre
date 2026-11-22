@@ -1361,6 +1361,11 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 - **Fait** (`/inventaire`, onglet Compter, inventaire en cours) : bloc **« Compter au scanner »** — **caméra du téléphone** (`BarcodeScanner`, retour en direct « ✓ OE640/2 : 12 comptés (appli 38) ») ou **douchette** (champ + Entrée) ; **chaque boîte scannée = +1** sur sa ligne (fiche par code-barres ou référence, sinon variante de marque par le code-barres de sa boîte) ; un article absent de la feuille y entre tout seul. **Boîte inconnue** → fenêtre « c'est quelle référence ? » : on choisit la réf. (Filtron, Flag, Wix…), la boîte est comptée **et le code est retenu** sur la fiche ou la variante (seulement si elle n'en avait pas) → la suivante est reconnue toute seule. Brouillon sauvé à partir de l'état le plus récent (plusieurs scans rapides de suite sans perte, `planifierSauvegarde`).
 - **État des codes-barres (22/11)** : 41 réf. en stock, **12 avec code-barres (398 pièces, surtout Filtron)**, 29 sans (198 pièces, surtout Flag) → elles seront apprises au premier scan pendant l'inventaire.
 
+## 8.54 Un seul stock : la voiture (22/11/2026)
+- **Demande** : « pas bien compris (magasin / voiture) ; pour simplifier, un seul stock voiture : mets-y toutes les références reçues (marchandise prise) pas encore vendues, et moi j'ajouterai les références exactes du cahier après les avoir comptées ».
+- **Fait** : réglage `reglages.stock_unique` = **vrai** (`lireStockUnique` / `choisirStockUnique` dans `src/lib/voiture.ts`). En mode « un seul stock », **Stock voiture = tout le stock** (fiches + variantes de marque, quantité > 0 : tout ce qui a été reçu et pas vendu), sans « Charger » ni « Décharger », sans colonne magasin ; bouton principal **📒 Marchandise d'avant (cahier)** (boîtes du cahier, à dinoun, sans double solde, sans dépôt voiture) ; réception ajoute, vente enlève, tout seul. Lien « J'ai aussi un magasin » pour revenir au mode magasin + voiture (dépôts), et « Un seul stock » pour revenir.
+- **Prochaine étape de l'utilisateur** : compter la voiture → boîtes du cahier en Marchandise d'avant ; pour vérifier les autres : Inventaire au scanner.
+
 ---
 
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*

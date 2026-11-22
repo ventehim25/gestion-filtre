@@ -13,8 +13,40 @@ export type ArticleVoiture = LigneVoiture & { id: string; prix: number; stockTot
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Db = SupabaseClient<any>;
 
-/** Ce qu'il y a dans la voiture (quantité > 0). */
+// ───────────── Un seul stock : la voiture (22/11/2026, BIBLE §8.54) ─────────────
+// Demande : « pour simplifier, un seul stock voiture : tout ce que j'ai reçu et pas encore vendu est dans la voiture ».
+// Réglage « stock_unique » (reglages) : vrai = la voiture EST le stock (page Stock voiture = tout le stock, sans
+// charger / décharger ; plus rien à suivre à part) ; faux = magasin + voiture comme avant (dépôts).
+export async function lireStockUnique(): Promise<boolean> {
+  const { data } = await supabase.from("reglages").select("valeur").eq("cle", "stock_unique").maybeSingle();
+  return (data as { valeur?: unknown } | null)?.valeur !== false; // vrai par défaut (choix de l'utilisateur)
+}
+export async function choisirStockUnique(v: boolean): Promise<void> {
+  await supabase.from("reglages").upsert({ cle: "stock_unique", valeur: v, modifie_le: new Date().toISOString() }, { onConflict: "cle" });
+}
+
+/** Tout le stock (fiches + variantes de marque, quantité > 0) vu comme « dans la voiture ». */
+async function toutLeStock(): Promise<ArticleVoiture[]> {
+  const out: ArticleVoiture[] = [];
+  for (let i = 0; i < 20; i++) {
+    const { data, error } = await supabase.from("products").select("id, reference, prix_vente, stock").gt("stock", 0).order("id").range(i * 1000, i * 1000 + 999);
+    if (error || !data?.length) break;
+    for (const p of data as { id: string; reference: string; prix_vente: number; stock: number }[]) out.push({ id: `p-${p.id}`, product_id: p.id, equivalence_id: null, ref: p.reference, quantite: p.stock, prix: Number(p.prix_vente ?? 0), stockTotal: p.stock });
+    if (data.length < 1000) break;
+  }
+  for (let i = 0; i < 20; i++) {
+    const { data, error } = await supabase.from("equivalences").select("id, product_id, marque, reference, prix, stock, products(prix_vente)").gt("stock", 0).order("id").range(i * 1000, i * 1000 + 999);
+    if (error || !data?.length) break;
+    for (const e of data as unknown as { id: string; product_id: string; marque: string; reference: string; prix: number | null; stock: number; products: { prix_vente: number } | null }[])
+      out.push({ id: `e-${e.id}`, product_id: e.product_id, equivalence_id: e.id, ref: `${e.reference} (${e.marque})`, quantite: e.stock, prix: Number(e.prix ?? e.products?.prix_vente ?? 0), stockTotal: e.stock });
+    if (data.length < 1000) break;
+  }
+  return out.sort((a, b) => a.ref.localeCompare(b.ref, undefined, { numeric: true }));
+}
+
+/** Ce qu'il y a dans la voiture (quantité > 0) : tout le stock si « un seul stock », sinon le dépôt « voiture ». */
 export async function stockVoiture(): Promise<ArticleVoiture[]> {
+  if (await lireStockUnique()) return toutLeStock();
   const out: ArticleVoiture[] = [];
   for (let i = 0; i < 20; i++) {
     const { data, error } = await supabase.from("stock_depots")

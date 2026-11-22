@@ -389,3 +389,7 @@ Menu **Mon stock** (ou la case **En stock** sur l'accueil) : le total de pièces
 4. **Ajouter au stock** : le stock monte, **la dette ne bouge pas** (pas de double solde).
 5. À la vente, ces boîtes passent toutes seules en **« 📒 cahier · dinoun »** : le camion « mettre de côté » te dit ce que tu dois à dinoun. Quand il n'en reste plus, tout redevient normal.
 
+## 31. Un seul stock : la voiture (depuis le 22/11/2026)
+
+Menu **Stock voiture** = **tout ton stock** (tout ce que tu as reçu et pas encore vendu). Rien à charger ni décharger : une réception ajoute, une vente enlève. Les boîtes qui ne sont que dans le cahier → **📒 Marchandise d'avant (cahier)**, à dinoun. Pour vérifier les chiffres → **Inventaire** (scanner).
+

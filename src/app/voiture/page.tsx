@@ -8,7 +8,7 @@ import ProductPicker, { type PickerVariant } from "@/components/ProductPicker";
 import { loadAll } from "@/lib/pagedFetch";
 import { chargerMarques } from "@/lib/brands";
 import { useTypeVehicule, useChangementType, type TypeVehicule } from "@/lib/typeVehicule";
-import { ajouterStockAvant, derniersTransferts, resteStockAvant, stockVoiture, transferer, type ArticleVoiture, type LigneVoiture, type ResteAvant } from "@/lib/voiture";
+import { ajouterStockAvant, choisirStockUnique, derniersTransferts, lireStockUnique, resteStockAvant, stockVoiture, transferer, type ArticleVoiture, type LigneVoiture, type ResteAvant } from "@/lib/voiture";
 import type { Product, Transfert } from "@/types/database";
 import { CarFront, PackagePlus, PackageMinus, X, Trash2, NotebookPen } from "lucide-react";
 
@@ -29,6 +29,7 @@ export default function VoiturePage() {
   const [avant, setAvant] = useState<(LigneVoiture & { deja: number })[] | null>(null); // deja = stock déjà dans l'appli (réceptions)
   const [avantVoiture, setAvantVoiture] = useState(true);
   const [resteAvant, setResteAvant] = useState(0);
+  const [unique, setUnique] = useState(true); // un seul stock = la voiture (BIBLE §8.54)
   const [fournisseurs, setFournisseurs] = useState<{ id: string; nom: string; type: string | null }[]>([]);
   const [proprio, setProprio] = useState<string>(""); // fournisseur à qui est la marchandise d'avant ("" = à moi)
   useEffect(() => {
@@ -39,7 +40,8 @@ export default function VoiturePage() {
   }, []);
 
   async function charger() {
-    const [s, h, ra] = await Promise.all([stockVoiture(), derniersTransferts(), resteStockAvant().catch(() => new Map<string, ResteAvant>())]);
+    const [s, h, ra, u] = await Promise.all([stockVoiture(), derniersTransferts(), resteStockAvant().catch(() => new Map<string, ResteAvant>()), lireStockUnique().catch(() => true)]);
+    setUnique(u);
     setStock(s); setHist(h); setResteAvant([...ra.values()].reduce((a, b) => a + b.quantite, 0));
   }
   async function chargerFiches(t: TypeVehicule = typeV) {
@@ -84,7 +86,7 @@ export default function VoiturePage() {
     if (!avant) return;
     setEnvoi(true);
     try {
-      await ajouterStockAvant(avant.map(({ deja: _d, ...l }) => l), avantVoiture, proprio || null); // eslint-disable-line @typescript-eslint/no-unused-vars
+      await ajouterStockAvant(avant.map(({ deja: _d, ...l }) => l), unique ? false : avantVoiture, proprio || null); // eslint-disable-line @typescript-eslint/no-unused-vars
       const n = avant.reduce((s, l) => s + l.quantite, 0);
       const nomP = fournisseurs.find((f) => f.id === proprio)?.nom;
       setMsg(`Marchandise d'avant ajoutée ✓ — ${n} pièce(s) dans le stock${avantVoiture ? " et dans la voiture" : ""}. La dette n'a pas bougé (pas de double solde) ; à la vente, elle sera comptée ${nomP ? `pour ${nomP}` : "pour toi"}.`);
@@ -113,16 +115,20 @@ export default function VoiturePage() {
       {msg && <div className="card p-3 mb-4 text-sm text-slate-200 flex justify-between gap-2">{msg}<button onClick={() => setMsg(null)}><X size={14} /></button></div>}
 
       <div className="card p-5 mb-4">
-        <div className="flex items-center gap-2 text-slate-400 text-sm"><CarFront size={16} className="text-amber-400" /> Dans la voiture</div>
+        <div className="flex items-center gap-2 text-slate-400 text-sm"><CarFront size={16} className="text-amber-400" /> {unique ? "Dans la voiture (tout ton stock)" : "Dans la voiture"}</div>
         <div className="text-3xl font-bold text-amber-300 mt-1">{pieces} pièce(s)</div>
         <div className="text-xs text-slate-500">{stock?.length ?? "…"} référence(s) · valeur {mad(valeur)} au prix de vente</div>
         <div className="flex flex-wrap gap-2 mt-4">
-          <button onClick={() => setCharge([])} className="flex items-center gap-1.5 btn-primary"><PackagePlus size={15} /> Charger la voiture</button>
-          <button onClick={() => { setAvant([]); setAvantVoiture(true); }} className="flex items-center gap-1.5 btn-secondary"><NotebookPen size={15} /> Marchandise d&apos;avant (cahier)</button>
-          {pieces > 0 && <button onClick={() => setDecharge(Object.fromEntries((stock ?? []).map((a) => [a.id, a.quantite])))} className="flex items-center gap-1.5 btn-secondary"><PackageMinus size={15} /> Décharger (retour magasin)</button>}
+          {!unique && <button onClick={() => setCharge([])} className="flex items-center gap-1.5 btn-primary"><PackagePlus size={15} /> Charger la voiture</button>}
+          <button onClick={() => { setAvant([]); setAvantVoiture(true); }} className={`flex items-center gap-1.5 ${unique ? "btn-primary" : "btn-secondary"}`}><NotebookPen size={15} /> Marchandise d&apos;avant (cahier)</button>
+          {!unique && pieces > 0 && <button onClick={() => setDecharge(Object.fromEntries((stock ?? []).map((a) => [a.id, a.quantite])))} className="flex items-center gap-1.5 btn-secondary"><PackageMinus size={15} /> Décharger (retour magasin)</button>}
         </div>
-        {resteAvant > 0 && <p className="text-xs text-amber-300 mt-3">📒 Il reste {resteAvant} pièce(s) de la marchandise d&apos;avant (cahier) : à la vente, elles sont comptées sur aucun fournisseur.</p>}
-        <p className="text-[11px] text-slate-500 mt-3">En tournée, coche <b>🚗 Sorti de la voiture</b> dans le formulaire de vente : la voiture se vide toute seule. Le stock total de l&apos;appli ne change pas quand tu charges ou décharges (magasin = total − voiture).</p>
+        {resteAvant > 0 && <p className="text-xs text-amber-300 mt-3">📒 Il reste {resteAvant} pièce(s) de la marchandise d&apos;avant (cahier) : à la vente, elles sont comptées pour le fournisseur choisi (pas de double solde).</p>}
+        {unique ? (
+          <p className="text-[11px] text-slate-500 mt-3">Un seul stock : tout ce que tu as reçu (Réception) et pas encore vendu est ici. Une réception ajoute, une vente enlève, tout seul. Les boîtes du cahier : <b>📒 Marchandise d&apos;avant</b>. Pour vérifier : Inventaire (scanner). <button type="button" className="underline" onClick={async () => { if (confirm("Séparer le magasin et la voiture ? (charger / décharger à la main)")) { await choisirStockUnique(false); charger(); } }}>J&apos;ai aussi un magasin</button></p>
+        ) : (
+          <p className="text-[11px] text-slate-500 mt-3">En tournée, coche <b>🚗 Sorti de la voiture</b> dans le formulaire de vente : la voiture se vide toute seule. Le stock total de l&apos;appli ne change pas quand tu charges ou décharges (magasin = total − voiture). <button type="button" className="underline" onClick={async () => { await choisirStockUnique(true); charger(); }}>Un seul stock (tout dans la voiture)</button></p>
+        )}
       </div>
 
       {!stock ? <p className="text-sm text-slate-400">Chargement…</p> : stock.length > 0 && (
@@ -130,7 +136,7 @@ export default function VoiturePage() {
           {stock.map((a) => (
             <div key={a.id} className="grid grid-cols-[1fr_auto_auto] gap-3 px-3 py-2 items-center">
               <span className="font-mono text-xs text-slate-200 truncate">{a.ref}</span>
-              <span className="text-[11px] text-slate-500">magasin {Math.max(0, a.stockTotal - a.quantite)}</span>
+              <span className="text-[11px] text-slate-500">{unique ? "" : `magasin ${Math.max(0, a.stockTotal - a.quantite)}`}</span>
               <span className="font-semibold text-amber-300 w-10 text-end">{a.quantite}</span>
             </div>
           ))}
@@ -183,7 +189,7 @@ export default function VoiturePage() {
               <button onClick={() => setAvant(null)} className="text-slate-400 hover:text-white"><X size={20} /></button>
             </div>
             <p className="text-xs text-slate-400 mb-3">La marchandise que tu avais déjà (notée dans le cahier). <b>Compte les boîtes</b> et tape le nombre de chaque référence. Elle entre dans le stock <b>sans réception</b> : la dette ne bouge pas (elle y est déjà par le cahier, pas de double solde). À la vente, elle est comptée pour le fournisseur choisi ci-dessous (« 📒 cahier »). Si tu ne peux pas tout compter maintenant, ajoute ce que tu as compté et complète plus tard.</p>
-            <p className="text-xs text-amber-300 mb-3">⚠ Les boîtes <b>déjà saisies en Réception</b> sont déjà dans l'appli : ne les remets pas ici. Pour les mettre dans la voiture, utilise <b>Charger la voiture</b> (le stock et la dette ne changent pas).</p>
+            <p className="text-xs text-amber-300 mb-3">⚠ Les boîtes <b>déjà saisies en Réception</b> sont déjà dans ton stock : ne les remets pas ici. Ici, seulement les boîtes <b>du cahier</b>.</p>
             <ProductPicker products={products} variants={variants} value="" onSelect={(p, v) => ajouterAvant(p, v)} placeholder="Tape la référence de la boîte" />
             <div className="space-y-2 my-3 max-h-[45vh] overflow-y-auto">
               {avant.map((l, i) => (
@@ -203,7 +209,7 @@ export default function VoiturePage() {
                 <option value="">À moi (sans fournisseur)</option>
               </select>
             </label>
-            <label className="flex items-center gap-2 text-sm text-slate-300 mb-4"><input type="checkbox" checked={avantVoiture} onChange={(e) => setAvantVoiture(e.target.checked)} /> Elle est dans la voiture</label>
+            {!unique && <label className="flex items-center gap-2 text-sm text-slate-300 mb-4"><input type="checkbox" checked={avantVoiture} onChange={(e) => setAvantVoiture(e.target.checked)} /> Elle est dans la voiture</label>}
             <div className="flex justify-end gap-2">
               <button onClick={() => setAvant(null)} className="btn-secondary">Annuler</button>
               <button onClick={validerAvant} disabled={envoi || !avant.some((l) => l.quantite > 0)} className="btn-primary disabled:opacity-50">Ajouter au stock</button>
