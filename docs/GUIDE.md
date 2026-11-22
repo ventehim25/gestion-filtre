@@ -381,6 +381,8 @@ Menu **Mon stock** (ou la case **En stock** sur l'accueil) : le total de pièces
 
 ## 30. La marchandise d'avant (notée dans le cahier) (depuis le 22/11/2026)
 
+⚠ Boîtes de la voiture **déjà saisies en Réception** → **Charger la voiture** (pas ici). Seulement celles **du cahier** → Marchandise d'avant.
+
 1. Menu **Stock voiture** → **📒 Marchandise d'avant (cahier)**.
 2. **Compte les boîtes** et tape chaque référence avec son nombre (si tu ne peux pas tout compter, mets ce que tu as compté et reviens plus tard).
 3. **Elle est à qui ?** → **dinoun** (elle est déjà dans sa dette par le cahier). Coche « Elle est dans la voiture ».

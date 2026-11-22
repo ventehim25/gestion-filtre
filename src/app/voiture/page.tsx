@@ -26,7 +26,7 @@ export default function VoiturePage() {
   const [msg, setMsg] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
   // Marchandise d'avant (notée dans le cahier) : entre dans le stock sans réception — BIBLE §8.51
-  const [avant, setAvant] = useState<LigneVoiture[] | null>(null);
+  const [avant, setAvant] = useState<(LigneVoiture & { deja: number })[] | null>(null); // deja = stock déjà dans l'appli (réceptions)
   const [avantVoiture, setAvantVoiture] = useState(true);
   const [resteAvant, setResteAvant] = useState(0);
   const [fournisseurs, setFournisseurs] = useState<{ id: string; nom: string; type: string | null }[]>([]);
@@ -77,13 +77,14 @@ export default function VoiturePage() {
   function ajouterAvant(p: Product, v?: PickerVariant) {
     const eq = v?.id ?? null;
     const ref = v ? `${v.reference} (${v.marque})` : p.reference;
-    setAvant((prev) => { const l = prev ?? []; return l.some((x) => x.product_id === p.id && x.equivalence_id === eq) ? l : [...l, { product_id: p.id, equivalence_id: eq, ref, quantite: 1 }]; });
+    const deja = v ? stocksVar.get(v.id) ?? 0 : p.stock;
+    setAvant((prev) => { const l = prev ?? []; return l.some((x) => x.product_id === p.id && x.equivalence_id === eq) ? l : [...l, { product_id: p.id, equivalence_id: eq, ref, quantite: 1, deja }]; });
   }
   async function validerAvant() {
     if (!avant) return;
     setEnvoi(true);
     try {
-      await ajouterStockAvant(avant, avantVoiture, proprio || null);
+      await ajouterStockAvant(avant.map(({ deja: _d, ...l }) => l), avantVoiture, proprio || null); // eslint-disable-line @typescript-eslint/no-unused-vars
       const n = avant.reduce((s, l) => s + l.quantite, 0);
       const nomP = fournisseurs.find((f) => f.id === proprio)?.nom;
       setMsg(`Marchandise d'avant ajoutée ✓ — ${n} pièce(s) dans le stock${avantVoiture ? " et dans la voiture" : ""}. La dette n'a pas bougé (pas de double solde) ; à la vente, elle sera comptée ${nomP ? `pour ${nomP}` : "pour toi"}.`);
@@ -182,11 +183,13 @@ export default function VoiturePage() {
               <button onClick={() => setAvant(null)} className="text-slate-400 hover:text-white"><X size={20} /></button>
             </div>
             <p className="text-xs text-slate-400 mb-3">La marchandise que tu avais déjà (notée dans le cahier). <b>Compte les boîtes</b> et tape le nombre de chaque référence. Elle entre dans le stock <b>sans réception</b> : la dette ne bouge pas (elle y est déjà par le cahier, pas de double solde). À la vente, elle est comptée pour le fournisseur choisi ci-dessous (« 📒 cahier »). Si tu ne peux pas tout compter maintenant, ajoute ce que tu as compté et complète plus tard.</p>
+            <p className="text-xs text-amber-300 mb-3">⚠ Les boîtes <b>déjà saisies en Réception</b> sont déjà dans l'appli : ne les remets pas ici. Pour les mettre dans la voiture, utilise <b>Charger la voiture</b> (le stock et la dette ne changent pas).</p>
             <ProductPicker products={products} variants={variants} value="" onSelect={(p, v) => ajouterAvant(p, v)} placeholder="Tape la référence de la boîte" />
             <div className="space-y-2 my-3 max-h-[45vh] overflow-y-auto">
               {avant.map((l, i) => (
                 <div key={i} className="grid grid-cols-[1fr_auto_auto] gap-2 items-center rounded-lg bg-slate-800/50 px-3 py-2">
-                  <span className="font-mono text-xs text-slate-200 truncate">{l.ref}</span>
+                  <span className="min-w-0"><span className="block font-mono text-xs text-slate-200 truncate">{l.ref}</span>
+                    <span className={`block text-[11px] ${l.deja > 0 ? "text-amber-300" : "text-slate-500"}`}>{l.deja > 0 ? `déjà ${l.deja} dans l'appli (réceptions) : n'ajoute que les boîtes du cahier en plus` : "pas encore dans l'appli"}</span></span>
                   <input type="number" inputMode="numeric" min={0} className="input w-20 py-1 text-center" value={l.quantite}
                     onChange={(e) => setAvant(avant.map((x, j) => j === i ? { ...x, quantite: Math.max(0, Math.round(Number(e.target.value) || 0)) } : x))} />
                   <button onClick={() => setAvant(avant.filter((_, j) => j !== i))} className="text-slate-500 hover:text-red-400"><Trash2 size={14} /></button>
