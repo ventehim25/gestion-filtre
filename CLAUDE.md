@@ -30,7 +30,7 @@ Tout ce qui est fait (fonction livrée, décision, donnée importée/remise à z
 
 ## Gotchas
 - Supabase limite à **1000 lignes/requête** → toujours paginer avec `.range()`. **Et toujours finir par un tri sur une colonne unique** (`.order("id")`, `loadAll` le fait : option `cleUnique`) : sans ordre unique, les pages se recouvrent (mesuré le 17/11 : 245 fiches en double et 245 manquantes). Pas de `.limit(N)` fixe sur `applications` pour afficher des voitures (une voiture = 20-30 lignes depuis les catalogues) : lire tout par paquets triés.
-- La classe CSS `.input` (globals.css) est **`w-full`** : elle écrase `w-28`/`w-16`/`flex-1` dans une rangée flex (champs qui disparaissent). Pour des formulaires multi-champs, utiliser une **grille avec libellés** (un `.input` par cellule), pas des largeurs Tailwind sur `.input`.
+- La classe CSS `.input` (globals.css) est **`w-full`** : elle écrase `w-28`/`w-16`/`flex-1` dans une rangée flex (champs qui disparaissent). Pour des formulaires multi-champs, utiliser une **grille avec libellés** (un `.input` par cellule), pas des largeurs Tailwind sur `.input`. Pour une petite case de quantité dans une ligne : **`input !w-20`** (le `!` passe devant le `w-full`, Tailwind 3.4) — sinon la case s'étale et cache la référence (constaté le 22/11 sur « À reprendre »).
 - Ne jamais piper une string vers `vercel env add` (BOM PowerShell casse l'en-tête) — déjà géré par le fallback clé propre.
 - Fetch externe en PowerShell : forcer `Tls12`.
 
