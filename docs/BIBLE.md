@@ -1384,6 +1384,13 @@ Marge brute ~40 % sur les pièces (ordre de grandeur : un filtre acheté 18 MAD 
 
 ---
 
+## 8.58 Pub réseaux hebdomadaire — routine cloud (26/11/2026)
+- Kit publicitaire créé pour **OE648/7** (filtre à huile Filtron, BMW Série 3 diesel 316d/318d/320d, moteur N47) — 7ᵉ produit traité après oe667-3, oe688-3, ap071-7, golf-7-4-filtres, oe688-1, op540-1. Référence et prix (achat 23 MAD / vente 39 MAD) sourcés dans `supabase/new_refs.sql` (ligne 165), compatibilité dans `supabase/compat_new.sql` (lignes 32-33), équivalences dans `supabase/equivalents_mahle_purflux.sql`, `equivalents_mann_wix.sql`, `equivalents_mecafilter.sql` — aucune invention.
+- Angle : qualité-garantie + prix juste (« ta BMW mérite la pièce juste, pas le prix concession »).
+- Fichiers : `docs/pub/oe648-7.md` (angle, scénario vidéo 9:16 FR+darija, variantes TikTok/Story, post FR+darija, hashtags, plan de publication) + `docs/pub/oe648-7-affiche.html` (affiche 9:16 autonome, charte FiltroPro).
+
+---
+
 # PAR OÙ JE COMMENCE LUNDI MATIN *(mis à jour le 18/11/2026)*
 
 *(Faits : protection de la base le 12/11, les 9 familles de pièces le 16/11 — plus jamais de SQL pour ajouter une catégorie.)*
